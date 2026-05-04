@@ -207,6 +207,28 @@ class TestCommandIdValidation:
         assert result.error is not None
         assert result.error.code is ErrorCode.INVALID_PATH
 
+    def test_command_id_with_record_separator_rejected(
+        self,
+        config: AppConfig,
+        audit: AuditLogger,
+        registry: ConfirmRegistry,
+    ) -> None:
+        """M7.5 — `\\x1e` is the HMAC field separator; rejecting it
+        in command_id keeps the encoding unambiguous."""
+        client = _FakeRestClient()
+        detector = _detector_for(client, available=True)
+        result = execute_command(
+            config,
+            audit,
+            registry,
+            client,  # type: ignore[arg-type]
+            detector,
+            command_id="editor:foo\x1ebar",
+        )
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.INVALID_PATH
+
 
 # ---------------------------------------------------------------------------
 # dry_run mode
@@ -433,6 +455,52 @@ class TestPhase2:
         assert result.error is not None
         assert result.error.code is ErrorCode.EXPIRED_CONFIRMATION_TOKEN
         assert client.execute_calls == []
+
+    def test_replay_with_rest_down_returns_invalid_not_unavailable(
+        self,
+        config: AppConfig,
+        audit: AuditLogger,
+        registry: ConfirmRegistry,
+    ) -> None:
+        """M7.5 — when phase 2 is replayed AND the REST endpoint went
+        down between phases, the security signal (INVALID token) MUST
+        win over the transient REST_UNAVAILABLE."""
+        client = _FakeRestClient()
+        detector = _detector_for(client, available=True)
+        first = execute_command(
+            config,
+            audit,
+            registry,
+            client,  # type: ignore[arg-type]
+            detector,
+            command_id="editor:focus",
+        )
+        token = first.data["confirm_token"]  # type: ignore[index]
+        # First commit succeeds.
+        execute_command(
+            config,
+            audit,
+            registry,
+            client,  # type: ignore[arg-type]
+            detector,
+            command_id="editor:focus",
+            confirm_token=token,
+        )
+        # Now flip the detector to unavailable AND replay.
+        detector._cached = False
+        result = execute_command(
+            config,
+            audit,
+            registry,
+            client,  # type: ignore[arg-type]
+            detector,
+            command_id="editor:focus",
+            confirm_token=token,
+        )
+        assert not result.ok
+        assert result.error is not None
+        # INVALID wins over REST_UNAVAILABLE.
+        assert result.error.code is ErrorCode.INVALID_CONFIRMATION_TOKEN
 
     def test_replay_after_consume_rejected(
         self,

@@ -58,6 +58,33 @@ class AppConfig(BaseModel):
             raise ValueError("max_batch must be positive")
         return value
 
+    @field_validator("rest_url")
+    @classmethod
+    def _rest_url_must_be_loopback(cls, value: str) -> str:
+        """Refuse non-loopback REST URLs.
+
+        v0.1 ships with `verify=False` on the httpx client because the
+        Obsidian Local REST API plugin uses a self-signed cert for
+        `127.0.0.1`. That posture is only safe on loopback — pointing
+        the client at a remote host would happily send the bearer
+        token in cleartext to whoever answered. Refuse the
+        configuration up-front.
+
+        v0.2 followup (M7-03) can relax this with a user-provided CA
+        bundle.
+        """
+        from urllib.parse import urlparse
+
+        parsed = urlparse(value)
+        host = (parsed.hostname or "").lower()
+        if host not in {"127.0.0.1", "localhost", "::1"}:
+            raise ValueError(
+                f"rest_url must point at loopback (127.0.0.1, localhost, ::1); "
+                f"got {host!r}. Non-loopback URLs are refused in v0.1 because "
+                f"verify_tls is disabled by default — see M7-03 followup."
+            )
+        return value
+
     @property
     def max_file_size_bytes(self) -> int:
         return self.max_file_size_mb * 1024 * 1024

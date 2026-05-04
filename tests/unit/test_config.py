@@ -45,10 +45,11 @@ class TestFromEnv:
         self, monkeypatch: pytest.MonkeyPatch, tmp_vault: Path
     ) -> None:
         monkeypatch.setenv("OBSIDIAN_REST_TOKEN", "token-xyz")
-        monkeypatch.setenv("OBSIDIAN_REST_URL", "https://10.0.0.1:27124")
+        # Use a loopback host — non-loopback is refused (M7.5).
+        monkeypatch.setenv("OBSIDIAN_REST_URL", "https://localhost:27124")
         cfg = AppConfig.from_env(tmp_vault)
         assert cfg.rest_token == "token-xyz"
-        assert cfg.rest_url == "https://10.0.0.1:27124"
+        assert cfg.rest_url == "https://localhost:27124"
 
     def test_env_vars_absent_uses_defaults(
         self, monkeypatch: pytest.MonkeyPatch, tmp_vault: Path
@@ -58,3 +59,51 @@ class TestFromEnv:
         cfg = AppConfig.from_env(tmp_vault)
         assert cfg.rest_token is None
         assert cfg.rest_url == "https://127.0.0.1:27124"
+
+
+class TestRestUrlLoopbackOnly:
+    """M7.5 — rest_url must point at loopback. Otherwise the
+    `verify=False` posture would expose the bearer token to whoever
+    answers a remote request."""
+
+    def test_localhost_accepted(self, tmp_vault: Path) -> None:
+        cfg = AppConfig(
+            vault_root=tmp_vault,
+            rest_url="https://localhost:27124",
+        )
+        assert cfg.rest_url == "https://localhost:27124"
+
+    def test_ipv4_loopback_accepted(self, tmp_vault: Path) -> None:
+        cfg = AppConfig(
+            vault_root=tmp_vault,
+            rest_url="https://127.0.0.1:27124",
+        )
+        assert cfg.rest_url == "https://127.0.0.1:27124"
+
+    def test_ipv6_loopback_accepted(self, tmp_vault: Path) -> None:
+        cfg = AppConfig(
+            vault_root=tmp_vault,
+            rest_url="https://[::1]:27124",
+        )
+        assert cfg.rest_url == "https://[::1]:27124"
+
+    def test_remote_host_refused(self, tmp_vault: Path) -> None:
+        with pytest.raises(ValueError, match="loopback"):
+            AppConfig(
+                vault_root=tmp_vault,
+                rest_url="https://attacker.example.com:27124",
+            )
+
+    def test_private_ip_refused(self, tmp_vault: Path) -> None:
+        with pytest.raises(ValueError, match="loopback"):
+            AppConfig(
+                vault_root=tmp_vault,
+                rest_url="https://10.0.0.1:27124",
+            )
+
+    def test_zero_bind_refused(self, tmp_vault: Path) -> None:
+        with pytest.raises(ValueError, match="loopback"):
+            AppConfig(
+                vault_root=tmp_vault,
+                rest_url="http://0.0.0.0:27124",
+            )

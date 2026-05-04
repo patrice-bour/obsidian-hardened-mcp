@@ -1000,6 +1000,10 @@ def _validate_command_id(command_id: str) -> str | None:
 
     The signature enforces `str`; we only re-validate the *content*.
     Returns an error message on rejection, None on success.
+
+    `\\x1e` (ASCII record separator) is the field separator in the
+    HMAC message; rejecting it here keeps the encoding unambiguous
+    until the broader length-prefixed scheme tracked in M6-01 lands.
     """
     if not command_id or not command_id.strip():
         return "command_id must not be empty"
@@ -1007,6 +1011,8 @@ def _validate_command_id(command_id: str) -> str | None:
         return "command_id contains a null byte"
     if "\n" in command_id or "\r" in command_id:
         return "command_id contains a newline"
+    if "\x1e" in command_id:
+        return "command_id contains an ASCII record separator (0x1e)"
     if len(command_id) > 256:
         return "command_id exceeds 256 characters"
     return None
@@ -1040,23 +1046,14 @@ def execute_command(
     if err is not None:
         return ToolResult.failure(ErrorCode.INVALID_PATH, err)
 
-    # 2. REST availability — short-circuit before anything else.
-    if rest_client is None or rest_detector is None:
-        return ToolResult.failure(
-            ErrorCode.REST_UNAVAILABLE,
-            "Local REST API not configured (set OBSIDIAN_REST_TOKEN)",
-        )
-    if not rest_detector.is_available():
-        return ToolResult.failure(
-            ErrorCode.REST_UNAVAILABLE,
-            "Local REST API is not currently reachable",
-        )
-
     payload_hash_value = params_hash(operation, command_id)
     is_phase2 = confirm_token is not None and not dry_run
 
-    # 3. Phase 2 token consume FIRST (replay -> INVALID, not duplicate-call
-    # masquerading as something else).
+    # 2. Phase-2 token consume FIRST — the security signal must win
+    # over a transient REST_UNAVAILABLE. A replayed token whose REST
+    # endpoint went down between phases would otherwise surface as
+    # REST_UNAVAILABLE and mask the real (security-relevant)
+    # INVALID_CONFIRMATION_TOKEN. Mirrors M6's ordering rationale.
     if is_phase2:
         try:
             registry.consume(
@@ -1067,6 +1064,18 @@ def execute_command(
             )
         except Exception as exc:
             return map_exception(exc)
+
+    # 3. REST availability — short-circuit before any further work.
+    if rest_client is None or rest_detector is None:
+        return ToolResult.failure(
+            ErrorCode.REST_UNAVAILABLE,
+            "Local REST API not configured (set OBSIDIAN_REST_TOKEN)",
+        )
+    if not rest_detector.is_available():
+        return ToolResult.failure(
+            ErrorCode.REST_UNAVAILABLE,
+            "Local REST API is not currently reachable",
+        )
 
     # 4. Build preview.
     preview: dict[str, Any] = {
