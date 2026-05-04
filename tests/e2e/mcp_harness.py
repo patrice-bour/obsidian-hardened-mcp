@@ -19,6 +19,7 @@ exercising the real CLI entrypoint.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import sys
@@ -28,6 +29,9 @@ from typing import Any
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+
+_STARTUP_TIMEOUT_S = 15.0
+_CALL_TIMEOUT_S = 30.0
 
 
 @dataclass(frozen=True)
@@ -93,29 +97,56 @@ class E2EHarness:
             ],
             env=env,
         )
-        self._stdio_ctx = stdio_client(params)
-        read, write = await self._stdio_ctx.__aenter__()
-        self._session_ctx = ClientSession(read, write)
-        self.session = await self._session_ctx.__aenter__()
-        await self.session.initialize()
-        listed = await self.session.list_tools()
-        self.tools = [
-            {"name": t.name, "description": t.description}
-            for t in listed.tools
-        ]
+        try:
+            async with asyncio.timeout(_STARTUP_TIMEOUT_S):
+                self._stdio_ctx = stdio_client(params)
+                read, write = await self._stdio_ctx.__aenter__()
+                self._session_ctx = ClientSession(read, write)
+                self.session = await self._session_ctx.__aenter__()
+                await self.session.initialize()
+                listed = await self.session.list_tools()
+                self.tools = [
+                    {"name": t.name, "description": t.description}
+                    for t in listed.tools
+                ]
+        except BaseException:
+            # Startup hung or raised: tear down whatever was set up so the
+            # subprocess can't survive as an orphan.
+            await self._cleanup()
+            raise
         return self
 
+    async def _cleanup(self) -> None:
+        """Best-effort teardown of partial state after a startup failure."""
+        try:
+            if self._session_ctx is not None:
+                await self._session_ctx.__aexit__(None, None, None)
+        except BaseException:
+            pass
+        finally:
+            try:
+                if self._stdio_ctx is not None:
+                    await self._stdio_ctx.__aexit__(None, None, None)
+            except BaseException:
+                pass
+
     async def __aexit__(self, *exc: object) -> None:
-        if self._session_ctx is not None:
-            await self._session_ctx.__aexit__(*exc)
-        if self._stdio_ctx is not None:
-            await self._stdio_ctx.__aexit__(*exc)
+        # LIFO teardown: enter order was stdio → session, so exit must be
+        # session → stdio. The try/finally guarantees the stdio_ctx (which
+        # owns the subprocess) is always closed even if session_ctx raises.
+        try:
+            if self._session_ctx is not None:
+                await self._session_ctx.__aexit__(*exc)
+        finally:
+            if self._stdio_ctx is not None:
+                await self._stdio_ctx.__aexit__(*exc)
 
     async def call(self, tool: str, **arguments: Any) -> CallResult:
         """Call `tool` with the given keyword arguments. Returns a decoded
         `CallResult`. Raises only on transport-level failure."""
         assert self.session is not None
-        resp = await self.session.call_tool(tool, arguments)
+        async with asyncio.timeout(_CALL_TIMEOUT_S):
+            resp = await self.session.call_tool(tool, arguments)
         if resp.isError:
             # MCP-level error (e.g., unknown tool, schema violation). Surface
             # the raw text so the scenario can decide what to assert.
