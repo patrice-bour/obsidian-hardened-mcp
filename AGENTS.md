@@ -51,7 +51,7 @@ The approved v0.1 plan lives at `~/.claude/plans/les-serveurs-mcp-existants-tran
 
 ## Where to resume (for a fresh session)
 
-**Last merged on `main`**: `fix(M6.5): code-review hardening — backlink-rewrite audit attribution`.
+**Last merged on `main`**: `fix(M7.5): code-review hardening — REST surface tightening`.
 
 **Milestones progress** (commits in `git log`):
 
@@ -66,42 +66,53 @@ The approved v0.1 plan lives at `~/.claude/plans/les-serveurs-mcp-existants-tran
 | ✅ | M5 — `search_notes` + `resolve_wikilink` (with C1/C2/C3/M3/M5 review fixes inline) | `57ea4fe` | 323 |
 | ✅ | M6 — destructive ops with 2-phase HMAC tokens (`delete_note` / `rename_note` / `move_note`) | `18550fe` | 409 |
 | ✅ | M6.5 — code-review hardening (backlink-rewrite audit attribution) | `b5f55b7` | 410 |
-| ▶ | **M7 — optional Local REST API integration** | next | — |
-| ⏳ | M8 — hardening + docs + release v0.1.0 | — | — |
+| ✅ | M7 — optional Local REST API (`execute_command` via REST + 2-phase HMAC) | `7fb3681` | 471 |
+| ✅ | M7.5 — code-review hardening (loopback-only `rest_url`, consume-before-REST ordering, `\x1e` rejection) | `182e28a` | 479 |
+| ▶ | **M8 — hardening + docs + release v0.1.0** | next | — |
 
-**Next task**: implement M7. The plan section to consult is "M7 — Local
-REST API enrichment" in `~/.claude/plans/les-serveurs-mcp-existants-tranquil-wave.md`.
-Standard loop:
+**Next task**: M8 — hardening + README + tag v0.1.0. Per the master plan
+(§"Plan d'implémentation incrémental"): "Hardening (property-based,
+golden files round-trip) + README + docs + tag v0.1.0 — 1 day". This
+is the final v0.1 milestone before release.
 
-1. Write an `m7-implementation-brief.md` analogue to the M6 brief
-   before starting. (M5/M6 both proved the brief-first pattern pays off.)
-2. Create worktree `feat/m7-rest`.
-3. TDD each piece (failing test → impl → green → repeat).
-4. After implementation completes, run an independent code review via
-   the `superpowers:code-reviewer` Agent, scoped to the M7 diff only.
-5. Fix **Critical / MUST-DO** findings inline in `M7.5`; track
-   everything else in [`docs/v0.1-followups.md`](./docs/v0.1-followups.md)
-   (already 18 entries from M4–M6 reviews).
-6. Merge to `main` via fast-forward, remove the worktree, delete the branch.
+Standard loop (no implementation brief needed; M8 is mostly polish +
+docs + release prep):
+
+1. Audit the v0.1 followups list (`docs/v0.1-followups.md`, 27 entries
+   from M4–M7 reviews); decide which Major items must close before v0.1
+   tag and which slip to v0.2. Document the cut.
+2. Property-based / golden-file tests as specified in the plan
+   (round-trip ruamel on 50+ pbkm-style notes, hypothesis sweep).
+3. Write `README.md` (currently a stub) — install, configure, examples,
+   security posture summary, link to `docs/security-model.md`.
+4. Polish CHANGELOG.md.
+5. Tag v0.1.0 on `main`. Create worktree only if there are non-trivial
+   tests/code changes.
 
 **Tooling sanity check** before starting:
 
 ```bash
 cd /Users/pbr/projets/IA/MCP/obsidian-power-mcp/main
-uv run pytest -q                # expect 410 passed
+uv run pytest -q                # expect 479 passed
 uv run ruff check src tests     # expect "All checks passed"
 uv run mypy src                 # expect "no issues found"
-git log --oneline -10           # expect 9 commits, last = b5f55b7
+git log --oneline -12           # expect 11 commits, last = 182e28a
 ```
 
-If any of those fail, do NOT start M7 — investigate the regression first.
+If any of those fail, do NOT start M8 — investigate the regression first.
 
-**M6 carryover** (deferred to v0.2 followups, see `docs/v0.1-followups.md`):
-- M6-01 HMAC field separator collisions (defense-in-depth).
-- M6-02 Snapshot path containment assertion.
-- M6-03 Backlink scan src→dest remap dead code (post-rename re-scan supersedes).
-- M6-04 Lazy registry init thread safety.
-- M6-05 Document consumed-then-failed-snapshot tokens are unrecoverable.
-- M6-06 `_verify_hmac` over-pads base64 input.
-- M6-07 Mode check `mode != 0o600` rejects `0o400`.
-- M6-08..M6-10 Optional polish (Literal trim, comment tighten, snapshot stress test).
+**M6+M7 carryover** (deferred to v0.2 followups, see `docs/v0.1-followups.md`):
+
+*M6 (10 entries)* — HMAC field separator collisions (M6-01); snapshot
+path containment assertion (M6-02); backlink scan dead-code (M6-03);
+lazy registry thread safety (M6-04); consumed-then-failed-snapshot UX
+docs (M6-05); base64 over-padding (M6-06); mode != 0o600 strictness
+(M6-07); optional polish (M6-08..M6-10).
+
+*M7 (9 entries)* — `search_notes` REST routing (M7-01, plan deviation);
+`resolve_wikilink` REST routing (M7-02); CA bundle (M7-03);
+`execute_command` allow-list (M7-04, defense-in-depth); semantic
+dry-run via /commands/<id>/ (M7-05); RestClient lifecycle (M7-S3);
+audit `vault_path=""` sentinel (M7-S4); triple mutex check
+(M7-S6); `invalidate()` unused (M7-S7); private-attribute access in
+server (M7-S8); fragile FastMCP integration tests (M7-S9).
