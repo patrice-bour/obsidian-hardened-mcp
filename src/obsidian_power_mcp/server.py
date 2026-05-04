@@ -1,17 +1,29 @@
 """MCP server registration.
 
-`create_server(config)` builds a `FastMCP` instance with every implemented
-tool wired to its underlying implementation. The server runs over stdio.
+`create_server(config)` builds a `FastMCP` instance wired to every tool
+the server implements. The server runs over stdio.
 """
 
 from __future__ import annotations
+
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
 from obsidian_power_mcp.config import AppConfig
 from obsidian_power_mcp.domain.results import ToolResult
+from obsidian_power_mcp.security.audit_logger import AuditLogger
+from obsidian_power_mcp.tools.frontmatter import (
+    delete_frontmatter_field as _delete_frontmatter_field_impl,
+)
 from obsidian_power_mcp.tools.frontmatter import (
     get_frontmatter as _get_frontmatter_impl,
+)
+from obsidian_power_mcp.tools.frontmatter import (
+    merge_frontmatter as _merge_frontmatter_impl,
+)
+from obsidian_power_mcp.tools.frontmatter import (
+    set_frontmatter_field as _set_frontmatter_field_impl,
 )
 from obsidian_power_mcp.tools.meta import get_vault_info as _get_vault_info_impl
 from obsidian_power_mcp.tools.meta import (
@@ -19,11 +31,20 @@ from obsidian_power_mcp.tools.meta import (
 )
 from obsidian_power_mcp.tools.read import list_notes as _list_notes_impl
 from obsidian_power_mcp.tools.read import read_note as _read_note_impl
+from obsidian_power_mcp.tools.write import (
+    append_to_note as _append_to_note_impl,
+)
+from obsidian_power_mcp.tools.write import create_note as _create_note_impl
+from obsidian_power_mcp.tools.write import patch_note as _patch_note_impl
+from obsidian_power_mcp.tools.write import update_note as _update_note_impl
 
 
 def create_server(config: AppConfig) -> FastMCP:
     """Build a FastMCP server bound to the given configuration."""
     app = FastMCP(name="obsidian-power-mcp")
+    audit = AuditLogger(audit_dir=config.audit_dir)
+
+    # ---- Read ----------------------------------------------------------
 
     @app.tool(description="Read a note's full text content from the vault.")
     def read_note(path: str) -> ToolResult:
@@ -40,6 +61,92 @@ def create_server(config: AppConfig) -> FastMCP:
     )
     def get_frontmatter(path: str) -> ToolResult:
         return _get_frontmatter_impl(config, path)
+
+    # ---- Write ---------------------------------------------------------
+
+    @app.tool(description="Create a new note. Fails if the file already exists.")
+    def create_note(path: str, content: str, dry_run: bool = False) -> ToolResult:
+        return _create_note_impl(config, audit, path, content, dry_run=dry_run)
+
+    @app.tool(description="Replace a note's full content. Fails if the file does not exist.")
+    def update_note(path: str, content: str, dry_run: bool = False) -> ToolResult:
+        return _update_note_impl(config, audit, path, content, dry_run=dry_run)
+
+    @app.tool(description="Append text to an existing note (with optional separating newline).")
+    def append_to_note(
+        path: str,
+        content: str,
+        ensure_newline: bool = True,
+        dry_run: bool = False,
+    ) -> ToolResult:
+        return _append_to_note_impl(
+            config, audit, path, content, ensure_newline=ensure_newline, dry_run=dry_run
+        )
+
+    @app.tool(
+        description=(
+            "Literal find-replace on a note. `count=1` (default) requires exactly one "
+            "occurrence; `count=0` replaces all occurrences; any other positive integer "
+            "is the EXACT number of matches expected."
+        )
+    )
+    def patch_note(
+        path: str,
+        find: str,
+        replace: str,
+        count: int = 1,
+        dry_run: bool = False,
+    ) -> ToolResult:
+        return _patch_note_impl(
+            config, audit, path, find, replace, count=count, dry_run=dry_run
+        )
+
+    # ---- Frontmatter atomic --------------------------------------------
+
+    @app.tool(
+        description=(
+            "Set a single frontmatter field, creating the block if absent. "
+            "Round-trip preserves comments, key order and quote style of other fields."
+        )
+    )
+    def set_frontmatter_field(
+        path: str, key: str, value: Any, dry_run: bool = False
+    ) -> ToolResult:
+        return _set_frontmatter_field_impl(
+            config, audit, path, key, value, dry_run=dry_run
+        )
+
+    @app.tool(description="Delete a single frontmatter field.")
+    def delete_frontmatter_field(
+        path: str, key: str, dry_run: bool = False
+    ) -> ToolResult:
+        return _delete_frontmatter_field_impl(
+            config, audit, path, key, dry_run=dry_run
+        )
+
+    @app.tool(
+        description=(
+            "Merge a patch dict into the frontmatter. mode='shallow' replaces "
+            "top-level keys; mode='deep' recurses into nested mappings."
+        )
+    )
+    def merge_frontmatter(
+        path: str,
+        patch: dict[str, Any],
+        mode: str = "shallow",
+        dry_run: bool = False,
+    ) -> ToolResult:
+        if mode not in ("shallow", "deep"):
+            from obsidian_power_mcp.domain.results import ErrorCode
+
+            return ToolResult.failure(
+                ErrorCode.INVALID_PATH, f"unknown merge mode: {mode!r}"
+            )
+        return _merge_frontmatter_impl(
+            config, audit, path, patch, mode=mode, dry_run=dry_run  # type: ignore[arg-type]
+        )
+
+    # ---- Meta ----------------------------------------------------------
 
     @app.tool(description="Return vault metadata (root, note count, limits, server identity).")
     def get_vault_info() -> ToolResult:

@@ -21,3 +21,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unsafe constructs to downstream readers
 - Frontmatter size cap (64 KiB default) defending against decompression
   / billion-laughs style attacks
+- Atomic filesystem writer (M3): same-directory tmp + write + flush +
+  fsync + `os.replace` + dir-fsync; tmp file cleaned on every error path
+- `AuditEvent` model + `AuditLogger`: append-only daily JSONL files
+  under `~/.obsidian-power-mcp/audit/`, `audit_id` is the SHA256 of the
+  canonical payload (deterministic for replay/correlation)
+- `create_note`, `update_note`, `append_to_note`, `patch_note` MCP
+  tools (M3) — every one supports `dry_run=true` to preview changes
+- Atomic frontmatter field operations (M3): `set_frontmatter_field`,
+  `delete_frontmatter_field`, `merge_frontmatter` (shallow + deep) with
+  full round-trip preservation of untouched fields
+- New error codes: `PATCH_COUNT_MISMATCH`, `FIELD_NOT_FOUND`,
+  `ALREADY_EXISTS`

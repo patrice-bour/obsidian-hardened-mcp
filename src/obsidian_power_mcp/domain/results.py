@@ -31,6 +31,8 @@ class ErrorCode(StrEnum):
     UNSAFE_YAML = "unsafe_yaml"
     MALFORMED_FRONTMATTER = "malformed_frontmatter"
     FRONTMATTER_TOO_LARGE = "frontmatter_too_large"
+    PATCH_COUNT_MISMATCH = "patch_count_mismatch"
+    FIELD_NOT_FOUND = "field_not_found"
     INTERNAL_ERROR = "internal_error"
 
 

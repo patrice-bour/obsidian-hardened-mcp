@@ -46,6 +46,7 @@ def list_tools_capabilities(config: AppConfig) -> ToolResult:
     client can use to apply UI-level confirmation policies.
     """
     tools: list[dict[str, Any]] = [
+        # Read
         {"name": "read_note", "kind": "read", "description": "Read a note's text content."},
         {"name": "list_notes", "kind": "read", "description": "List markdown notes."},
         {
@@ -53,6 +54,44 @@ def list_tools_capabilities(config: AppConfig) -> ToolResult:
             "kind": "read",
             "description": "Parse a note's YAML frontmatter (round-trip aware).",
         },
+        # Write
+        {
+            "name": "create_note",
+            "kind": "write",
+            "description": "Create a new note. Fails if it already exists.",
+        },
+        {
+            "name": "update_note",
+            "kind": "write",
+            "description": "Replace a note's full content.",
+        },
+        {
+            "name": "append_to_note",
+            "kind": "write",
+            "description": "Append text to an existing note.",
+        },
+        {
+            "name": "patch_note",
+            "kind": "write",
+            "description": "Literal find-replace on a note with explicit count check.",
+        },
+        # Frontmatter atomic
+        {
+            "name": "set_frontmatter_field",
+            "kind": "write",
+            "description": "Set a single frontmatter field, preserving everything else.",
+        },
+        {
+            "name": "delete_frontmatter_field",
+            "kind": "write",
+            "description": "Delete a single frontmatter field.",
+        },
+        {
+            "name": "merge_frontmatter",
+            "kind": "write",
+            "description": "Shallow or deep merge of a patch dict into the frontmatter.",
+        },
+        # Meta
         {"name": "get_vault_info", "kind": "meta", "description": "Vault metadata."},
         {
             "name": "list_tools_capabilities",
