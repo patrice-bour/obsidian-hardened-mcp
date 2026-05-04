@@ -25,6 +25,7 @@ from obsidian_power_mcp.config import AppConfig
 from obsidian_power_mcp.domain.audit import OpKind
 from obsidian_power_mcp.domain.results import ErrorCode, ToolResult
 from obsidian_power_mcp.domain.vault_path import VaultPath
+from obsidian_power_mcp.frontmatter import parse_note
 from obsidian_power_mcp.fs.reader import read_text
 from obsidian_power_mcp.fs.writer import AlreadyExistsError, atomic_write_text
 from obsidian_power_mcp.security.audit_logger import AuditLogger
@@ -33,7 +34,10 @@ from obsidian_power_mcp.tools._base import (
     map_exception,
     new_request_id,
     params_hash,
+    run_validation_hooks,
+    to_plain_dict,
 )
+from obsidian_power_mcp.validation.hooks import HookContext, HookRegistry
 
 
 def _execute_write(
@@ -49,8 +53,36 @@ def _execute_write(
     extra_data: dict[str, Any] | None = None,
     started: float,
     params_hash_value: str,
+    hooks: HookRegistry | None,
 ) -> ToolResult:
-    """Common tail for write tools: dry-run path + write + audit."""
+    """Common tail for write tools: validation + dry-run + write + audit.
+
+    Validation runs BEFORE the disk touches. Hooks see the parsed post-write
+    state (frontmatter + body), regardless of whether `dry_run` is True —
+    the user gets the same yes/no in both modes.
+    """
+    if hooks is not None:
+        try:
+            parsed = parse_note(new_content)
+        except Exception as exc:
+            return map_exception(exc)
+        try:
+            run_validation_hooks(
+                hooks,
+                HookContext(
+                    path=vp,
+                    new_frontmatter=(
+                        None
+                        if parsed.frontmatter is None
+                        else to_plain_dict(dict(parsed.frontmatter))
+                    ),
+                    new_body=parsed.body,
+                    operation=tool_name,
+                ),
+            )
+        except Exception as exc:
+            return map_exception(exc)
+
     data: dict[str, Any] = {
         "path": str(vp.relative),
         "size": len(new_content.encode("utf-8")),
@@ -111,6 +143,7 @@ def create_note(
     path: str,
     content: str,
     *,
+    hooks: HookRegistry | None = None,
     dry_run: bool = False,
 ) -> ToolResult:
     """Create a new note. Fails if the target already exists."""
@@ -130,6 +163,7 @@ def create_note(
         exclusive=True,
         started=started,
         params_hash_value=params_hash(path, len(content)),
+        hooks=hooks,
     )
 
 
@@ -139,6 +173,7 @@ def update_note(
     path: str,
     content: str,
     *,
+    hooks: HookRegistry | None = None,
     dry_run: bool = False,
 ) -> ToolResult:
     """Replace a note's full content. Fails if the file does not exist."""
@@ -161,6 +196,7 @@ def update_note(
         dry_run=dry_run,
         started=started,
         params_hash_value=params_hash(path, len(content)),
+        hooks=hooks,
     )
 
 
@@ -170,6 +206,7 @@ def append_to_note(
     path: str,
     content: str,
     *,
+    hooks: HookRegistry | None = None,
     ensure_newline: bool = True,
     dry_run: bool = False,
 ) -> ToolResult:
@@ -203,6 +240,7 @@ def append_to_note(
         dry_run=dry_run,
         started=started,
         params_hash_value=params_hash(path, len(content), ensure_newline),
+        hooks=hooks,
     )
 
 
@@ -213,6 +251,7 @@ def patch_note(
     find: str,
     replace: str,
     *,
+    hooks: HookRegistry | None = None,
     count: int = 1,
     dry_run: bool = False,
 ) -> ToolResult:
@@ -268,4 +307,5 @@ def patch_note(
         extra_data={"replacements": count if count > 0 else occurrences},
         started=started,
         params_hash_value=params_hash(path, find, replace, count),
+        hooks=hooks,
     )

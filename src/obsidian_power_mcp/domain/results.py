@@ -33,6 +33,7 @@ class ErrorCode(StrEnum):
     FRONTMATTER_TOO_LARGE = "frontmatter_too_large"
     PATCH_COUNT_MISMATCH = "patch_count_mismatch"
     FIELD_NOT_FOUND = "field_not_found"
+    VALIDATION_FAILED = "validation_failed"
     INTERNAL_ERROR = "internal_error"
 
 

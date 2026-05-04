@@ -41,8 +41,11 @@ from obsidian_power_mcp.tools._base import (
     map_exception,
     new_request_id,
     params_hash,
+    run_validation_hooks,
+    to_plain_dict,
     tool_call,
 )
+from obsidian_power_mcp.validation.hooks import HookContext, HookRegistry
 
 _BODY_PREVIEW_BYTES = 4096
 
@@ -87,6 +90,7 @@ def set_frontmatter_field(
     key: str,
     value: Any,
     *,
+    hooks: HookRegistry | None = None,
     dry_run: bool = False,
 ) -> ToolResult:
     """Set a single frontmatter field, creating the block if absent.
@@ -108,6 +112,7 @@ def set_frontmatter_field(
         tool_name="set_frontmatter_field",
         params=(key, value),
         dry_run=dry_run,
+        hooks=hooks,
         mutator=lambda fm: _set_field(fm, key, value),
     )
 
@@ -118,6 +123,7 @@ def delete_frontmatter_field(
     path: str,
     key: str,
     *,
+    hooks: HookRegistry | None = None,
     dry_run: bool = False,
 ) -> ToolResult:
     """Delete a single frontmatter field. Returns FIELD_NOT_FOUND if missing."""
@@ -128,6 +134,7 @@ def delete_frontmatter_field(
         tool_name="delete_frontmatter_field",
         params=(key,),
         dry_run=dry_run,
+        hooks=hooks,
         mutator=lambda fm: _delete_field(fm, key),
     )
 
@@ -139,6 +146,7 @@ def merge_frontmatter(
     patch: dict[str, Any],
     *,
     mode: MergeMode = "shallow",
+    hooks: HookRegistry | None = None,
     dry_run: bool = False,
 ) -> ToolResult:
     """Merge a patch dict into the frontmatter.
@@ -163,6 +171,7 @@ def merge_frontmatter(
         tool_name="merge_frontmatter",
         params=(patch, mode),
         dry_run=dry_run,
+        hooks=hooks,
         mutator=lambda fm: _merge(fm, patch, mode),
     )
 
@@ -180,6 +189,7 @@ def _mutate_frontmatter(
     tool_name: str,
     params: tuple[Any, ...],
     dry_run: bool,
+    hooks: HookRegistry | None,
     mutator: Callable[[CommentedMap | None], CommentedMap],
 ) -> ToolResult:
     started = time.monotonic()
@@ -212,6 +222,24 @@ def _mutate_frontmatter(
     new_parsed = ParsedNote(frontmatter=new_fm, body=parsed.body)
     new_content = render_note(new_parsed)
     params_hash_value = params_hash(path, *params)
+
+    # Validation runs against the desired post-write state, BEFORE we touch
+    # disk and identically in dry-run vs real-write mode.
+    if hooks is not None:
+        try:
+            run_validation_hooks(
+                hooks,
+                HookContext(
+                    path=vp,
+                    new_frontmatter=(
+                        None if new_fm is None else to_plain_dict(dict(new_fm))
+                    ),
+                    new_body=parsed.body,
+                    operation=tool_name,
+                ),
+            )
+        except Exception as exc:
+            return map_exception(exc)
 
     if dry_run:
         audit_id = emit_audit(

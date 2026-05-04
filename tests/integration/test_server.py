@@ -90,3 +90,39 @@ async def test_get_frontmatter_tool_is_callable_through_mcp(
     server = create_server(config)
     raw = await server.call_tool("get_frontmatter", {"path": "01_Notes/fm.md"})
     assert "MCP" in str(raw)
+
+
+@pytest.mark.asyncio
+async def test_server_auto_loads_validation_config_from_vault(
+    config: AppConfig, tmp_vault: Path
+) -> None:
+    """`create_server` (with no explicit `hooks=`) reads
+    `<vault_root>/.obsidian-power-mcp.yaml` at boot and applies the hooks
+    to write tools."""
+    (tmp_vault / ".obsidian-power-mcp.yaml").write_text("hooks:\n  - iso_date\n")
+
+    server = create_server(config)
+    raw = await server.call_tool(
+        "create_note",
+        {"path": "01_Notes/bad.md", "content": "---\ndate: tomorrow\n---\n"},
+    )
+    text = str(raw)
+    assert "validation_failed" in text or "iso_date" in text
+    assert not (tmp_vault / "01_Notes" / "bad.md").exists()
+
+
+@pytest.mark.asyncio
+async def test_server_with_explicit_empty_registry_skips_validation(
+    config: AppConfig, tmp_vault: Path
+) -> None:
+    """Passing `hooks=HookRegistry([])` overrides the auto-load."""
+    from obsidian_power_mcp.validation.hooks import HookRegistry
+
+    (tmp_vault / ".obsidian-power-mcp.yaml").write_text("hooks:\n  - iso_date\n")
+    server = create_server(config, hooks=HookRegistry([]))
+
+    await server.call_tool(
+        "create_note",
+        {"path": "01_Notes/bad.md", "content": "---\ndate: tomorrow\n---\n"},
+    )
+    assert (tmp_vault / "01_Notes" / "bad.md").exists()

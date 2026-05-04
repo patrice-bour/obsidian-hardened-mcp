@@ -66,3 +66,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   non-goals (TOCTOU at write time, hostile local users, concurrent
   writers, mode preservation, multi-vault isolation, iCloud offload
   during write, network adversaries).
+
+### Added (M4 — pluggable validation)
+- `validation.hooks` module with the `ValidationHook` Protocol,
+  `HookContext`, `HookResult` (accept/warn/reject), `HookRegistry`,
+  `HookViolationError`. Hooks run in declared order; first reject
+  short-circuits; warnings accumulate; a crashing hook is treated as a
+  rejection (the registry never opens the door because of an unexpected
+  exception).
+- Three built-in hooks (`validation.builtin_hooks`):
+  - `IsoDateHook` — refuse non-ISO-8601 dates in configured fields.
+  - `ReservedTagsHook` — refuse forbidden tags or forbidden top-level
+    fields (e.g. migration markers).
+  - `JsonSchemaHook` — validate frontmatter against a JSON Schema
+    (Draft 2020-12) selected by the `type:` field.
+- `.obsidian-power-mcp.yaml` config loader (`validation.config_loader`):
+  resolves hook names → built-in classes, validates kwargs against each
+  hook's signature, loads schema files relative to the vault, refuses
+  schema paths that escape the vault, and surfaces errors at boot via
+  `ConfigError` rather than at first write.
+- `create_server(config, hooks=None)` auto-loads
+  `<vault_root>/.obsidian-power-mcp.yaml` when `hooks` is omitted; pass
+  `HookRegistry([])` to skip auto-load entirely.
+- All write tools and frontmatter atomic operations accept an optional
+  `hooks: HookRegistry | None` keyword argument and run validation
+  BEFORE any disk write — including in `dry_run=True` mode (preview
+  surfaces the same yes/no the real call would).
+- New error code `VALIDATION_FAILED` (mapped from `HookViolationError`).
+- New `docs/config-reference.md` documenting the YAML format, all
+  built-in hooks, and operational notes.
+- 272 tests pass (from 204); global coverage 94%; 100% on
+  `domain/vault_path`, `fs/`, `domain/`, `security/audit_logger`.

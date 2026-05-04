@@ -37,12 +37,24 @@ from obsidian_power_mcp.tools.write import (
 from obsidian_power_mcp.tools.write import create_note as _create_note_impl
 from obsidian_power_mcp.tools.write import patch_note as _patch_note_impl
 from obsidian_power_mcp.tools.write import update_note as _update_note_impl
+from obsidian_power_mcp.validation.config_loader import load_validation_config
+from obsidian_power_mcp.validation.hooks import HookRegistry
 
 
-def create_server(config: AppConfig) -> FastMCP:
-    """Build a FastMCP server bound to the given configuration."""
+def create_server(
+    config: AppConfig, *, hooks: HookRegistry | None = None
+) -> FastMCP:
+    """Build a FastMCP server bound to the given configuration.
+
+    `hooks` is the validation registry; if omitted the server loads it from
+    `<vault_root>/.obsidian-power-mcp.yaml` (and falls back to an empty
+    registry if the file is absent). Pass an explicit `HookRegistry([])`
+    to skip auto-loading entirely (used by tests).
+    """
     app = FastMCP(name="obsidian-power-mcp")
     audit = AuditLogger(audit_dir=config.audit_dir)
+    if hooks is None:
+        hooks = load_validation_config(config.vault_root)
 
     # ---- Read ----------------------------------------------------------
 
@@ -66,11 +78,15 @@ def create_server(config: AppConfig) -> FastMCP:
 
     @app.tool(description="Create a new note. Fails if the file already exists.")
     def create_note(path: str, content: str, dry_run: bool = False) -> ToolResult:
-        return _create_note_impl(config, audit, path, content, dry_run=dry_run)
+        return _create_note_impl(
+            config, audit, path, content, hooks=hooks, dry_run=dry_run
+        )
 
     @app.tool(description="Replace a note's full content. Fails if the file does not exist.")
     def update_note(path: str, content: str, dry_run: bool = False) -> ToolResult:
-        return _update_note_impl(config, audit, path, content, dry_run=dry_run)
+        return _update_note_impl(
+            config, audit, path, content, hooks=hooks, dry_run=dry_run
+        )
 
     @app.tool(description="Append text to an existing note (with optional separating newline).")
     def append_to_note(
@@ -80,7 +96,13 @@ def create_server(config: AppConfig) -> FastMCP:
         dry_run: bool = False,
     ) -> ToolResult:
         return _append_to_note_impl(
-            config, audit, path, content, ensure_newline=ensure_newline, dry_run=dry_run
+            config,
+            audit,
+            path,
+            content,
+            hooks=hooks,
+            ensure_newline=ensure_newline,
+            dry_run=dry_run,
         )
 
     @app.tool(
@@ -98,7 +120,14 @@ def create_server(config: AppConfig) -> FastMCP:
         dry_run: bool = False,
     ) -> ToolResult:
         return _patch_note_impl(
-            config, audit, path, find, replace, count=count, dry_run=dry_run
+            config,
+            audit,
+            path,
+            find,
+            replace,
+            hooks=hooks,
+            count=count,
+            dry_run=dry_run,
         )
 
     # ---- Frontmatter atomic --------------------------------------------
@@ -113,7 +142,7 @@ def create_server(config: AppConfig) -> FastMCP:
         path: str, key: str, value: Any, dry_run: bool = False
     ) -> ToolResult:
         return _set_frontmatter_field_impl(
-            config, audit, path, key, value, dry_run=dry_run
+            config, audit, path, key, value, hooks=hooks, dry_run=dry_run
         )
 
     @app.tool(description="Delete a single frontmatter field.")
@@ -121,7 +150,7 @@ def create_server(config: AppConfig) -> FastMCP:
         path: str, key: str, dry_run: bool = False
     ) -> ToolResult:
         return _delete_frontmatter_field_impl(
-            config, audit, path, key, dry_run=dry_run
+            config, audit, path, key, hooks=hooks, dry_run=dry_run
         )
 
     @app.tool(
@@ -143,7 +172,13 @@ def create_server(config: AppConfig) -> FastMCP:
                 ErrorCode.INVALID_PATH, f"unknown merge mode: {mode!r}"
             )
         return _merge_frontmatter_impl(
-            config, audit, path, patch, mode=mode, dry_run=dry_run  # type: ignore[arg-type]
+            config,
+            audit,
+            path,
+            patch,
+            mode=mode,  # type: ignore[arg-type]
+            hooks=hooks,
+            dry_run=dry_run,
         )
 
     # ---- Meta ----------------------------------------------------------

@@ -43,6 +43,11 @@ from obsidian_power_mcp.fs.reader import (
     NotFoundError,
 )
 from obsidian_power_mcp.security.audit_logger import AuditLogger
+from obsidian_power_mcp.validation.hooks import (
+    HookContext,
+    HookRegistry,
+    HookViolationError,
+)
 
 P = ParamSpec("P")
 R = TypeVar("R", bound=ToolResult)
@@ -87,6 +92,8 @@ def map_exception(exc: Exception) -> ToolResult:
             code = ErrorCode.MALFORMED_FRONTMATTER
         case FrontmatterTooLargeError():
             code = ErrorCode.FRONTMATTER_TOO_LARGE
+        case HookViolationError():
+            code = ErrorCode.VALIDATION_FAILED
         case PermissionError():
             code = ErrorCode.PERMISSION_DENIED
         case _:
@@ -178,3 +185,46 @@ def emit_audit(
             snapshot_id=snapshot_id,
         )
     )
+
+
+# ---------------------------------------------------------------------------
+# Validation helpers
+# ---------------------------------------------------------------------------
+
+
+def run_validation_hooks(
+    hooks: HookRegistry | None,
+    ctx: HookContext,
+) -> None:
+    """Run the configured pre-write hooks against `ctx`. Raises
+    `HookViolationError` on rejection (which `map_exception` then turns into
+    `ErrorCode.VALIDATION_FAILED`). When `hooks` is None or empty, this is a
+    no-op — the caller never has to check.
+    """
+    if hooks is None:
+        return
+    report = hooks.run(ctx)
+    report.raise_for_rejection()
+
+
+def to_plain_dict(value: Any) -> Any:
+    """Recursively convert a ruamel `CommentedMap`/`CommentedSeq` tree to a
+    plain `dict`/`list` of JSON-clean Python types — what hooks see in
+    `HookContext`.
+
+    `datetime.date` / `datetime.datetime` are emitted as ISO-8601 strings
+    so hooks see exactly the same shape `get_frontmatter` would return to
+    the MCP client. This means an `IsoDateHook` validating `date:` does
+    not have to special-case "ruamel parsed it as a `date` object".
+    """
+    import datetime as _dt
+
+    if isinstance(value, _dt.datetime):
+        return value.isoformat()
+    if isinstance(value, _dt.date):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {str(k): to_plain_dict(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [to_plain_dict(item) for item in value]
+    return value
