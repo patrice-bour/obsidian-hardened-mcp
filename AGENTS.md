@@ -51,7 +51,7 @@ The approved v0.1 plan lives at `~/.claude/plans/les-serveurs-mcp-existants-tran
 
 ## Where to resume (for a fresh session)
 
-**Last merged on `main`**: `feat(M5): search_notes + resolve_wikilink`.
+**Last merged on `main`**: `fix(M6.5): code-review hardening — backlink-rewrite audit attribution`.
 
 **Milestones progress** (commits in `git log`):
 
@@ -64,31 +64,44 @@ The approved v0.1 plan lives at `~/.claude/plans/les-serveurs-mcp-existants-tran
 | ✅ | M4 — pluggable validation hooks | `b0b7862` | 274 |
 | ✅ | M4.5 — code-review hardening (cyclic-ref + YAML config + hook isolation) | `4e4933a` | 283 |
 | ✅ | M5 — `search_notes` + `resolve_wikilink` (with C1/C2/C3/M3/M5 review fixes inline) | `57ea4fe` | 323 |
-| ▶ | **M6 — destructive ops with 2-phase HMAC tokens** | next | — |
-| ⏳ | M7 — optional Local REST API integration | — | — |
+| ✅ | M6 — destructive ops with 2-phase HMAC tokens (`delete_note` / `rename_note` / `move_note`) | `18550fe` | 409 |
+| ✅ | M6.5 — code-review hardening (backlink-rewrite audit attribution) | `b5f55b7` | 410 |
+| ▶ | **M7 — optional Local REST API integration** | next | — |
 | ⏳ | M8 — hardening + docs + release v0.1.0 | — | — |
 
-**Next task**: implement M6. The full brief lives at
-[`docs/m6-implementation-brief.md`](./docs/m6-implementation-brief.md) — read it
-first, then create a worktree `feat/m6-destructive` and follow the standard
-loop:
+**Next task**: implement M7. The plan section to consult is "M7 — Local
+REST API enrichment" in `~/.claude/plans/les-serveurs-mcp-existants-tranquil-wave.md`.
+Standard loop:
 
-1. TDD each piece (failing test → impl → green → repeat).
-2. After implementation completes, run an independent code review via
-   the `superpowers:code-reviewer` Agent, scoped to the M6 diff only.
-3. Fix **Critical / MUST-DO** findings inline in a follow-up commit
-   (e.g. `M6.5`); track everything else in
-   [`docs/v0.1-followups.md`](./docs/v0.1-followups.md).
-4. Merge to `main` via fast-forward, remove the worktree, delete the branch.
+1. Write an `m7-implementation-brief.md` analogue to the M6 brief
+   before starting. (M5/M6 both proved the brief-first pattern pays off.)
+2. Create worktree `feat/m7-rest`.
+3. TDD each piece (failing test → impl → green → repeat).
+4. After implementation completes, run an independent code review via
+   the `superpowers:code-reviewer` Agent, scoped to the M7 diff only.
+5. Fix **Critical / MUST-DO** findings inline in `M7.5`; track
+   everything else in [`docs/v0.1-followups.md`](./docs/v0.1-followups.md)
+   (already 18 entries from M4–M6 reviews).
+6. Merge to `main` via fast-forward, remove the worktree, delete the branch.
 
 **Tooling sanity check** before starting:
 
 ```bash
 cd /Users/pbr/projets/IA/MCP/obsidian-power-mcp/main
-uv run pytest -q                # expect 323 passed
+uv run pytest -q                # expect 410 passed
 uv run ruff check src tests     # expect "All checks passed"
 uv run mypy src                 # expect "no issues found"
-git log --oneline -8            # expect 7 commits, last = 57ea4fe
+git log --oneline -10           # expect 9 commits, last = b5f55b7
 ```
 
-If any of those fail, do NOT start M6 — investigate the regression first.
+If any of those fail, do NOT start M7 — investigate the regression first.
+
+**M6 carryover** (deferred to v0.2 followups, see `docs/v0.1-followups.md`):
+- M6-01 HMAC field separator collisions (defense-in-depth).
+- M6-02 Snapshot path containment assertion.
+- M6-03 Backlink scan src→dest remap dead code (post-rename re-scan supersedes).
+- M6-04 Lazy registry init thread safety.
+- M6-05 Document consumed-then-failed-snapshot tokens are unrecoverable.
+- M6-06 `_verify_hmac` over-pads base64 input.
+- M6-07 Mode check `mode != 0o600` rejects `0o400`.
+- M6-08..M6-10 Optional polish (Literal trim, comment tighten, snapshot stress test).
