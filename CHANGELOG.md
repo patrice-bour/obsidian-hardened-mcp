@@ -33,3 +33,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   full round-trip preservation of untouched fields
 - New error codes: `PATCH_COUNT_MISMATCH`, `FIELD_NOT_FOUND`,
   `ALREADY_EXISTS`
+
+### Changed (M3.5 — code review hardening)
+- **`audit_id` is now a CONTENT HASH** over `(tool, vault_path, op_kind,
+  outcome, params_hash, dry_run, snapshot_id)`. Volatile fields (`ts`,
+  `request_id`, `duration_ms`) are deliberately excluded so two events
+  with the same content fingerprint share the same `audit_id`. This
+  fixes the previous "deterministic" claim that was actually random.
+- **`request_id` is generated ONCE per tool call** and propagated through
+  every `emit_audit`. Previously each `_emit` minted its own random id,
+  breaking correlation between phases of the same operation.
+- **`params_hash` is canonical** (JSON sort_keys + `default=repr`), so
+  dicts with the same keys but different insertion orders give the
+  same hash. Previously the `repr()`-based fingerprint was non-canonical.
+- **Frontmatter writers validate value types** at the tool boundary.
+  `set_frontmatter_field` / `merge_frontmatter` reject bytes, Path,
+  set/frozenset, tuple, custom classes, datetime objects, oversized
+  strings, deeply nested structures, and non-string dict keys with
+  `UNSAFE_YAML`. Closes the round-trip safety loop with the parser.
+- **`dry_run` operations deepcopy the in-memory frontmatter** before
+  mutation. The on-disk file and the original parse result are both
+  guaranteed unchanged after a `dry_run=True` call.
+- **Deep merge type-mismatch** behaviour explicitly documented: "wholesale
+  replace at the offending key" when patch and target shape differ
+  (dict vs list/scalar/None). Tests added.
+- `_emit` / `_params_hash` extracted from `tools/write.py` into
+  `tools/_base.py` (`emit_audit`, `params_hash`, `new_request_id`).
+  Removes private cross-module imports from `tools/frontmatter.py`.
+- Documented the **single-writer assumption** (no concurrent-write lock)
+  in `docs/security-model.md` instead of pretending it was implemented.
+- New `docs/security-model.md` enumerating threats handled and explicit
+  non-goals (TOCTOU at write time, hostile local users, concurrent
+  writers, mode preservation, multi-vault isolation, iCloud offload
+  during write, network adversaries).

@@ -1,15 +1,27 @@
 """Shared helpers for tool implementations.
 
-Maps internal exceptions to public `ErrorCode`s and provides a
-`tool_call` decorator that wraps any exception into a `ToolResult.failure`.
+- `map_exception` / `tool_call`: turn internal exceptions into public
+  `ErrorCode`s without leaking stack traces.
+- `new_request_id`: per-tool-call unique identifier; generated ONCE at the
+  tool boundary and propagated through every `emit_audit` call.
+- `params_hash`: canonical JSON-based fingerprint of a tool's input
+  parameters (stable across Python versions and dict insertion orders).
+- `emit_audit`: pyramidalises the audit-event construction so write tools
+  do not import logger plumbing themselves.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
+import secrets
+import time
 from collections.abc import Callable
+from datetime import UTC, datetime
 from functools import wraps
-from typing import ParamSpec, TypeVar
+from typing import Any, ParamSpec, TypeVar
 
+from obsidian_power_mcp.domain.audit import AuditEvent, OpKind, Outcome
 from obsidian_power_mcp.domain.results import ErrorCode, ToolResult
 from obsidian_power_mcp.domain.vault_path import (
     AbsolutePathError,
@@ -30,9 +42,15 @@ from obsidian_power_mcp.fs.reader import (
     NotAFileError,
     NotFoundError,
 )
+from obsidian_power_mcp.security.audit_logger import AuditLogger
 
 P = ParamSpec("P")
 R = TypeVar("R", bound=ToolResult)
+
+
+# ---------------------------------------------------------------------------
+# Exception -> ErrorCode mapping
+# ---------------------------------------------------------------------------
 
 
 def map_exception(exc: Exception) -> ToolResult:
@@ -88,3 +106,75 @@ def tool_call(func: Callable[P, ToolResult]) -> Callable[P, ToolResult]:
             return map_exception(exc)
 
     return wrapper
+
+
+# ---------------------------------------------------------------------------
+# Audit helpers
+# ---------------------------------------------------------------------------
+
+
+def new_request_id() -> str:
+    """Generate a fresh request id. Call ONCE per tool invocation; pass the
+    result into every `emit_audit` made by that invocation so the audit
+    trail can correlate them.
+    """
+    return secrets.token_hex(8)
+
+
+def now_utc() -> datetime:
+    return datetime.now(tz=UTC)
+
+
+def params_hash(*parts: object) -> str:
+    """Canonical fingerprint of tool parameters.
+
+    Uses `json.dumps(..., sort_keys=True)` so dicts with the same keys but
+    different insertion order produce the same hash. Non-JSON values fall
+    back to `str(v)` via `default=`. Returns the leading 16 hex chars of
+    sha256 — enough entropy for replay/dedup without bloating the audit log.
+    """
+
+    def _safe_default(value: Any) -> str:
+        return repr(value)
+
+    canonical = json.dumps(
+        list(parts),
+        sort_keys=True,
+        separators=(",", ":"),
+        default=_safe_default,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
+
+
+def emit_audit(
+    audit: AuditLogger,
+    *,
+    request_id: str,
+    tool: str,
+    op_kind: OpKind,
+    vault_path: str,
+    outcome: Outcome,
+    started: float,
+    params_hash: str,
+    dry_run: bool,
+    snapshot_id: str | None = None,
+) -> str:
+    """Build an `AuditEvent` from the live state and append it to the log.
+
+    `started` is a `time.monotonic()` reading taken at the start of the
+    tool call; we compute `duration_ms` here so callers don't have to.
+    """
+    return audit.log(
+        AuditEvent(
+            ts=now_utc(),
+            request_id=request_id,
+            tool=tool,
+            vault_path=vault_path,
+            op_kind=op_kind,
+            outcome=outcome,
+            duration_ms=int((time.monotonic() - started) * 1000),
+            params_hash=params_hash,
+            dry_run=dry_run,
+            snapshot_id=snapshot_id,
+        )
+    )

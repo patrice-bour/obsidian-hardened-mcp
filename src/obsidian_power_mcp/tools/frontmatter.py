@@ -9,10 +9,16 @@ Atomic field operations (`set_frontmatter_field`, `delete_frontmatter_field`,
 Round-trip preservation means edits to ONE field leave comments, key order,
 indentation and quote styles of OTHER fields untouched. That is the headline
 gap left open by every other Obsidian MCP server we surveyed.
+
+Write-side safety: every value flowing into the frontmatter is checked
+against a strict type whitelist (`_ensure_safe_value`). This closes the
+loop with `frontmatter.parser._reject_custom_tags` — we refuse on read AND
+on write any construct that could become an unsafe YAML tag downstream.
 """
 
 from __future__ import annotations
 
+import copy
 import datetime as dt
 import time
 from collections.abc import Callable
@@ -30,8 +36,13 @@ from obsidian_power_mcp.frontmatter import (
 )
 from obsidian_power_mcp.fs.reader import read_text
 from obsidian_power_mcp.security.audit_logger import AuditLogger
-from obsidian_power_mcp.tools._base import map_exception, tool_call
-from obsidian_power_mcp.tools.write import _emit, _params_hash
+from obsidian_power_mcp.tools._base import (
+    emit_audit,
+    map_exception,
+    new_request_id,
+    params_hash,
+    tool_call,
+)
 
 _BODY_PREVIEW_BYTES = 4096
 
@@ -82,7 +93,14 @@ def set_frontmatter_field(
 
     Round-trip preservation: comments, key order, quote styles of OTHER
     fields are kept exactly. Only the targeted key is added/overwritten.
+
+    Raises (returned as `ToolResult.failure`):
+        UNSAFE_YAML if `value` contains a non-whitelisted type.
     """
+    try:
+        _ensure_safe_value(value)
+    except _UnsafeValueError as exc:
+        return ToolResult.failure(ErrorCode.UNSAFE_YAML, str(exc))
     return _mutate_frontmatter(
         config,
         audit,
@@ -125,11 +143,19 @@ def merge_frontmatter(
 ) -> ToolResult:
     """Merge a patch dict into the frontmatter.
 
-    `mode="shallow"` (default): top-level keys replace existing ones outright;
+    `mode="shallow"`: top-level keys replace existing ones outright;
         nested mappings are NOT recursed into.
-    `mode="deep"`: nested dict-vs-dict merges recurse; lists and scalars are
-        replaced wholesale.
+    `mode="deep"`: nested dict-vs-dict merges recurse; lists, scalars, and
+        type mismatches (dict-vs-list, dict-vs-None, etc.) are replaced
+        wholesale at the offending key.
+
+    Raises (returned as `ToolResult.failure`):
+        UNSAFE_YAML if `patch` contains a non-whitelisted type.
     """
+    try:
+        _ensure_safe_value(patch)
+    except _UnsafeValueError as exc:
+        return ToolResult.failure(ErrorCode.UNSAFE_YAML, str(exc))
     return _mutate_frontmatter(
         config,
         audit,
@@ -157,6 +183,7 @@ def _mutate_frontmatter(
     mutator: Callable[[CommentedMap | None], CommentedMap],
 ) -> ToolResult:
     started = time.monotonic()
+    request_id = new_request_id()
     try:
         vp = VaultPath.from_user(path, config.vault_root)
     except Exception as exc:
@@ -169,7 +196,14 @@ def _mutate_frontmatter(
     try:
         existing = read_text(vp, max_size_bytes=config.max_file_size_bytes)
         parsed = parse_note(existing)
-        new_fm = mutator(parsed.frontmatter)
+        # `dry_run` must NOT mutate the in-memory `parsed.frontmatter`. Copy
+        # so the mutator works on its own object regardless of mode; this
+        # also keeps real-write behaviour predictable since the original
+        # parse result is never trampled.
+        fm_to_mutate = (
+            None if parsed.frontmatter is None else copy.deepcopy(parsed.frontmatter)
+        )
+        new_fm = mutator(fm_to_mutate)
     except _FieldNotFoundError as exc:
         return ToolResult.failure(ErrorCode.FIELD_NOT_FOUND, str(exc))
     except Exception as exc:
@@ -177,22 +211,25 @@ def _mutate_frontmatter(
 
     new_parsed = ParsedNote(frontmatter=new_fm, body=parsed.body)
     new_content = render_note(new_parsed)
+    params_hash_value = params_hash(path, *params)
 
     if dry_run:
-        audit_id = _emit(
+        audit_id = emit_audit(
             audit,
+            request_id=request_id,
             tool=tool_name,
             op_kind="write",
             vault_path=str(vp.relative),
             outcome="success",
             started=started,
-            params_hash=_params_hash(path, *params),
+            params_hash=params_hash_value,
             dry_run=True,
         )
         return ToolResult(
             ok=True,
             data={
                 "path": str(vp.relative),
+                "request_id": request_id,
                 "new_content": new_content,
                 "new_frontmatter": _to_json_safe(dict(new_fm)) if new_fm else None,
             },
@@ -207,20 +244,22 @@ def _mutate_frontmatter(
     except Exception as exc:
         return map_exception(exc)
 
-    audit_id = _emit(
+    audit_id = emit_audit(
         audit,
+        request_id=request_id,
         tool=tool_name,
         op_kind="write",
         vault_path=str(vp.relative),
         outcome="success",
         started=started,
-        params_hash=_params_hash(path, *params),
+        params_hash=params_hash_value,
         dry_run=False,
     )
     return ToolResult(
         ok=True,
         data={
             "path": str(vp.relative),
+            "request_id": request_id,
             "new_frontmatter": _to_json_safe(dict(new_fm)) if new_fm else None,
         },
         audit_id=audit_id,
@@ -229,6 +268,10 @@ def _mutate_frontmatter(
 
 class _FieldNotFoundError(Exception):
     """Internal sentinel used by `_delete_field`."""
+
+
+class _UnsafeValueError(ValueError):
+    """Internal sentinel raised by `_ensure_safe_value`."""
 
 
 def _set_field(fm: CommentedMap | None, key: str, value: Any) -> CommentedMap:
@@ -259,11 +302,82 @@ def _merge(
 
 
 def _deep_merge_into(target: CommentedMap, patch: dict[str, Any]) -> None:
+    """Deep-merge `patch` into `target`.
+
+    Behaviour on type mismatch (e.g. patch wants dict at `k` but target has
+    a list/scalar/None there) is "wholesale replace at the offending key" —
+    we never coerce or mix shapes.
+    """
     for k, v in patch.items():
-        if isinstance(v, dict) and isinstance(target.get(k), dict):
-            _deep_merge_into(target[k], v)
+        existing = target.get(k)
+        if isinstance(v, dict) and isinstance(existing, CommentedMap):
+            _deep_merge_into(existing, v)
         else:
             target[k] = v
+
+
+# ---------------------------------------------------------------------------
+# Write-side value whitelist (closes the YAML safety loop with the parser)
+# ---------------------------------------------------------------------------
+
+_MAX_VALUE_DEPTH = 16
+_MAX_STRING_LENGTH = 64 * 1024
+_MAX_KEYS_PER_DICT = 1024
+_MAX_LIST_ITEMS = 1024
+
+
+def _ensure_safe_value(value: Any, *, _depth: int = 0) -> None:
+    """Refuse any frontmatter value that isn't a JSON-compatible scalar /
+    list / dict.
+
+    Closes the loop with `frontmatter.parser._reject_custom_tags`: that
+    function refuses arbitrary YAML tags coming IN; this one refuses values
+    that would get tagged when going OUT (a `Path`, a `set`, a custom class,
+    etc.). Without this, a client can polute the file with constructs the
+    parser would later refuse to read back.
+
+    Allowed types: None, bool, int, float, str, list[Allowed], dict[str, Allowed].
+    Rejected: bytes, datetime/date objects (clients should pass ISO strings),
+    Path, set/frozenset, tuple, custom classes, anything else.
+    """
+    if _depth > _MAX_VALUE_DEPTH:
+        raise _UnsafeValueError(
+            f"value nesting exceeds depth {_MAX_VALUE_DEPTH}"
+        )
+    if value is None or isinstance(value, bool):
+        return
+    # `bool` is a subclass of `int` — handled above first.
+    if isinstance(value, (int, float)):
+        return
+    if isinstance(value, str):
+        if len(value) > _MAX_STRING_LENGTH:
+            raise _UnsafeValueError(
+                f"string value exceeds {_MAX_STRING_LENGTH} chars"
+            )
+        return
+    if isinstance(value, dict):
+        if len(value) > _MAX_KEYS_PER_DICT:
+            raise _UnsafeValueError(
+                f"dict has more than {_MAX_KEYS_PER_DICT} keys"
+            )
+        for k, v in value.items():
+            if not isinstance(k, str):
+                raise _UnsafeValueError(
+                    f"dict keys must be strings, got {type(k).__name__}"
+                )
+            _ensure_safe_value(v, _depth=_depth + 1)
+        return
+    if isinstance(value, list):
+        if len(value) > _MAX_LIST_ITEMS:
+            raise _UnsafeValueError(
+                f"list has more than {_MAX_LIST_ITEMS} items"
+            )
+        for item in value:
+            _ensure_safe_value(item, _depth=_depth + 1)
+        return
+    raise _UnsafeValueError(
+        f"value type not allowed in frontmatter: {type(value).__name__}"
+    )
 
 
 def _to_json_safe(value: Any) -> Any:
