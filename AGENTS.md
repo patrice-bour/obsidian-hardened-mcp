@@ -48,3 +48,47 @@ uv run mypy src                            # type check
 ## Plan reference
 
 The approved v0.1 plan lives at `~/.claude/plans/les-serveurs-mcp-existants-tranquil-wave.md` (off-repo).
+
+## Where to resume (for a fresh session)
+
+**Last merged on `main`**: `feat(M5): search_notes + resolve_wikilink`.
+
+**Milestones progress** (commits in `git log`):
+
+| Status | Milestone | Commit | Tests |
+|---|---|---|---|
+| ✅ | M1 — sandbox + read tools | `54c9c59` | 90 |
+| ✅ | M2 — frontmatter parser round-trip + `get_frontmatter` | `ffbb2d7` | 121 |
+| ✅ | M3 — atomic writer + audit + frontmatter atomic ops | `2d426fb` | 164 |
+| ✅ | M3.5 — code-review hardening (audit + write validation) | `b01697b` | 204 |
+| ✅ | M4 — pluggable validation hooks | `b0b7862` | 274 |
+| ✅ | M4.5 — code-review hardening (cyclic-ref + YAML config + hook isolation) | `4e4933a` | 283 |
+| ✅ | M5 — `search_notes` + `resolve_wikilink` (with C1/C2/C3/M3/M5 review fixes inline) | `57ea4fe` | 323 |
+| ▶ | **M6 — destructive ops with 2-phase HMAC tokens** | next | — |
+| ⏳ | M7 — optional Local REST API integration | — | — |
+| ⏳ | M8 — hardening + docs + release v0.1.0 | — | — |
+
+**Next task**: implement M6. The full brief lives at
+[`docs/m6-implementation-brief.md`](./docs/m6-implementation-brief.md) — read it
+first, then create a worktree `feat/m6-destructive` and follow the standard
+loop:
+
+1. TDD each piece (failing test → impl → green → repeat).
+2. After implementation completes, run an independent code review via
+   the `superpowers:code-reviewer` Agent, scoped to the M6 diff only.
+3. Fix **Critical / MUST-DO** findings inline in a follow-up commit
+   (e.g. `M6.5`); track everything else in
+   [`docs/v0.1-followups.md`](./docs/v0.1-followups.md).
+4. Merge to `main` via fast-forward, remove the worktree, delete the branch.
+
+**Tooling sanity check** before starting:
+
+```bash
+cd /Users/pbr/projets/IA/MCP/obsidian-power-mcp/main
+uv run pytest -q                # expect 323 passed
+uv run ruff check src tests     # expect "All checks passed"
+uv run mypy src                 # expect "no issues found"
+git log --oneline -8            # expect 7 commits, last = 57ea4fe
+```
+
+If any of those fail, do NOT start M6 — investigate the regression first.
