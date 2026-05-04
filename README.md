@@ -72,7 +72,8 @@ The server speaks stdio MCP. For Claude Desktop, add to
 |---|---|
 | `OBSIDIAN_VAULT_ROOT` | Default vault root when `--vault` isn't passed. |
 | `OBSIDIAN_REST_URL` | Override the Local REST API endpoint. **Must be loopback** (`127.0.0.1`, `localhost`, `[::1]`). Default `https://127.0.0.1:27124`. |
-| `OBSIDIAN_REST_TOKEN` | Bearer token for the Local REST API plugin. When set, `execute_command` becomes available. |
+| `OBSIDIAN_REST_TOKEN` | Bearer token for the Local REST API plugin. When set, `execute_command` becomes available. **Don't paste it inline** — see [security note in `tests/e2e/README.md`](tests/e2e/README.md#optional-opt-in-rest-api-with-token-s9). |
+| `OBSIDIAN_AUDIT_DIR` | Override the audit log directory. Default `~/.obsidian-full-mcp/audit/`. Useful for CI runners that publish test artefacts (avoids `$HOME` leakage). |
 
 ### Vault-level config (`<vault>/.obsidian-full-mcp.yaml`)
 

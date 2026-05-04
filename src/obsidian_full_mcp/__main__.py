@@ -7,6 +7,7 @@ Environment variables:
     OBSIDIAN_VAULT_ROOT   Default vault root if `--vault` is not provided.
     OBSIDIAN_REST_URL     Override the Local REST API endpoint (M7+).
     OBSIDIAN_REST_TOKEN   Bearer token for the Local REST API plugin (M7+).
+    OBSIDIAN_AUDIT_DIR    Override the audit log directory.
 """
 
 from __future__ import annotations
@@ -52,10 +53,12 @@ def main() -> None:
         )
         sys.exit(2)
 
-    overrides: dict[str, object] = {}
+    # CLI flags override env, env overrides defaults. Built in one pass so
+    # pydantic validators run on the final config.
+    cli_overrides: dict[str, object] = {}
     if args.max_file_size_mb is not None:
-        overrides["max_file_size_mb"] = args.max_file_size_mb
-    config = AppConfig(vault_root=Path(vault_root), **overrides)  # type: ignore[arg-type]
+        cli_overrides["max_file_size_mb"] = args.max_file_size_mb
+    config = AppConfig.from_env(vault_root, **cli_overrides)
 
     server = create_server(config)
     server.run()

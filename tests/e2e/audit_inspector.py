@@ -21,13 +21,29 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import os
 from pathlib import Path
 from typing import Any
 
 DEFAULT_AUDIT_DIR = Path.home() / ".obsidian-full-mcp" / "audit"
 
 
-def today_log_path(audit_dir: Path = DEFAULT_AUDIT_DIR) -> Path:
+def resolved_audit_dir() -> Path:
+    """Return the audit dir the server is expected to write to.
+
+    Honours `OBSIDIAN_AUDIT_DIR` so test runs can sandbox audit logs
+    outside the user's home directory, and so this inspector stays in
+    sync with whatever the spawned subprocess sees.
+    """
+    env = os.getenv("OBSIDIAN_AUDIT_DIR")
+    if env is not None:
+        return Path(env).expanduser()
+    return DEFAULT_AUDIT_DIR
+
+
+def today_log_path(audit_dir: Path | None = None) -> Path:
+    if audit_dir is None:
+        audit_dir = resolved_audit_dir()
     today = dt.datetime.now(dt.UTC).strftime("%Y-%m-%d")
     return audit_dir / f"{today}.jsonl"
 

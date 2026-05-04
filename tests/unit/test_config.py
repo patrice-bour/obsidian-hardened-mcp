@@ -56,9 +56,33 @@ class TestFromEnv:
     ) -> None:
         monkeypatch.delenv("OBSIDIAN_REST_TOKEN", raising=False)
         monkeypatch.delenv("OBSIDIAN_REST_URL", raising=False)
+        monkeypatch.delenv("OBSIDIAN_AUDIT_DIR", raising=False)
         cfg = AppConfig.from_env(tmp_vault)
         assert cfg.rest_token is None
         assert cfg.rest_url == "https://127.0.0.1:27124"
+        assert cfg.audit_dir == Path.home() / ".obsidian-full-mcp" / "audit"
+
+    def test_audit_dir_env_override(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_vault: Path, tmp_path: Path
+    ) -> None:
+        sandbox = tmp_path / "audit-sandbox"
+        monkeypatch.setenv("OBSIDIAN_AUDIT_DIR", str(sandbox))
+        cfg = AppConfig.from_env(tmp_vault)
+        assert cfg.audit_dir == sandbox
+
+    def test_audit_dir_env_expands_tilde(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_vault: Path
+    ) -> None:
+        monkeypatch.setenv("OBSIDIAN_AUDIT_DIR", "~/custom-audit")
+        cfg = AppConfig.from_env(tmp_vault)
+        assert cfg.audit_dir == Path.home() / "custom-audit"
+
+    def test_overrides_take_precedence_over_env(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_vault: Path
+    ) -> None:
+        monkeypatch.setenv("OBSIDIAN_REST_TOKEN", "from-env")
+        cfg = AppConfig.from_env(tmp_vault, rest_token="from-cli")
+        assert cfg.rest_token == "from-cli"
 
 
 class TestRestUrlLoopbackOnly:

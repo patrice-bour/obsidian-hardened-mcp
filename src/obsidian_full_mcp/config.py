@@ -90,11 +90,19 @@ class AppConfig(BaseModel):
         return self.max_file_size_mb * 1024 * 1024
 
     @classmethod
-    def from_env(cls, vault_root: Path | str) -> AppConfig:
-        """Build a config from a vault path plus optional `OBSIDIAN_*` env vars."""
+    def from_env(cls, vault_root: Path | str, **overrides: object) -> AppConfig:
+        """Build a config from a vault path plus optional `OBSIDIAN_*` env
+        vars. Caller-supplied `overrides` (typically CLI flags) take
+        precedence over env values."""
         kwargs: dict[str, object] = {"vault_root": Path(vault_root)}
         if (token := os.getenv("OBSIDIAN_REST_TOKEN")) is not None:
             kwargs["rest_token"] = token
         if (url := os.getenv("OBSIDIAN_REST_URL")) is not None:
             kwargs["rest_url"] = url
+        if (audit := os.getenv("OBSIDIAN_AUDIT_DIR")) is not None:
+            # Allows CI runners (or paranoid users) to relocate audit logs
+            # outside the default ~/.obsidian-full-mcp/audit/. Useful when
+            # publishing test artefacts that would otherwise leak $HOME.
+            kwargs["audit_dir"] = Path(audit).expanduser()
+        kwargs.update(overrides)
         return cls(**kwargs)  # type: ignore[arg-type]

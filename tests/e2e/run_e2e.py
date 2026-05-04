@@ -10,6 +10,10 @@ Usage:
 Optional env vars:
     OBSIDIAN_E2E_REST_TOKEN  — enables the "with token" branch of S9
                                 (needs Obsidian + Local REST API plugin)
+    OBSIDIAN_AUDIT_DIR       — relocate the audit log dir (server +
+                                inspector). When unset, the runner
+                                defaults to a sandbox under .runs/audit/
+                                so production logs stay clean.
 
 Exit code: 0 if every scenario fully passes (SKIPPED rows count as
 passing), 1 otherwise.
@@ -18,6 +22,7 @@ passing), 1 otherwise.
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -47,6 +52,14 @@ async def main() -> int:
     vault = HERE / ".test-vault"
     seed(vault)
     print(f"\nseeded vault: {vault}\n")
+
+    # Sandbox audit logs under .runs/audit/ unless the caller already
+    # set OBSIDIAN_AUDIT_DIR (e.g., a CI tmp_path). This isolates E2E
+    # writes from the user's ~/.obsidian-full-mcp/audit/ and makes
+    # publishable test artefacts safe (no $HOME leakage).
+    os.environ.setdefault(
+        "OBSIDIAN_AUDIT_DIR", str(HERE / ".runs" / "audit")
+    )
 
     audit_baseline = audit_inspector.line_count(
         audit_inspector.today_log_path()

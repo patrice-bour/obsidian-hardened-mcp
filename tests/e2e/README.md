@@ -29,16 +29,41 @@ failing step.
 
 By default S9 only verifies the no-token branch (`execute_command`
 returns `rest_unavailable`). To exercise the with-token branch you need
-Obsidian running with the Local REST API plugin enabled, then:
+Obsidian running with the Local REST API plugin enabled.
+
+> **Security — don't paste the token inline.** The Local REST API
+> bearer token grants write access to your live vault. Most shells
+> persist command history (zsh with `SHARE_HISTORY`, bash with the
+> default `HISTFILE`), so an inline `OBSIDIAN_E2E_REST_TOKEN=…` ends up
+> stored on disk in cleartext. Pick one:
+>
+> - **direnv** with a gitignored `.envrc` containing `export OBSIDIAN_E2E_REST_TOKEN=…`
+> - `read -rs OBSIDIAN_E2E_REST_TOKEN && export OBSIDIAN_E2E_REST_TOKEN`
+> - prefix the command with `HISTFILE=/dev/null ` (zsh) or `set +o history` first
+>
+> The same caveat applies to `OBSIDIAN_REST_TOKEN` if you wire the
+> server with REST in your own setup.
+
+Then run:
 
 ```bash
-OBSIDIAN_E2E_REST_TOKEN=<your-plugin-bearer-token> \
-  uv run python tests/e2e/run_e2e.py
+uv run python tests/e2e/run_e2e.py
 ```
+
+(or, accepting the history-leak caveat above, prefix the command with
+`OBSIDIAN_E2E_REST_TOKEN=…`).
 
 The harness opens a second server with `OBSIDIAN_REST_TOKEN` set and
 runs the 2-phase confirm against `app:show-release-notes` (a safe,
 side-effect-free Obsidian command).
+
+## Audit log isolation
+
+By default, the runner sets `OBSIDIAN_AUDIT_DIR` to
+`tests/e2e/.runs/audit/` so test runs don't pollute the user's
+`~/.obsidian-full-mcp/audit/`. Set the env var explicitly to override
+(useful for CI tmp paths). The audit inspector honours the same
+variable so it always reads what the server wrote.
 
 ## Scenarios
 
@@ -77,7 +102,7 @@ run_e2e.py
 | `run_e2e.py` | Orchestrator — spawns harness, runs scenarios, prints table |
 | `mcp_harness.py` | `E2EHarness` async context manager wrapping `stdio_client` + `ClientSession`; `CallResult` decoder |
 | `seed_vault.py` | `seed(target)` produces the 10-note canonical test vault |
-| `audit_inspector.py` | Reads `~/.obsidian-full-mcp/audit/<today>.jsonl`, verifies entry shape |
+| `audit_inspector.py` | Reads `<OBSIDIAN_AUDIT_DIR or ~/.obsidian-full-mcp/audit/>/<today>.jsonl`, verifies entry shape |
 | `scenarios/_assert.py` | `Step`, `ScenarioReport`, expectation helpers |
 | `scenarios/sN_*.py` | One module per scenario, all expose `async def run(h) -> ScenarioReport` |
 
@@ -100,9 +125,10 @@ hash). Forgetting `update_backlinks=True` on one of the two calls is a
 classic foot-gun.
 
 **Audit assertions fail / no log file** — the server lazily creates
-`~/.obsidian-full-mcp/audit/<today>.jsonl` on the first write. If the
-run only contained reads, the file may not exist yet. The harness's
-S2/S4 always trigger writes, so this should not happen in practice.
+the audit log (under `OBSIDIAN_AUDIT_DIR`, falling back to
+`~/.obsidian-full-mcp/audit/`) on the first write. If the run only
+contained reads, the file may not exist yet. The harness's S2/S4
+always trigger writes, so this should not happen in practice.
 
 **REST with-token loop fails** — Obsidian must be open AND the Local
 REST API plugin enabled. The plugin's bearer token is shown in
