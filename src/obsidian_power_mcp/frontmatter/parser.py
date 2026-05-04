@@ -30,6 +30,8 @@ from ruamel.yaml.comments import CommentedMap
 from ruamel.yaml.constructor import ConstructorError
 from ruamel.yaml.error import YAMLError
 
+from obsidian_power_mcp.frontmatter.yaml_safety import enforce_default_tags_only
+
 DEFAULT_MAX_FRONTMATTER_BYTES = 64 * 1024
 
 # Closing marker: a line that is exactly `---` (LF or CRLF), at start of file
@@ -158,50 +160,8 @@ def _load_yaml_block(yaml_block: str) -> CommentedMap:
         raise MalformedFrontmatterError(
             "frontmatter must be a YAML mapping at the top level"
         )
-    _reject_custom_tags(loaded)
+    enforce_default_tags_only(loaded, error_class=UnsafeYamlError)
     return loaded
-
-
-_SAFE_TAG_VALUES: frozenset[str] = frozenset(
-    {
-        "tag:yaml.org,2002:str",
-        "tag:yaml.org,2002:int",
-        "tag:yaml.org,2002:float",
-        "tag:yaml.org,2002:bool",
-        "tag:yaml.org,2002:null",
-        "tag:yaml.org,2002:seq",
-        "tag:yaml.org,2002:map",
-        "tag:yaml.org,2002:timestamp",
-        "tag:yaml.org,2002:binary",
-        "tag:yaml.org,2002:omap",
-        "tag:yaml.org,2002:set",
-    }
-)
-
-
-def _reject_custom_tags(node: object) -> None:
-    """Walk a ruamel YAML object and refuse any non-default explicit tag.
-
-    ruamel's round-trip loader does NOT execute Python object tags (it just
-    drops the tag, returning a plain list/dict-like value), but the tag is
-    preserved on the round-trip metadata. If we wrote that back unchanged,
-    a subsequent reader running PyYAML in unsafe mode WOULD execute the
-    callable. So we reject any tag that is not on a strict whitelist of
-    the YAML 1.2 default types (str, int, float, bool, null, seq, map,
-    timestamp, binary, omap, set). Any `!Foo`, `!!python/object/...`, or
-    other custom tag is refused at parse time.
-    """
-    tag = getattr(node, "tag", None)
-    if tag is not None:
-        tag_value = getattr(tag, "value", None)
-        if tag_value is not None and tag_value not in _SAFE_TAG_VALUES:
-            raise UnsafeYamlError(f"unsafe YAML tag: {tag_value}")
-    if isinstance(node, dict):
-        for value in node.values():
-            _reject_custom_tags(value)
-    elif isinstance(node, list):
-        for item in node:
-            _reject_custom_tags(item)
 
 
 def render_note(parsed: ParsedNote) -> str:

@@ -39,6 +39,7 @@ import jsonschema
 from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 
+from obsidian_power_mcp.frontmatter.yaml_safety import enforce_default_tags_only
 from obsidian_power_mcp.validation.builtin_hooks import (
     IsoDateHook,
     JsonSchemaHook,
@@ -82,6 +83,10 @@ def load_validation_config(vault_root: Path) -> HookRegistry:
             raw = yaml.load(fp)
     except YAMLError as exc:
         raise ConfigError(f"invalid YAML in {config_path}: {exc}") from exc
+
+    # Same custom-tag policy as note frontmatter — invariant #5 of the
+    # project applies project-wide, not just to vault notes.
+    enforce_default_tags_only(raw, error_class=ConfigError)
 
     if raw is None:
         return HookRegistry([])

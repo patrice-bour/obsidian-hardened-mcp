@@ -20,6 +20,7 @@ door because of an unexpected exception.
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol, runtime_checkable
 
@@ -147,11 +148,23 @@ class HookRegistry:
 
     def run(self, ctx: HookContext) -> HookReport:
         """Run all hooks against `ctx`. Stops at the first reject (or hook
-        exception). Warnings accumulate; accepts are the default."""
+        exception). Warnings accumulate; accepts are the default.
+
+        Mutation isolation: each hook receives a fresh deep-copy of
+        `ctx.new_frontmatter` and `ctx.new_body` so that a mutating hook
+        cannot leak state to the next hook in the registry, nor to the
+        caller. The caller's view of the original `ctx` is also preserved.
+        """
         warnings: list[_Warning] = []
         for hook in self._hooks:
+            isolated_ctx = HookContext(
+                path=ctx.path,
+                new_frontmatter=copy.deepcopy(ctx.new_frontmatter),
+                new_body=ctx.new_body,
+                operation=ctx.operation,
+            )
             try:
-                result = hook.validate(ctx)
+                result = hook.validate(isolated_ctx)
             except Exception as exc:
                 # A crashing hook MUST NOT be treated as "accept". Convert it
                 # into a rejection so the calling tool aborts the write.

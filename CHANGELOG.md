@@ -97,3 +97,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   built-in hooks, and operational notes.
 - 272 tests pass (from 204); global coverage 94%; 100% on
   `domain/vault_path`, `fs/`, `domain/`, `security/audit_logger`.
+
+### Fixed (M4.5 — code review hardening)
+- **DoS via cyclic JSON Schema `$ref`**: `JsonSchemaHook` now probes
+  each schema with a small set of inputs under a lowered recursion
+  limit at construction. Mutually-recursive `$refs` (e.g. `A → B → A`)
+  are rejected with `CyclicRefError` at server boot rather than
+  exploding with `RecursionError` on the first real write.
+- **YAML config file safety**: `.obsidian-power-mcp.yaml` is now
+  enforced under the same custom-tag whitelist as note frontmatter.
+  An attacker cannot smuggle `!!python/object/...` or any non-default
+  YAML 1.2 tag into the project config. Shared primitive
+  `frontmatter.yaml_safety.enforce_default_tags_only` factored out
+  from `frontmatter.parser`.
+- **`HookContext` mutation isolation**: `HookRegistry.run` now
+  deepcopies the context per hook. A mutating hook can no longer leak
+  state to the next hook, nor to the caller. The `frozen=True`
+  dataclass already prevented field reassignment but not nested
+  dict/list mutation.
+- New `docs/v0.1-followups.md` tracks deferred review findings.

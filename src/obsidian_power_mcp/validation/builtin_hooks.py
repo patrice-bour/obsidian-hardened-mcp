@@ -28,12 +28,19 @@ Hook descriptions:
 from __future__ import annotations
 
 import datetime as dt
+import sys
 from collections.abc import Iterable
 from typing import Any
 
 import jsonschema
 
 from obsidian_power_mcp.validation.hooks import HookContext, HookResult
+
+
+class CyclicRefError(ValueError):
+    """Raised when a JSON Schema contains `$ref` cycles that would cause
+    `iter_errors` to recurse infinitely. Detected at hook construction time
+    so the error surfaces at server boot, not on the first write."""
 
 # ---------------------------------------------------------------------------
 # IsoDateHook
@@ -157,8 +164,9 @@ class JsonSchemaHook:
     def __init__(self, schemas: dict[str, dict[str, Any]]) -> None:
         # Validate each schema once at construction so we fail loudly on
         # malformed config rather than at first hook run.
-        for schema in schemas.values():
+        for type_name, schema in schemas.items():
             jsonschema.Draft202012Validator.check_schema(schema)
+            _check_no_cyclic_refs(type_name, schema)
         self._validators: dict[str, jsonschema.Draft202012Validator] = {
             type_name: jsonschema.Draft202012Validator(schema)
             for type_name, schema in schemas.items()
@@ -183,3 +191,50 @@ class JsonSchemaHook:
         return HookResult.reject(
             f"schema {type_name!r} violation at {location}: {first.message}"
         )
+
+
+# Sample inputs used to probe a schema for cyclic-`$ref` recursion bombs.
+# A real cyclic schema infinite-loops on ANY input, so a small set is enough.
+_PROBE_INPUTS: tuple[Any, ...] = (
+    None,
+    True,
+    0,
+    "",
+    [],
+    [1],
+    {},
+    {"x": 1},
+)
+
+
+def _check_no_cyclic_refs(type_name: str, schema: dict[str, Any]) -> None:
+    """Probe a schema with sample inputs under a lowered recursion limit.
+
+    `Draft202012Validator.check_schema` does NOT detect mutually-recursive
+    `$ref` constructs (e.g. `A → B → A`). Such schemas accept construction
+    but explode with `RecursionError` on the first real `iter_errors` call,
+    locking every subsequent write with a hook crash.
+
+    We pre-flight a small set of probe inputs under a bounded recursion
+    limit. If the validator recurses infinitely, we raise `CyclicRefError`
+    and the server refuses to boot — fail loud, not at first write.
+
+    `sys.setrecursionlimit` is process-global and thread-unsafe; we restore
+    it in `finally`. The probe is synchronous and short, so no other code
+    runs at the lowered limit.
+    """
+    validator = jsonschema.Draft202012Validator(schema)
+    probe_limit = 300
+    old_limit = sys.getrecursionlimit()
+    try:
+        sys.setrecursionlimit(min(old_limit, probe_limit))
+        for probe in _PROBE_INPUTS:
+            try:
+                list(validator.iter_errors(probe))
+            except RecursionError as exc:
+                raise CyclicRefError(
+                    f"schema {type_name!r} has cyclic $refs that would "
+                    f"recurse infinitely at validation time: {exc}"
+                ) from exc
+    finally:
+        sys.setrecursionlimit(old_limit)
