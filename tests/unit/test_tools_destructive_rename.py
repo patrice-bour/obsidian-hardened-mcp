@@ -430,6 +430,10 @@ class TestRenameBacklinks:
         assert len(write_records) == 3  # bare + with_md + alias
         # The destructive (rename) audit comes too.
         assert commit_record["snapshot_id"]
+        # M6.5 — every backlink-rewrite audit must be attributed to the
+        # CALLER tool, not hardcoded to "rename_note".
+        for record in write_records:
+            assert record["tool"] == "rename_note"
 
     def test_unreadable_file_is_skipped_not_crashed(
         self,

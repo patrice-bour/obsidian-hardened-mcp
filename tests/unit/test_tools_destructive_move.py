@@ -296,6 +296,48 @@ class TestMovePhase2:
 
 
 class TestMoveBacklinks:
+    def test_move_backlink_rewrite_audits_attributed_to_move_note(
+        self,
+        config: AppConfig,
+        audit: AuditLogger,
+        tmp_vault: Path,
+    ) -> None:
+        """M6.5 regression test for the C1 finding: when the helper
+        rewrites a wikilink during a move, the per-file audit MUST say
+        `tool="move_note"`, not `tool="rename_note"`. We exercise the
+        helper directly (move_note's surface keeps the basename, so this
+        path isn't reachable through the public API today, but the
+        helper is shared with rename_note and any future op)."""
+        from pathlib import PurePosixPath
+
+        from obsidian_power_mcp.tools.destructive import (
+            _rewrite_backlinks_phase2,
+        )
+
+        # A file containing the wikilink we want rewritten.
+        ref = tmp_vault / "01_Notes" / "ref.md"
+        ref.write_text("see [[oldname]]\n")
+        candidates = [PurePosixPath("01_Notes/ref.md")]
+        rewritten, _ = _rewrite_backlinks_phase2(
+            config=config,
+            audit=audit,
+            request_id="req-test",
+            tool="move_note",
+            candidates=candidates,
+            src_relative=PurePosixPath("01_Notes/oldname.md"),
+            dest_relative=PurePosixPath("00_Journal/oldname.md"),
+            old_bare="oldname",
+            new_bare="newname",
+        )
+        assert rewritten == 1
+        records = _all_audits(config.audit_dir)
+        write_records = [r for r in records if r["op_kind"] == "write"]
+        assert len(write_records) == 1
+        assert write_records[0]["tool"] == "move_note"
+        assert write_records[0]["request_id"] == "req-test"
+        # And the rewrite actually happened on disk.
+        assert "[[newname]]" in ref.read_text()
+
     def test_backlinks_with_basename_collision_left_alone(
         self,
         config: AppConfig,

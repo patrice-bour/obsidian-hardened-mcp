@@ -130,6 +130,7 @@ def _rewrite_backlinks_phase2(
     config: AppConfig,
     audit: AuditLogger,
     request_id: str,
+    tool: str,
     candidates: list[PurePosixPath],
     src_relative: PurePosixPath,
     dest_relative: PurePosixPath,
@@ -138,6 +139,10 @@ def _rewrite_backlinks_phase2(
 ) -> tuple[int, int]:
     """Apply the wikilink rewrite to every candidate. Emits one
     `op_kind=write` audit per rewritten file (correlated to `request_id`).
+
+    `tool` is the *caller's* tool name (`"rename_note"` or `"move_note"`)
+    so the per-rewrite audit lines can be correlated back to the
+    triggering destructive op rather than mis-attributed.
 
     Returns (rewritten_count, skipped_count). `candidates` is the list
     captured BEFORE the rename; if a candidate equals `src_relative` we
@@ -175,7 +180,7 @@ def _rewrite_backlinks_phase2(
         emit_audit(
             audit,
             request_id=request_id,
-            tool="rename_note",
+            tool=tool,
             op_kind="write",
             vault_path=str(target_vp.relative),
             outcome="success",
@@ -669,6 +674,7 @@ def rename_note(
             config=config,
             audit=audit,
             request_id=request_id,
+            tool=tool_name,
             candidates=candidates_rel,
             src_relative=src_vp.relative,
             dest_relative=dest_vp.relative,
@@ -948,6 +954,7 @@ def move_note(
             config=config,
             audit=audit,
             request_id=request_id,
+            tool=tool_name,
             candidates=candidates_rel,
             src_relative=src_vp.relative,
             dest_relative=dest_vp.relative,
