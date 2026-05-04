@@ -44,15 +44,18 @@ async def run(vault: Path) -> ScenarioReport:
     rep = ScenarioReport("S7", "validation hooks")
 
     # 1 — drop config + schema files, then spawn a fresh server so it
-    # auto-loads the hooks at boot.
+    # auto-loads the hooks at boot. Drops live inside the try/finally so
+    # a partial failure (e.g., one drop succeeds, the next raises, or the
+    # harness fails to start) cannot leave orphan config files in the
+    # vault for subsequent runs to trip over.
     config_path = vault / ".obsidian-full-mcp.yaml"
     schema_dir = vault / "_schemas"
     schema_path = schema_dir / "journal.json"
-    schema_dir.mkdir(parents=True, exist_ok=True)
-    schema_path.write_text(json.dumps(_JOURNAL_SCHEMA), encoding="utf-8")
-    config_path.write_text(_HOOKS_CONFIG, encoding="utf-8")
 
     try:
+        schema_dir.mkdir(parents=True, exist_ok=True)
+        schema_path.write_text(json.dumps(_JOURNAL_SCHEMA), encoding="utf-8")
+        config_path.write_text(_HOOKS_CONFIG, encoding="utf-8")
         async with E2EHarness(vault) as h:
             # iso_date — non-ISO date in journal/ -> reject
             bad_date = await h.call(

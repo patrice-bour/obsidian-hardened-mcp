@@ -30,6 +30,14 @@ async def run(h: E2EHarness) -> ScenarioReport:
         f"unexpectedly created {target_abs}",
     )
 
+    # Snapshot the parent dir before the real write so we can assert no
+    # extra files appeared (atomic-write tmp files should be gone, not
+    # left behind). A glob with a guessed prefix would pass vacuously
+    # if the project's tmp pattern ever changed.
+    parent = target_abs.parent
+    parent.mkdir(parents=True, exist_ok=True)
+    before = set(parent.iterdir())
+
     real = await h.call("create_note", path=target, content=body_v1)
     ok, why = expect_ok(real, where="create_note real")
     rep.add("create_note real ok", ok, why)
@@ -39,12 +47,12 @@ async def run(h: E2EHarness) -> ScenarioReport:
         f"exists={target_abs.exists()}",
     )
 
-    # No orphan tmp files in the same dir.
-    tmp_orphans = [p.name for p in target_abs.parent.glob(".*tmp*")]
+    after = set(parent.iterdir())
+    extras = after - before - {target_abs}
     rep.add(
         "no orphan tmp file after atomic write",
-        not tmp_orphans,
-        f"tmp files: {tmp_orphans}",
+        not extras,
+        f"unexpected files: {[p.name for p in extras]}",
     )
 
     # --- update_note -------------------------------------------------------

@@ -61,9 +61,11 @@ async def main() -> int:
         "OBSIDIAN_AUDIT_DIR", str(HERE / ".runs" / "audit")
     )
 
-    audit_baseline = audit_inspector.line_count(
-        audit_inspector.today_log_path()
-    )
+    # Capture the audit log path now so S8 reads the SAME file at the end,
+    # even if the run crosses midnight UTC and today_log_path() would
+    # otherwise return a fresh date-stamped path.
+    audit_log_path = audit_inspector.today_log_path()
+    audit_baseline = audit_inspector.line_count(audit_log_path)
 
     reports: list[ScenarioReport] = []
 
@@ -100,7 +102,7 @@ async def main() -> int:
 
     # S8 — audit post-condition.
     print("--- s8_audit ---")
-    rep = await s8_audit.run(audit_baseline)
+    rep = await s8_audit.run(audit_baseline, audit_log_path)
     reports.append(rep)
     _print_scenario(rep)
 

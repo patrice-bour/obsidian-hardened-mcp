@@ -4,15 +4,18 @@ expected JSON shape."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import audit_inspector
 
 from ._assert import ScenarioReport
 
 
-async def run(audit_baseline: int) -> ScenarioReport:
+async def run(audit_baseline: int, log_path: Path) -> ScenarioReport:
+    """`log_path` is captured at baseline time in run_e2e so the
+    comparison is against the same file even if the run crosses midnight
+    UTC."""
     rep = ScenarioReport("S8", "audit")
-
-    log_path = audit_inspector.today_log_path()
     rep.add(
         "audit log exists",
         log_path.exists(),

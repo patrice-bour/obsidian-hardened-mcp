@@ -13,6 +13,7 @@ test_confirm.py`); we skip it here to keep the E2E run fast.
 
 from __future__ import annotations
 
+import secrets
 from pathlib import Path
 
 from mcp_harness import E2EHarness
@@ -151,8 +152,11 @@ async def run(h: E2EHarness) -> ScenarioReport:
     await h.call("create_note", path=target_t, content=body)
     p1t = await h.call("delete_note", path=target_t)
     real_token = field_value(p1t, "confirm_token") or ""
-    # Flip the last char (preserves base64url alphabet by mapping a→b/A→B…).
-    bad_token = real_token[:-1] + ("A" if real_token[-1] != "A" else "B")
+    # Build a fully-random base64url token of similar length. Using
+    # secrets.token_urlsafe() keeps the alphabet valid (so the server's
+    # decoding stage doesn't reject it before the HMAC check) while
+    # making collision with the real token cryptographically impossible.
+    bad_token = secrets.token_urlsafe(64)[: len(real_token)]
     p2t = await h.call(
         "delete_note", path=target_t, confirm_token=bad_token
     )
