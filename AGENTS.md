@@ -51,7 +51,10 @@ The approved v0.1 plan lives at `~/.claude/plans/les-serveurs-mcp-existants-tran
 
 ## Where to resume (for a fresh session)
 
-**Last merged on `main`**: `chore(M8): hardening + docs + v0.1.0 release prep`. **v0.1.0 tagged.**
+**Last merged on `main`**: `chore(release): v0.1.1` — cosmetic + quality pass on
+top of v0.1.0 (repo renamed `power → full`, E2E harness added,
+post-publication code review fixes 4/4 MUST + 13/13 SHOULD).
+**v0.1.1 tagged.** v0.1.0 tag preserved on `f24827b`.
 
 **Milestones progress** (commits in `git log`):
 
@@ -70,6 +73,7 @@ The approved v0.1 plan lives at `~/.claude/plans/les-serveurs-mcp-existants-tran
 | ✅ | M7.5 — code-review hardening (loopback-only `rest_url`, consume-before-REST ordering, `\x1e` rejection) | `182e28a` | 479 |
 | ✅ | **M8 — hardening + README + CHANGELOG + golden round-trip + v0.1.0 tag** | `f24827b` | 530 |
 | 🎉 | **v0.1.0 tagged** | tag `v0.1.0` on `f24827b` | — |
+| 🎉 | **v0.1.1 tagged** — E2E harness + repo rename + code-review pass | tag `v0.1.1` (post-publication) | 533 + 101 E2E |
 
 **Next task**: v0.2 — pick up the v0.2 backlog in
 `docs/v0.1-followups.md` (36 entries). The master plan covered v0.1;
@@ -79,15 +83,15 @@ index cache (M5-01 + M5-02), `path_routing` built-in hook (M4-01),
 `search_notes` REST routing that v0.1 deferred (M7-01). Decide a
 proper v0.2 plan + brief before opening the next worktree.
 
-**Sanity check** to confirm a clean v0.1.0 base:
+**Sanity check** to confirm a clean v0.1.1 base:
 
 ```bash
 cd /Users/pbr/projets/IA/MCP/obsidian-full-mcp/main
-uv run pytest -q                # expect 530 passed
-uv run ruff check src tests     # expect "All checks passed"
-uv run mypy src                 # expect "no issues found"
-git log --oneline -14           # expect 13 commits, last = f24827b (v0.1.0 tag)
-git tag -l                      # expect 'v0.1.0'
+uv run pytest -q                                    # expect 533 passed
+uv run python tests/e2e/run_e2e.py                  # expect 101/101 PASS
+uv run ruff check src tests                         # expect "All checks passed"
+uv run mypy src                                     # expect "no issues found"
+git tag -l                                          # expect 'v0.1.0' and 'v0.1.1'
 ```
 
 **v0.2 backlog** (M8 audit, full table in `docs/v0.1-followups.md` § v0.1.0 disposition): 4 done, 36 v0.2, 2 wontfix. Top targets when v0.2 opens:

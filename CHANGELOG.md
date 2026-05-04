@@ -10,6 +10,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 (Nothing yet — v0.2 will pick up the deferred items in
 `docs/v0.1-followups.md`.)
 
+## [0.1.1] - 2026-05-04
+
+Cosmetic + quality pass on top of v0.1.0:
+
+- **Repository renamed** from `obsidian-power-mcp` to `obsidian-full-mcp`
+  (Python module, CLI entry point, vault config file, HMAC secret
+  directory, and `.opmcp-trash/ → .ofmcp-trash/` slug).
+- **End-to-end test harness** (`tests/e2e/`) — 10 scenarios driven
+  through a real `python -m obsidian_full_mcp` subprocess on a freshly
+  seeded vault: smoke, read, write, frontmatter atomic ops, destructive
+  2-phase HMAC, path sandbox, YAML safety, validation hooks, audit
+  log, REST branch.
+- Post-publication code review pass: 4/4 MUST and 13/13 SHOULD
+  findings addressed. Highlights below.
+
+### Added
+- `OBSIDIAN_AUDIT_DIR` environment variable to relocate the audit log
+  directory (useful for CI runners that publish test artefacts).
+- `tests/e2e/` end-to-end harness (1817 lines) plus its README.
+- E2E runner sandboxes audit logs under `tests/e2e/.runs/audit/` by
+  default so test runs no longer pollute `~/.obsidian-full-mcp/audit/`.
+
+### Changed
+- **Breaking** — package, CLI bin, vault config, HMAC secret dir, and
+  trash slug all migrated from `obsidian-power-mcp` / `.opmcp-trash`
+  family to `obsidian-full-mcp` / `.ofmcp-trash`.
+- E2E harness: `__aexit__` now LIFO-safe via try/finally; startup
+  wrapped in `asyncio.timeout(15s)`, `call()` in `asyncio.timeout(30s)`.
+
+### Fixed
+- `OBSIDIAN_REST_TOKEN` and `OBSIDIAN_REST_URL` env vars are now
+  actually wired through the CLI entry point (previously documented
+  but silently dead-letter — `__main__.py` constructed `AppConfig`
+  directly instead of going through `from_env`).
+- E2E S8 audit baseline could pick a different file from S8's read if
+  the run crossed midnight UTC. The path is now captured once at
+  baseline time and threaded through.
+- E2E S7 cleanup race: config + schema file drops moved inside the
+  `try/finally` so a partial failure can no longer leave orphan
+  `.obsidian-full-mcp.yaml` / `_schemas/journal.json` behind.
+- E2E S4 destructive: token tampering now uses `secrets.token_urlsafe`
+  instead of a one-letter flip, removing the (small) risk of
+  collision with the real token.
+- E2E S2 atomic-write tmp leftover detection: the previous `.*tmp*`
+  glob passed vacuously; replaced with a `set(parent.iterdir())`
+  before/after diff that proves the dir contents grew by exactly the
+  new file.
+- E2E `audit_inspector.read_recent` uses `deque(maxlen=n)` instead of
+  reading the whole audit log into memory.
+- E2E `run_e2e` glyph output guarded against non-UTF-8 stdout (legacy
+  Windows consoles, pipes-to-file).
+- E2E S0 cross-checks `list_tools_capabilities` against the MCP
+  initialise/list_tools handshake; the baseline tool set is now a
+  subset check rather than equality so v0.2 additions don't break S0.
+- E2E S9 with-token branch: bare except now surfaces
+  `traceback.format_exc()` so a real bug isn't silently rebadged as
+  "Obsidian probably not running".
+- E2E S3 frontmatter: removed the post-test `write_text` restore; the
+  runner re-seeds at the start of every full run, and the previous
+  restore could have written back a partially-mutated body if S3 had
+  failed midway.
+
+### Removed
+- Deprecated `License :: OSI Approved :: Apache Software License`
+  PEP 639 classifier (the project is still licensed under Apache-2.0
+  via `license = { text = "Apache-2.0" }`).
+- Unused `CallResult.raw` field — was held in every result but never
+  read anywhere; the MCP-error path keeps the body in `error_message`.
+
+### Documentation
+- Project README: documents `OBSIDIAN_AUDIT_DIR` and points at the
+  shell-history caveat for the REST bearer token.
+- E2E README: security note on shell history when exporting
+  `OBSIDIAN_E2E_REST_TOKEN`; "Determinism notes" section on what the
+  101/101 figure assumes (S9 SKIPPED unless opted in, S5 oversize
+  filesystem-dependent).
+
 ## [0.1.0] - 2026-05-04
 
 First public-preview release. Local-first single-user Obsidian MCP
