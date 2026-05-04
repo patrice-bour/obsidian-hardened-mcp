@@ -30,7 +30,13 @@ async def test_registered_tools_match_capabilities_manifest(
     `list_tools_capabilities` so clients can rely on it."""
     server = create_server(config)
     registered = {t.name for t in await server.list_tools()}
-    expected = {"read_note", "list_notes", "get_vault_info", "list_tools_capabilities"}
+    expected = {
+        "read_note",
+        "list_notes",
+        "get_frontmatter",
+        "get_vault_info",
+        "list_tools_capabilities",
+    }
     assert expected <= registered
 
 
@@ -71,3 +77,16 @@ async def test_list_tools_capabilities_tool_is_callable_through_mcp(
     server = create_server(config)
     raw = await server.call_tool("list_tools_capabilities", {})
     assert "read_note" in str(raw)
+    assert "get_frontmatter" in str(raw)
+
+
+@pytest.mark.asyncio
+async def test_get_frontmatter_tool_is_callable_through_mcp(
+    config: AppConfig, tmp_vault: Path
+) -> None:
+    (tmp_vault / "01_Notes" / "fm.md").write_text(
+        "---\ntitle: MCP\n---\nBody\n"
+    )
+    server = create_server(config)
+    raw = await server.call_tool("get_frontmatter", {"path": "01_Notes/fm.md"})
+    assert "MCP" in str(raw)

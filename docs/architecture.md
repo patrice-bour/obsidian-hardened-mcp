@@ -19,7 +19,7 @@ src/obsidian_power_mcp/
 │   ├── listing.py         # markdown enumeration with forbidden-zone pruning
 │   ├── writer.py          # atomic writes (M3)
 │   └── snapshot.py        # snapshot-before-destruction (M3)
-├── frontmatter/           # ruamel.yaml round-trip parser + atomic ops (M2)
+├── frontmatter/           # ruamel.yaml round-trip parser (M2) + atomic field ops (M3)
 ├── validation/            # JSON Schema + pluggable hooks (M4)
 ├── security/              # 2-phase confirm + audit logger (M3, M6)
 ├── rest/                  # optional Local REST API client (M7)
@@ -27,7 +27,7 @@ src/obsidian_power_mcp/
     ├── _base.py           # @tool_call decorator + exception → ErrorCode mapping
     ├── read.py            # read_note, list_notes
     ├── meta.py            # get_vault_info, list_tools_capabilities
-    ├── frontmatter.py     # set/delete/merge_frontmatter_field (M2)
+    ├── frontmatter.py     # get_frontmatter (M2); set/delete/merge_frontmatter_field (M3)
     ├── write.py           # create_note, update_note, append_to_note, patch_note (M3)
     └── destructive.py     # delete_note, rename_note, move_note (M6)
 ```

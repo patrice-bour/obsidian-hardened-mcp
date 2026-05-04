@@ -28,6 +28,9 @@ class ErrorCode(StrEnum):
     FILE_OFFLOADED = "file_offloaded"
     NOT_A_FILE = "not_a_file"
     NOT_A_DIRECTORY = "not_a_directory"
+    UNSAFE_YAML = "unsafe_yaml"
+    MALFORMED_FRONTMATTER = "malformed_frontmatter"
+    FRONTMATTER_TOO_LARGE = "frontmatter_too_large"
     INTERNAL_ERROR = "internal_error"
 
 

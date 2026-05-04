@@ -19,6 +19,11 @@ from obsidian_power_mcp.domain.vault_path import (
     SymlinkEscapeError,
     VaultPathError,
 )
+from obsidian_power_mcp.frontmatter import (
+    FrontmatterTooLargeError,
+    MalformedFrontmatterError,
+    UnsafeYamlError,
+)
 from obsidian_power_mcp.fs.reader import (
     FileOffloadedError,
     FileTooLargeError,
@@ -58,6 +63,12 @@ def map_exception(exc: Exception) -> ToolResult:
             code = ErrorCode.FILE_TOO_LARGE
         case FileOffloadedError():
             code = ErrorCode.FILE_OFFLOADED
+        case UnsafeYamlError():
+            code = ErrorCode.UNSAFE_YAML
+        case MalformedFrontmatterError():
+            code = ErrorCode.MALFORMED_FRONTMATTER
+        case FrontmatterTooLargeError():
+            code = ErrorCode.FRONTMATTER_TOO_LARGE
         case PermissionError():
             code = ErrorCode.PERMISSION_DENIED
         case _:

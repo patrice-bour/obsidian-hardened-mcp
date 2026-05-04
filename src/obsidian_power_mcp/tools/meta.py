@@ -48,6 +48,11 @@ def list_tools_capabilities(config: AppConfig) -> ToolResult:
     tools: list[dict[str, Any]] = [
         {"name": "read_note", "kind": "read", "description": "Read a note's text content."},
         {"name": "list_notes", "kind": "read", "description": "List markdown notes."},
+        {
+            "name": "get_frontmatter",
+            "kind": "read",
+            "description": "Parse a note's YAML frontmatter (round-trip aware).",
+        },
         {"name": "get_vault_info", "kind": "meta", "description": "Vault metadata."},
         {
             "name": "list_tools_capabilities",

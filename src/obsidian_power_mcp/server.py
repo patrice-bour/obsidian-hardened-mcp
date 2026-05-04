@@ -1,7 +1,7 @@
 """MCP server registration.
 
-`create_server(config)` builds a `FastMCP` instance with every M1 tool
-wired to its underlying implementation. The server runs over stdio.
+`create_server(config)` builds a `FastMCP` instance with every implemented
+tool wired to its underlying implementation. The server runs over stdio.
 """
 
 from __future__ import annotations
@@ -10,6 +10,9 @@ from mcp.server.fastmcp import FastMCP
 
 from obsidian_power_mcp.config import AppConfig
 from obsidian_power_mcp.domain.results import ToolResult
+from obsidian_power_mcp.tools.frontmatter import (
+    get_frontmatter as _get_frontmatter_impl,
+)
 from obsidian_power_mcp.tools.meta import get_vault_info as _get_vault_info_impl
 from obsidian_power_mcp.tools.meta import (
     list_tools_capabilities as _list_tools_capabilities_impl,
@@ -29,6 +32,14 @@ def create_server(config: AppConfig) -> FastMCP:
     @app.tool(description="List markdown notes in the vault, optionally filtered by folder.")
     def list_notes(folder: str | None = None, limit: int = 200) -> ToolResult:
         return _list_notes_impl(config, folder=folder, limit=limit)
+
+    @app.tool(
+        description=(
+            "Return the parsed YAML frontmatter of a note plus a preview of the body."
+        )
+    )
+    def get_frontmatter(path: str) -> ToolResult:
+        return _get_frontmatter_impl(config, path)
 
     @app.tool(description="Return vault metadata (root, note count, limits, server identity).")
     def get_vault_info() -> ToolResult:
