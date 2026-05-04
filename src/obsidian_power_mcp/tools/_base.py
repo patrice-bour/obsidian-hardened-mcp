@@ -43,6 +43,11 @@ from obsidian_power_mcp.fs.reader import (
     NotFoundError,
 )
 from obsidian_power_mcp.security.audit_logger import AuditLogger
+from obsidian_power_mcp.security.confirm import (
+    ExpiredConfirmationTokenError,
+    InvalidConfirmationTokenError,
+    PayloadMismatchError,
+)
 from obsidian_power_mcp.validation.hooks import (
     HookContext,
     HookRegistry,
@@ -94,6 +99,12 @@ def map_exception(exc: Exception) -> ToolResult:
             code = ErrorCode.FRONTMATTER_TOO_LARGE
         case HookViolationError():
             code = ErrorCode.VALIDATION_FAILED
+        case ExpiredConfirmationTokenError():
+            code = ErrorCode.EXPIRED_CONFIRMATION_TOKEN
+        case PayloadMismatchError():
+            code = ErrorCode.PAYLOAD_MISMATCH
+        case InvalidConfirmationTokenError():
+            code = ErrorCode.INVALID_CONFIRMATION_TOKEN
         case PermissionError():
             code = ErrorCode.PERMISSION_DENIED
         case _:

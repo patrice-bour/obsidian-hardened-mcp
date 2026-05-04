@@ -12,8 +12,14 @@ from obsidian_power_mcp.server import create_server
 
 
 @pytest.fixture
-def config(tmp_vault: Path) -> AppConfig:
-    return AppConfig(vault_root=tmp_vault)
+def config(tmp_vault: Path, tmp_path: Path) -> AppConfig:
+    # Redirect audit_dir AND secret_file into the per-test tmp tree so we
+    # never pollute the user's `~/.obsidian-power-mcp/` directory.
+    return AppConfig(
+        vault_root=tmp_vault,
+        audit_dir=tmp_path / "audit",
+        secret_file=tmp_path / "secret",
+    )
 
 
 def test_create_server_returns_fastmcp_instance(config: AppConfig) -> None:
@@ -126,3 +132,94 @@ async def test_server_with_explicit_empty_registry_skips_validation(
         {"path": "01_Notes/bad.md", "content": "---\ndate: tomorrow\n---\n"},
     )
     assert (tmp_vault / "01_Notes" / "bad.md").exists()
+
+
+# ---------------------------------------------------------------------------
+# Destructive tools — server-level 2-phase confirm
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_destructive_tools_listed_in_capabilities(
+    config: AppConfig,
+) -> None:
+    server = create_server(config)
+    raw = await server.call_tool("list_tools_capabilities", {})
+    text = str(raw)
+    assert "delete_note" in text
+    assert "rename_note" in text
+    assert "move_note" in text
+    assert "destructive" in text
+
+
+@pytest.mark.asyncio
+async def test_destructive_tools_are_registered_through_mcp(
+    config: AppConfig,
+) -> None:
+    server = create_server(config)
+    registered = {t.name for t in await server.list_tools()}
+    assert {"delete_note", "rename_note", "move_note"} <= registered
+
+
+@pytest.mark.asyncio
+async def test_delete_note_two_phase_through_mcp(
+    config: AppConfig, tmp_vault: Path
+) -> None:
+    """End-to-end: phase 1 returns a token, file untouched; phase 2 with
+    that token deletes the file."""
+    from obsidian_power_mcp.security.confirm import ConfirmRegistry
+
+    # Use an explicit registry so the server doesn't bootstrap the secret
+    # from disk for this isolated assertion.
+    registry = ConfirmRegistry(secret=b"k" * 32)
+    server = create_server(config, registry=registry)
+
+    # Phase 1: no token.
+    raw1 = await server.call_tool(
+        "delete_note", {"path": "01_Notes/sample.md"}
+    )
+    text1 = str(raw1)
+    assert "confirm_token" in text1
+    # Source still in place.
+    assert (tmp_vault / "01_Notes" / "sample.md").exists()
+
+    # Extract the token (look for a base64url string of length 86).
+    import re
+
+    match = re.search(r"[A-Za-z0-9_-]{86}", text1)
+    assert match is not None, f"no token found in phase-1 output: {text1[:200]}"
+    token = match.group(0)
+
+    # Phase 2: same path + token.
+    raw2 = await server.call_tool(
+        "delete_note",
+        {"path": "01_Notes/sample.md", "confirm_token": token},
+    )
+    assert "snapshot_id" in str(raw2)
+    # File removed; snapshot kept.
+    assert not (tmp_vault / "01_Notes" / "sample.md").exists()
+
+
+@pytest.mark.asyncio
+async def test_delete_without_token_does_not_mutate_through_mcp(
+    config: AppConfig, tmp_vault: Path
+) -> None:
+    from obsidian_power_mcp.security.confirm import ConfirmRegistry
+
+    registry = ConfirmRegistry(secret=b"k" * 32)
+    server = create_server(config, registry=registry)
+    await server.call_tool("delete_note", {"path": "01_Notes/sample.md"})
+    # File preserved without phase 2.
+    assert (tmp_vault / "01_Notes" / "sample.md").exists()
+
+
+@pytest.mark.asyncio
+async def test_default_create_server_lazily_bootstraps_secret(
+    config: AppConfig,
+) -> None:
+    """`create_server(config)` (no explicit registry) must NOT bootstrap
+    the secret unless a destructive tool is actually called."""
+    server = create_server(config)
+    # Read tool — should not touch the secret file.
+    await server.call_tool("read_note", {"path": "01_Notes/sample.md"})
+    assert not config.secret_file.exists()

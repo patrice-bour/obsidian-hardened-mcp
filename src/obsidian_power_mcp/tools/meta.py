@@ -101,6 +101,31 @@ def list_tools_capabilities(config: AppConfig) -> ToolResult:
             "kind": "write",
             "description": "Shallow or deep merge of a patch dict into the frontmatter.",
         },
+        # Destructive (2-phase HMAC confirm)
+        {
+            "name": "delete_note",
+            "kind": "destructive",
+            "description": (
+                "Delete a note. Two-phase HMAC confirm + snapshot under "
+                ".opmcp-trash/."
+            ),
+        },
+        {
+            "name": "rename_note",
+            "kind": "destructive",
+            "description": (
+                "Rename a note within its folder. Two-phase confirm; "
+                "optional best-effort wikilink rewrite."
+            ),
+        },
+        {
+            "name": "move_note",
+            "kind": "destructive",
+            "description": (
+                "Move a note to another folder. Two-phase confirm; "
+                "optional best-effort wikilink rewrite."
+            ),
+        },
         # Meta
         {"name": "get_vault_info", "kind": "meta", "description": "Vault metadata."},
         {

@@ -34,6 +34,10 @@ class ErrorCode(StrEnum):
     PATCH_COUNT_MISMATCH = "patch_count_mismatch"
     FIELD_NOT_FOUND = "field_not_found"
     VALIDATION_FAILED = "validation_failed"
+    CONFIRMATION_REQUIRED = "confirmation_required"
+    INVALID_CONFIRMATION_TOKEN = "invalid_confirmation_token"  # noqa: S105
+    EXPIRED_CONFIRMATION_TOKEN = "expired_confirmation_token"  # noqa: S105
+    PAYLOAD_MISMATCH = "payload_mismatch"
     INTERNAL_ERROR = "internal_error"
 
 

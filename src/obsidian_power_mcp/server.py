@@ -13,6 +13,19 @@ from mcp.server.fastmcp import FastMCP
 from obsidian_power_mcp.config import AppConfig
 from obsidian_power_mcp.domain.results import ToolResult
 from obsidian_power_mcp.security.audit_logger import AuditLogger
+from obsidian_power_mcp.security.confirm import (
+    ConfirmRegistry,
+    load_or_bootstrap_secret,
+)
+from obsidian_power_mcp.tools.destructive import (
+    delete_note as _delete_note_impl,
+)
+from obsidian_power_mcp.tools.destructive import (
+    move_note as _move_note_impl,
+)
+from obsidian_power_mcp.tools.destructive import (
+    rename_note as _rename_note_impl,
+)
 from obsidian_power_mcp.tools.frontmatter import (
     delete_frontmatter_field as _delete_frontmatter_field_impl,
 )
@@ -46,7 +59,10 @@ from obsidian_power_mcp.validation.hooks import HookRegistry
 
 
 def create_server(
-    config: AppConfig, *, hooks: HookRegistry | None = None
+    config: AppConfig,
+    *,
+    hooks: HookRegistry | None = None,
+    registry: ConfirmRegistry | None = None,
 ) -> FastMCP:
     """Build a FastMCP server bound to the given configuration.
 
@@ -54,11 +70,27 @@ def create_server(
     `<vault_root>/.obsidian-power-mcp.yaml` (and falls back to an empty
     registry if the file is absent). Pass an explicit `HookRegistry([])`
     to skip auto-loading entirely (used by tests).
+
+    `registry` is the 2-phase confirmation registry used by destructive
+    tools. We construct it lazily on first destructive call so that
+    purely-read flows (and tests for them) never touch the on-disk HMAC
+    secret. Pass an explicit `ConfirmRegistry` to override (tests do this
+    to avoid the secret file altogether).
     """
     app = FastMCP(name="obsidian-power-mcp")
     audit = AuditLogger(audit_dir=config.audit_dir)
     if hooks is None:
         hooks = load_validation_config(config.vault_root)
+
+    # Lazy registry construction: the secret is only loaded/bootstrapped
+    # on the first destructive tool call. Mutable list as a closure cell.
+    _registry_slot: list[ConfirmRegistry | None] = [registry]
+
+    def _ensure_registry() -> ConfirmRegistry:
+        if _registry_slot[0] is None:
+            secret = load_or_bootstrap_secret(config.secret_file)
+            _registry_slot[0] = ConfirmRegistry(secret=secret)
+        return _registry_slot[0]  # type: ignore[return-value]
 
     # ---- Read ----------------------------------------------------------
 
@@ -217,6 +249,82 @@ def create_server(
             patch,
             mode=mode,  # type: ignore[arg-type]
             hooks=hooks,
+            dry_run=dry_run,
+        )
+
+    # ---- Destructive (2-phase HMAC confirm) ----------------------------
+
+    @app.tool(
+        description=(
+            "Delete a note. Two-phase: first call returns a `confirm_token` "
+            "and a preview without touching the disk; second call with the "
+            "same token snapshots the file under `.opmcp-trash/` and unlinks "
+            "it. Pass `dry_run=True` to preview without issuing a token."
+        )
+    )
+    def delete_note(
+        path: str,
+        confirm_token: str | None = None,
+        dry_run: bool = False,
+    ) -> ToolResult:
+        return _delete_note_impl(
+            config,
+            audit,
+            _ensure_registry(),
+            path=path,
+            confirm_token=confirm_token,
+            dry_run=dry_run,
+        )
+
+    @app.tool(
+        description=(
+            "Rename a note within its current folder. `new_name` is a "
+            "filename only (no slashes). Same 2-phase confirm as "
+            "`delete_note`. Set `update_backlinks=True` to also rewrite "
+            "`[[oldname]]` wikilinks across the vault (best-effort)."
+        )
+    )
+    def rename_note(
+        path: str,
+        new_name: str,
+        confirm_token: str | None = None,
+        update_backlinks: bool = False,
+        dry_run: bool = False,
+    ) -> ToolResult:
+        return _rename_note_impl(
+            config,
+            audit,
+            _ensure_registry(),
+            path=path,
+            new_name=new_name,
+            confirm_token=confirm_token,
+            update_backlinks=update_backlinks,
+            dry_run=dry_run,
+        )
+
+    @app.tool(
+        description=(
+            "Move a note to a different folder, keeping its filename. "
+            "`new_folder` is a vault-relative folder path. Same 2-phase "
+            "confirm as `delete_note`. `update_backlinks=True` is honoured "
+            "but typically a no-op (basename unchanged)."
+        )
+    )
+    def move_note(
+        path: str,
+        new_folder: str,
+        confirm_token: str | None = None,
+        update_backlinks: bool = False,
+        dry_run: bool = False,
+    ) -> ToolResult:
+        return _move_note_impl(
+            config,
+            audit,
+            _ensure_registry(),
+            path=path,
+            new_folder=new_folder,
+            confirm_token=confirm_token,
+            update_backlinks=update_backlinks,
             dry_run=dry_run,
         )
 

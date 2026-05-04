@@ -65,6 +65,44 @@ Every write goes through `fs.writer.atomic_write_text`:
 The tests assert that simulated `fsync`/`replace` failures leave the
 target either at its old content or its new content, never in between.
 
+### LLM-driven destructive ops
+
+Destructive tools (`delete_note`, `rename_note`, `move_note`) require a
+**two-phase HMAC confirmation**. A single hallucinated tool call cannot
+mutate the vault on the first try.
+
+- **Phase 1** (`confirm_token=None`): the tool computes a preview, issues
+  a single-use `OperationToken` HMAC-signed against the secret + payload,
+  and returns it. The disk is **not** touched.
+- **Phase 2** (`confirm_token=<from phase 1>`): the registry verifies the
+  token (single-use, TTL-bound, payload-bound), the original file is
+  copied into `<vault>/.opmcp-trash/<UTC-ts>-<short-hash>/`, then the
+  destructive op runs atomically (`os.replace` for rename/move,
+  `Path.unlink` for delete).
+
+Token format: `base64url(nonce || HMAC_SHA256(secret, op || target ||
+payload_hash || expires_at || nonce))`. 32-byte nonce + 32-byte HMAC =
+86 base64url chars.
+
+The HMAC secret lives at `~/.obsidian-power-mcp/secret` with mode
+`0o600`. Any wider mode is treated as compromised — the loader refuses
+and the server aborts. Manual rotation: `rm ~/.obsidian-power-mcp/secret`,
+restart. There is no automatic rotation in v0.1.
+
+In-memory storage is **by design**: a server restart invalidates all
+phase-1 tokens. The 90 s TTL makes that acceptable; phase-1 issuances
+older than 90 s would have expired anyway.
+
+Snapshots accumulate under `<vault>/.opmcp-trash/`. They are NEVER
+re-exposed by read tools (the directory is in the VaultPath
+forbidden-zone list). Manual cleanup convention: prune
+`.opmcp-trash/` yourself when disk usage matters.
+
+`update_backlinks=True` (rename/move) is best-effort: only exact
+wikilink targets `[[oldname]]` / `[[oldname.md]]` are rewritten,
+free-text occurrences are left alone, and unreadable files are counted
+as `skipped_unreadable` rather than crashing the operation.
+
 ### Audit trail integrity (within process scope)
 
 Every write or destructive operation emits a JSONL line to
@@ -116,6 +154,21 @@ the server as **single-writer**: open one client at a time, or coordinate
 manually. We may add per-path `anyio.Lock` serialisation in a later
 release; v0.1 will not.
 
+### Restore-from-snapshot
+
+Destructive ops write a snapshot under `.opmcp-trash/` before mutating.
+v0.1 ships **no restore tool** — restoration is a manual operation
+(copy the snapshot back to its original path). A scripted
+`restore_from_snapshot` is on the v0.2 roadmap.
+
+### Disk pressure from snapshots
+
+Snapshots are **not** automatically pruned. Long-running deployments
+with frequent destructive ops will see `<vault>/.opmcp-trash/` grow.
+Treat it as your manual responsibility to prune (the directory is in
+the VaultPath forbidden-zone list, so no MCP tool will ever read or
+delete from it on your behalf).
+
 ### Multi-vault isolation
 
 v0.1 binds to one vault root chosen at server startup. There is no
@@ -166,6 +219,11 @@ For the threat model above to hold, you must:
 - Dry-run immutability: the file on disk is byte-identical before/after
   a `dry_run=True` call; the in-memory `CommentedMap` is `deepcopy`-d
   before any mutation.
+- 2-phase confirmation: phase-1 issues a token without writing,
+  phase-2 consumes (single-use), tokens past their TTL are rejected,
+  payload-mismatched calls are rejected, replay is rejected, HMAC
+  tampering is rejected, and the secret file is refused if its mode
+  is wider than `0o600`.
 
 What is **not** enforced by tests (yet):
 
