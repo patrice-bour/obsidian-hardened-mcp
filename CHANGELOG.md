@@ -116,3 +116,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dataclass already prevented field reassignment but not nested
   dict/list mutation.
 - New `docs/v0.1-followups.md` tracks deferred review findings.
+
+### Added (M5 — search + wikilinks)
+- `search_notes` MCP tool: literal query against note bodies and/or
+  frontmatter, three modes (`fulltext` / `frontmatter` / `combined`),
+  filters (folder, tag, type), bounded `limit`. Returns a snippet,
+  match kind, and per-match metadata. `combined` mode reports BOTH
+  matches when a note hits in both layers (`match_kind="combined"` plus
+  separate `snippet` / `frontmatter_field` / `frontmatter_snippet`).
+- `resolve_wikilink` MCP tool: parses Obsidian-style `[[Target]]`,
+  `[[Target|Alias]]`, `[[Target#Heading]]`, `[[Target^block-id]]`,
+  `[[folder/Target]]`. Resolves by basename or path-form. Disambiguates
+  same-basename hits via `from_path` (Obsidian shortest-relative).
+  Returns `{resolved, alias, heading, block_id, ambiguous, candidates}`.
+
+### Fixed (M5 — code review)
+- `combined` mode in `search_notes` now reports BOTH fulltext and
+  frontmatter matches when both fire on the same note (was: only the
+  first kind, silently dropping the other signal).
+- Disjoint `from_path` (no folder prefix shared with any candidate)
+  correctly leaves the result `ambiguous=True` instead of silently
+  picking a candidate.
+- `search_notes` exposes `skipped_read` and `skipped_parse` counters
+  so unreadable / malformed files no longer disappear silently.
+- Windows-style backslash paths in wikilinks are normalised before
+  resolution.
+- Mismatched `[[` / `]]` brackets in wikilink targets are rejected
+  with `INVALID_PATH` rather than silently mis-parsed.

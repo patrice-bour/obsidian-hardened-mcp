@@ -54,6 +54,16 @@ def list_tools_capabilities(config: AppConfig) -> ToolResult:
             "kind": "read",
             "description": "Parse a note's YAML frontmatter (round-trip aware).",
         },
+        {
+            "name": "search_notes",
+            "kind": "read",
+            "description": "Search notes by literal query (fulltext + frontmatter).",
+        },
+        {
+            "name": "resolve_wikilink",
+            "kind": "read",
+            "description": "Resolve a [[wikilink]] to a vault-relative path.",
+        },
         # Write
         {
             "name": "create_note",

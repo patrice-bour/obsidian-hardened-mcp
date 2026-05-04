@@ -31,6 +31,10 @@ from obsidian_power_mcp.tools.meta import (
 )
 from obsidian_power_mcp.tools.read import list_notes as _list_notes_impl
 from obsidian_power_mcp.tools.read import read_note as _read_note_impl
+from obsidian_power_mcp.tools.search import search_notes as _search_notes_impl
+from obsidian_power_mcp.tools.wikilink import (
+    resolve_wikilink as _resolve_wikilink_impl,
+)
 from obsidian_power_mcp.tools.write import (
     append_to_note as _append_to_note_impl,
 )
@@ -73,6 +77,41 @@ def create_server(
     )
     def get_frontmatter(path: str) -> ToolResult:
         return _get_frontmatter_impl(config, path)
+
+    @app.tool(
+        description=(
+            "Search markdown notes for a literal query. mode='fulltext' "
+            "scans bodies, 'frontmatter' scans frontmatter values, 'combined' "
+            "(default) does both. Filter by folder, tag, or type."
+        )
+    )
+    def search_notes(
+        query: str,
+        mode: str = "combined",
+        folder: str | None = None,
+        tag: str | None = None,
+        type_filter: str | None = None,
+        limit: int = 50,
+    ) -> ToolResult:
+        return _search_notes_impl(
+            config,
+            query,
+            mode=mode,  # type: ignore[arg-type]
+            folder=folder,
+            tag=tag,
+            type_filter=type_filter,
+            limit=limit,
+        )
+
+    @app.tool(
+        description=(
+            "Resolve an Obsidian wikilink target (without [[...]]) to a "
+            "vault-relative path. Returns alias/heading/block_id when "
+            "present and `ambiguous=true` with `candidates` on collisions."
+        )
+    )
+    def resolve_wikilink(target: str, from_path: str | None = None) -> ToolResult:
+        return _resolve_wikilink_impl(config, target, from_path=from_path)
 
     # ---- Write ---------------------------------------------------------
 
