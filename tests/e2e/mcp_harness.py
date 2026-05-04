@@ -9,7 +9,7 @@ The harness:
 - spawns `uv run obsidian-full-mcp --vault <vault>` in a subprocess
 - pipes stdio MCP frames through `ClientSession`
 - normalises tool results to a tiny dataclass (`.ok`, `.data`, `.error_code`,
-  `.error_message`, `.dry_run`, `.audit_id`, `.raw`)
+  `.error_message`, `.dry_run`, `.audit_id`)
 
 The server module's `__main__` is invoked through the same Python
 interpreter that runs the harness, via `python -m obsidian_full_mcp` —
@@ -44,7 +44,6 @@ class CallResult:
     error_message: str | None
     dry_run: bool
     audit_id: str | None
-    raw: str  # original JSON text — kept for debugging / regex probing
 
     @classmethod
     def from_text(cls, text: str) -> CallResult:
@@ -60,7 +59,6 @@ class CallResult:
             error_message=err.get("message"),
             dry_run=bool(payload.get("dry_run")),
             audit_id=payload.get("audit_id"),
-            raw=text,
         )
 
 
@@ -149,7 +147,8 @@ class E2EHarness:
             resp = await self.session.call_tool(tool, arguments)
         if resp.isError:
             # MCP-level error (e.g., unknown tool, schema violation). Surface
-            # the raw text so the scenario can decide what to assert.
+            # the raw text via error_message so the scenario can decide what
+            # to assert.
             text = _extract_text(resp.content) or "<no content>"
             return CallResult(
                 ok=False,
@@ -158,7 +157,6 @@ class E2EHarness:
                 error_message=text,
                 dry_run=False,
                 audit_id=None,
-                raw=text,
             )
         body = _extract_text(resp.content)
         if body is None:
