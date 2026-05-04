@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.x"
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Sync dependencies
+        run: uv sync --frozen
+
+      - name: Lint (ruff)
+        run: uv run ruff check src tests
+
+      - name: Type-check (mypy)
+        run: uv run mypy src
+
+      - name: Test (pytest with coverage)
+        run: uv run pytest --cov --cov-report=term --cov-report=xml
+
+      - name: Upload coverage
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+
+  security-coverage-gate:
+    name: 100% coverage on security-critical modules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.x"
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv sync --frozen
+      - name: VaultPath sandbox must have 100% coverage
+        run: >
+          uv run pytest tests/security
+          --cov=obsidian_power_mcp.domain.vault_path
+          --cov-report=term-missing
+          --cov-fail-under=100
