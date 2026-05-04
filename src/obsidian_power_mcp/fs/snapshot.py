@@ -63,7 +63,23 @@ def snapshot_for_destruction(
         )
 
     snapshot_id = _new_snapshot_id()
+    if not vp.relative.parts:  # pragma: no cover - VaultPath enforces non-empty
+        raise SnapshotError(
+            "VaultPath.relative is empty; cannot build snapshot destination"
+        )
     destination = snapshot_root / snapshot_id / Path(*vp.relative.parts)
+
+    # Defense in depth: confirm the resolved destination stays under
+    # `snapshot_root`. VaultPath already rejects traversal upstream, but
+    # asserting here would catch any future bypass before we copy data.
+    resolved_dest = (
+        destination.parent.resolve(strict=False) / destination.name
+    )
+    if not resolved_dest.is_relative_to(snapshot_root.resolve(strict=False)):
+        raise SnapshotError(
+            f"snapshot destination escapes snapshot_root: {resolved_dest}"
+        )
+
     try:
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)

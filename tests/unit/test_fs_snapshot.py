@@ -84,15 +84,20 @@ class TestSnapshotFile:
 
 
 class TestSnapshotIdUniqueness:
-    def test_two_rapid_calls_yield_different_ids(self, tmp_vault: Path) -> None:
+    def test_rapid_calls_yield_different_ids(self, tmp_vault: Path) -> None:
+        # Stress test: 100 successive calls (M8 hardening per M6-10).
+        # All complete within the same second on any modern machine, so
+        # the only thing keeping ids unique is the 4-byte hex suffix
+        # (1-in-4-billion collision per pair). 100 calls = ~5000 pairs;
+        # collision probability ~1.2e-6 — safely below the test's
+        # detection threshold under normal entropy.
         vp = _vp(tmp_vault, "01_Notes/sample.md")
         ids: set[str] = set()
-        for _ in range(5):
+        for _ in range(100):
             ids.add(
                 snapshot_for_destruction(vp, snapshot_root=_trash(tmp_vault))
             )
-        # 5 successive calls (likely within the same second) → 5 distinct ids.
-        assert len(ids) == 5
+        assert len(ids) == 100
 
     def test_calls_separated_by_a_second_still_differ(
         self, tmp_vault: Path

@@ -255,7 +255,7 @@ class TestSemantics:
 # ---------------------------------------------------------------------------
 
 
-@settings(max_examples=500, deadline=None)
+@settings(max_examples=1000, deadline=None)
 @given(
     st.text(
         alphabet=st.characters(blacklist_categories=("Cs",)),  # exclude lone surrogates

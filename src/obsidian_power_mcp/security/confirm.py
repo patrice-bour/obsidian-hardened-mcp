@@ -42,13 +42,19 @@ from typing import Literal
 from obsidian_power_mcp.domain.vault_path import VaultPath
 
 OperationName = Literal[
-    "delete_note", "rename_note", "move_note", "execute_command", "batch"
+    "delete_note", "rename_note", "move_note", "execute_command"
 ]
 
 _NONCE_BYTES = 32
 _HMAC_BYTES = 32
 _SECRET_BYTES = 32
-_FIELD_SEP = b"\x1e"  # ASCII record separator — won't appear in our fields.
+# ASCII record separator. Path targets cannot contain it (forbidden zones
+# aside, VaultPath-validated relative paths are NFC-normalised; see
+# domain/vault_path.py). Command-bound `target_command` strings explicitly
+# reject `\x1e` in `_validate_command_id` (see tools/destructive.py). The
+# field separator is therefore unambiguous in practice. A length-prefixed
+# encoding is tracked as M6-01 in the v0.2 followups.
+_FIELD_SEP = b"\x1e"
 
 
 # ---------------------------------------------------------------------------

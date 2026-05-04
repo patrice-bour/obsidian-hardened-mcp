@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+(Nothing yet — v0.2 will pick up the deferred items in
+`docs/v0.1-followups.md`.)
+
+## [0.1.0] - 2026-05-04
+
+First public-preview release. Local-first single-user Obsidian MCP
+server with hardened path sandbox, atomic writes, round-trip
+frontmatter, 2-phase HMAC for destructive ops, and an optional
+loopback-only Local REST API integration.
+
+530 tests pass; 93 % global line+branch coverage; 100 % on
+`security/`, `domain/vault_path.py`, and `fs/writer.py`. ruff and
+strict mypy clean.
+
 ### Added
 - Initial project scaffolding (M1): pyproject, CI, project layout
 - `VaultPath` immutable sandbox class with strict validation
@@ -143,3 +157,100 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   resolution.
 - Mismatched `[[` / `]]` brackets in wikilink targets are rejected
   with `INVALID_PATH` rather than silently mis-parsed.
+
+### Added (M6 — destructive ops with 2-phase HMAC)
+- `delete_note`, `rename_note`, `move_note` MCP tools, each guarded by
+  the same 2-phase confirmation protocol: phase 1 returns a single-use
+  HMAC token + preview without touching the disk; phase 2 consumes the
+  token, snapshots the original under `.opmcp-trash/<UTC-ts>-<hash>/`,
+  and applies the change atomically (`Path.unlink` for delete,
+  `os.replace` for rename/move). 90 s TTL, single-use, payload-bound.
+- `security.confirm` module with `OperationToken`, `ConfirmRegistry`,
+  `load_or_bootstrap_secret`. HMAC-SHA256 over secret + (op, target,
+  payload_hash, expires_at, nonce). Secret bootstrapped to
+  `~/.obsidian-power-mcp/secret` with mode `0o600` enforced;
+  any wider mode is refused.
+- `fs.snapshot.snapshot_for_destruction`: best-effort copy under
+  `.opmcp-trash/`. The directory is in the VaultPath forbidden-zone
+  list so MCP read tools cannot expose snapshots back to clients.
+- `update_backlinks=True` (rename/move): best-effort scan + rewrite
+  of `[[oldname]]` / `[[oldname.md]]` wikilinks across the vault.
+  Skips unreadable files (counted in `skipped_unreadable`); emits one
+  `op_kind=write` audit event per rewritten file.
+- `dry_run=True` orthogonal mode: preview without issuing a token or
+  consuming one.
+- New error codes: `CONFIRMATION_REQUIRED`,
+  `INVALID_CONFIRMATION_TOKEN`, `EXPIRED_CONFIRMATION_TOKEN`,
+  `PAYLOAD_MISMATCH`.
+
+### Fixed (M6.5 — code review hardening)
+- Backlink-rewrite audit attribution: `_rewrite_backlinks_phase2`
+  used to hardcode `tool="rename_note"` even when called from
+  `move_note`. The helper now threads the caller's tool name so the
+  per-rewrite write audits correlate to the correct destructive op.
+
+### Added (M7 — optional Local REST API integration)
+- `rest.client.RestClient`: thin httpx wrapper for the Obsidian Local
+  REST API plugin. Bearer auth, masked-token `__repr__`, error
+  taxonomy (`RestUnavailableError`, `RestAuthError`, `RestError`).
+  Defaults to `verify=False` because the plugin uses a self-signed
+  certificate for `127.0.0.1`.
+- `rest.detector.RestAvailabilityDetector`: 60 s TTL availability
+  cache with clock injection. Failures cached as unavailable for the
+  same window so a down endpoint isn't hammered.
+- `execute_command` MCP tool — REST-only, 2-phase HMAC. Same protocol
+  as `delete_note` but the token is bound to the **command id**
+  (`target_command`) instead of a vault path. The HMAC includes a
+  `p:` / `c:` discriminator so a path target and a command target
+  with the same string never collide.
+- `OperationToken.target_command` field; `OperationName` Literal
+  extended with `"execute_command"`.
+- `create_server` accepts an optional `rest_detector` parameter; the
+  default builds a `RestClient` + detector when `config.rest_token`
+  is set.
+- `get_vault_info()` now reflects `detector.is_available()` rather
+  than the M1 placeholder `False`.
+- `list_tools_capabilities()` manifest gains `execute_command` (kind
+  = `destructive`).
+- New error codes: `REST_UNAVAILABLE`, `REST_AUTH_FAILED`, `REST_ERROR`.
+
+### Fixed (M7.5 — code review hardening)
+- `OBSIDIAN_REST_URL` / `AppConfig.rest_url` is now refused unless its
+  host is loopback (`127.0.0.1`, `localhost`, `[::1]`). The
+  `verify=False` posture is only safe on loopback; pointing the client
+  at a remote host would expose the bearer token to whoever answered.
+  Track `M7-03` to add a CA-bundle option in v0.2.
+- `execute_command` now consumes the confirmation token BEFORE
+  checking REST availability. A replayed token whose REST went down
+  between phases would otherwise mask the security-relevant
+  `INVALID_CONFIRMATION_TOKEN` with a transient `REST_UNAVAILABLE`.
+- `_validate_command_id` rejects `\x1e` (the HMAC field separator)
+  to keep the encoding unambiguous until the broader length-prefixed
+  scheme tracked in M6-01 lands.
+
+### Hardening (M8)
+- `fs.snapshot.snapshot_for_destruction` now asserts the resolved
+  destination stays under `snapshot_root` before copying. Defence in
+  depth on top of the VaultPath sandbox.
+- `_FIELD_SEP` documentation tightened — the invariant that path and
+  command targets reject the separator is now spelled out.
+- Snapshot uniqueness stress test bumped from 5 → 100 successive calls.
+- `OperationName` Literal trimmed to actually-implemented operations
+  (`"batch"` reservation removed).
+- `_SNIPPET_MAX_BYTES` renamed to `_SNIPPET_MAX_CHARS` to match its
+  semantics.
+- `VaultPath` property test bumped from 500 → 1 000 hypothesis
+  examples (plan target).
+- New round-trip golden-file corpus (`tests/security/test_round_trip_
+  golden.py`): 50 synthetic notes asserting `parse_note` +
+  `render_note` is byte-identical, covering comments, key ordering,
+  quote styles, nested mappings, ISO dates, unicode (NFC), tags,
+  flow style, and body invariants.
+- `README.md` rewritten: install, configure, Claude Desktop quick
+  start, tool catalogue, two-phase confirmation walkthrough,
+  security posture summary, links to all sub-docs.
+- `docs/v0.1-followups.md` now opens with a v0.1 disposition section
+  cataloguing every entry as `done` / `v0.2` / `wontfix` per the
+  "implemented or explicitly closed" rule.
+
+[0.1.0]: https://github.com/patrice-bour/obsidian-power-mcp/releases/tag/v0.1.0

@@ -32,7 +32,7 @@ from obsidian_power_mcp.tools._base import map_exception, to_plain_dict
 SearchMode = Literal["fulltext", "frontmatter", "combined"]
 _VALID_MODES: frozenset[str] = frozenset({"fulltext", "frontmatter", "combined"})
 
-_SNIPPET_MAX_BYTES = 200
+_SNIPPET_MAX_CHARS = 200
 
 
 def search_notes(
@@ -213,7 +213,7 @@ def _match_note(
 def _match_fulltext(body: str, q_lower: str) -> str | None:
     for line in body.splitlines():
         if q_lower in line.lower():
-            return line.strip()[:_SNIPPET_MAX_BYTES]
+            return line.strip()[:_SNIPPET_MAX_CHARS]
     return None
 
 
@@ -230,7 +230,7 @@ def _walk_for_match(
 ) -> tuple[str, str] | None:
     if isinstance(node, str):
         if q_lower in node.lower():
-            return path or "<root>", node[:_SNIPPET_MAX_BYTES]
+            return path or "<root>", node[:_SNIPPET_MAX_CHARS]
         return None
     if isinstance(node, dict):
         for k, v in node.items():
