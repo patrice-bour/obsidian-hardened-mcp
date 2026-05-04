@@ -65,3 +65,7 @@ dmypy.json
 audit-logs/
 .opmcp-trash/
 secret
+
+# E2E test vault (ephemeral, recreated by tests/e2e/seed_vault.py)
+tests/e2e/.test-vault/
+tests/e2e/.runs/
