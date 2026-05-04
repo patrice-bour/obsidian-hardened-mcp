@@ -985,3 +985,183 @@ def move_note(
         data["backlinks_rewritten"] = rewritten_count
         data["skipped_unreadable"] = skipped_unreadable
     return ToolResult(ok=True, data=data, audit_id=audit_id)
+
+
+# ---------------------------------------------------------------------------
+# execute_command (M7 — REST-only)
+# ---------------------------------------------------------------------------
+
+# Lazy imports so this module doesn't pull in `httpx` for callers that only
+# touch the file ops. We import at function entry instead of module top.
+
+
+def _validate_command_id(command_id: str) -> str | None:
+    """Reject `command_id` if it isn't a sane Obsidian command id.
+
+    The signature enforces `str`; we only re-validate the *content*.
+    Returns an error message on rejection, None on success.
+    """
+    if not command_id or not command_id.strip():
+        return "command_id must not be empty"
+    if "\x00" in command_id:
+        return "command_id contains a null byte"
+    if "\n" in command_id or "\r" in command_id:
+        return "command_id contains a newline"
+    if len(command_id) > 256:
+        return "command_id exceeds 256 characters"
+    return None
+
+
+def execute_command(
+    config: AppConfig,
+    audit: AuditLogger,
+    registry: ConfirmRegistry,
+    rest_client: Any,
+    rest_detector: Any,
+    *,
+    command_id: str,
+    confirm_token: str | None = None,
+    dry_run: bool = False,
+) -> ToolResult:
+    """Execute a named Obsidian command via the Local REST API plugin.
+
+    REST-only: returns `REST_UNAVAILABLE` if no client / detector is
+    configured, or if the detector reports the API as unavailable.
+    Otherwise the same 2-phase HMAC protocol as `delete_note` applies,
+    bound to the command id rather than a vault path.
+    """
+    started = time.monotonic()
+    request_id = new_request_id()
+    tool_name = "execute_command"
+    operation: OperationName = "execute_command"
+
+    # 1. command_id validation (cheap, no REST round-trip).
+    err = _validate_command_id(command_id)
+    if err is not None:
+        return ToolResult.failure(ErrorCode.INVALID_PATH, err)
+
+    # 2. REST availability — short-circuit before anything else.
+    if rest_client is None or rest_detector is None:
+        return ToolResult.failure(
+            ErrorCode.REST_UNAVAILABLE,
+            "Local REST API not configured (set OBSIDIAN_REST_TOKEN)",
+        )
+    if not rest_detector.is_available():
+        return ToolResult.failure(
+            ErrorCode.REST_UNAVAILABLE,
+            "Local REST API is not currently reachable",
+        )
+
+    payload_hash_value = params_hash(operation, command_id)
+    is_phase2 = confirm_token is not None and not dry_run
+
+    # 3. Phase 2 token consume FIRST (replay -> INVALID, not duplicate-call
+    # masquerading as something else).
+    if is_phase2:
+        try:
+            registry.consume(
+                confirm_token,  # type: ignore[arg-type]
+                expected_operation=operation,
+                expected_target_command=command_id,
+                expected_payload_hash=payload_hash_value,
+            )
+        except Exception as exc:
+            return map_exception(exc)
+
+    # 4. Build preview.
+    preview: dict[str, Any] = {
+        "command_id": command_id,
+        "would_execute": True,
+    }
+
+    # 5. dry_run -> preview only.
+    if dry_run:
+        # Audit uses the vault root as a stable vault_path for command-bound
+        # ops (we have no file path). Pre-existing audits use vault-relative
+        # paths; the empty-string sentinel here is intentional and
+        # documented.
+        audit_id = emit_audit(
+            audit,
+            request_id=request_id,
+            tool=tool_name,
+            op_kind="destructive",
+            vault_path="",
+            outcome="success",
+            started=started,
+            params_hash=payload_hash_value,
+            dry_run=True,
+        )
+        return ToolResult(
+            ok=True,
+            data={**preview, "request_id": request_id},
+            dry_run=True,
+            audit_id=audit_id,
+        )
+
+    # 6. Phase 1 -> issue token.
+    if not is_phase2:
+        op_token = registry.issue(
+            operation=operation,
+            target_command=command_id,
+            payload_hash=payload_hash_value,
+        )
+        audit_id = emit_audit(
+            audit,
+            request_id=request_id,
+            tool=tool_name,
+            op_kind="destructive",
+            vault_path="",
+            outcome="success",
+            started=started,
+            params_hash=payload_hash_value,
+            dry_run=True,
+        )
+        return ToolResult(
+            ok=True,
+            data={
+                **preview,
+                "request_id": request_id,
+                "confirm_token": op_token.token,
+                "expires_at": op_token.expires_at.isoformat(),
+            },
+            dry_run=True,
+            audit_id=audit_id,
+        )
+
+    # 7. Phase 2 -> REST execute.
+    try:
+        rest_response = rest_client.execute_command(command_id)
+    except Exception as exc:
+        audit_id = emit_audit(
+            audit,
+            request_id=request_id,
+            tool=tool_name,
+            op_kind="destructive",
+            vault_path="",
+            outcome="failure",
+            started=started,
+            params_hash=payload_hash_value,
+            dry_run=False,
+        )
+        return map_exception(exc).model_copy(update={"audit_id": audit_id})
+
+    audit_id = emit_audit(
+        audit,
+        request_id=request_id,
+        tool=tool_name,
+        op_kind="destructive",
+        vault_path="",
+        outcome="success",
+        started=started,
+        params_hash=payload_hash_value,
+        dry_run=False,
+    )
+    return ToolResult(
+        ok=True,
+        data={
+            "command_id": command_id,
+            "request_id": request_id,
+            "result": rest_response,
+        },
+        audit_id=audit_id,
+    )

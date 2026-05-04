@@ -374,6 +374,200 @@ class TestHmacTamper:
 
 
 # ---------------------------------------------------------------------------
+# Command-bound tokens (M7 — execute_command)
+# ---------------------------------------------------------------------------
+
+
+class TestCommandBoundTokens:
+    """M7 — execute_command tokens carry a `target_command` (str) instead
+    of a `target` (VaultPath). The HMAC includes a `p:` / `c:`
+    discriminator so a path target and a command target with the same
+    string never collide."""
+
+    def test_issue_command_token_returns_target_command(self) -> None:
+        registry = ConfirmRegistry(secret=b"k" * 32)
+        tok = registry.issue(
+            operation="execute_command",
+            target_command="editor:focus-current",
+            payload_hash="ph",
+        )
+        assert tok.operation == "execute_command"
+        assert tok.target is None
+        assert tok.target_command == "editor:focus-current"
+
+    def test_consume_command_token_happy_path(self) -> None:
+        registry = ConfirmRegistry(secret=b"k" * 32)
+        tok = registry.issue(
+            operation="execute_command",
+            target_command="editor:focus-current",
+            payload_hash="ph",
+        )
+        registry.consume(
+            tok.token,
+            expected_operation="execute_command",
+            expected_target_command="editor:focus-current",
+            expected_payload_hash="ph",
+        )
+
+    def test_consume_command_token_with_swapped_id_rejected(self) -> None:
+        registry = ConfirmRegistry(secret=b"k" * 32)
+        tok = registry.issue(
+            operation="execute_command",
+            target_command="editor:focus-current",
+            payload_hash="ph",
+        )
+        with pytest.raises(PayloadMismatchError):
+            registry.consume(
+                tok.token,
+                expected_operation="execute_command",
+                expected_target_command="workspace:close",
+                expected_payload_hash="ph",
+            )
+
+    def test_consume_command_with_path_expectation_rejected(
+        self, tmp_vault: Path
+    ) -> None:
+        """A command-bound token must not be consumable with a
+        VaultPath expectation (mixing token kinds)."""
+        registry = ConfirmRegistry(secret=b"k" * 32)
+        tok = registry.issue(
+            operation="execute_command",
+            target_command="editor:focus-current",
+            payload_hash="ph",
+        )
+        with pytest.raises(PayloadMismatchError):
+            registry.consume(
+                tok.token,
+                expected_operation="execute_command",
+                expected_target=_vp(tmp_vault, "01_Notes/sample.md"),
+                expected_payload_hash="ph",
+            )
+
+    def test_consume_path_with_command_expectation_rejected(
+        self, tmp_vault: Path
+    ) -> None:
+        """Inverse: a path-bound token cannot be consumed via the
+        command path."""
+        registry = ConfirmRegistry(secret=b"k" * 32)
+        tok = registry.issue(
+            operation="delete_note",
+            target=_vp(tmp_vault, "01_Notes/sample.md"),
+            payload_hash="ph",
+        )
+        with pytest.raises(PayloadMismatchError):
+            registry.consume(
+                tok.token,
+                expected_operation="delete_note",
+                expected_target_command="editor:focus-current",
+                expected_payload_hash="ph",
+            )
+
+    def test_issue_with_neither_target_nor_command_rejected(
+        self,
+    ) -> None:
+        registry = ConfirmRegistry(secret=b"k" * 32)
+        with pytest.raises(ValueError, match="exactly one"):
+            registry.issue(
+                operation="execute_command",
+                payload_hash="ph",
+            )
+
+    def test_issue_with_both_target_and_command_rejected(
+        self, tmp_vault: Path
+    ) -> None:
+        registry = ConfirmRegistry(secret=b"k" * 32)
+        with pytest.raises(ValueError, match="exactly one"):
+            registry.issue(
+                operation="execute_command",
+                target=_vp(tmp_vault, "01_Notes/sample.md"),
+                target_command="editor:focus",
+                payload_hash="ph",
+            )
+
+    def test_consume_with_neither_expectation_rejected(self) -> None:
+        registry = ConfirmRegistry(secret=b"k" * 32)
+        tok = registry.issue(
+            operation="execute_command",
+            target_command="editor:focus",
+            payload_hash="ph",
+        )
+        with pytest.raises(ValueError, match="exactly one"):
+            registry.consume(
+                tok.token,
+                expected_operation="execute_command",
+                expected_payload_hash="ph",
+            )
+
+    def test_consume_with_both_expectations_rejected(
+        self, tmp_vault: Path
+    ) -> None:
+        registry = ConfirmRegistry(secret=b"k" * 32)
+        tok = registry.issue(
+            operation="execute_command",
+            target_command="editor:focus",
+            payload_hash="ph",
+        )
+        with pytest.raises(ValueError, match="exactly one"):
+            registry.consume(
+                tok.token,
+                expected_operation="execute_command",
+                expected_target=_vp(tmp_vault, "01_Notes/sample.md"),
+                expected_target_command="editor:focus",
+                expected_payload_hash="ph",
+            )
+
+    def test_direct_construction_with_neither_target_rejected(self) -> None:
+        """The dataclass `__post_init__` enforces the mutex even when
+        someone bypasses the registry and constructs OperationToken
+        directly. This is defense-in-depth — the registry's `issue()`
+        also validates."""
+        from datetime import UTC, datetime
+
+        with pytest.raises(ValueError, match="exactly one"):
+            OperationToken(
+                token="x",
+                operation="execute_command",
+                expires_at=datetime.now(tz=UTC),
+                payload_hash="ph",
+            )
+
+    def test_direct_construction_with_both_targets_rejected(
+        self, tmp_vault: Path
+    ) -> None:
+        from datetime import UTC, datetime
+
+        with pytest.raises(ValueError, match="exactly one"):
+            OperationToken(
+                token="x",
+                operation="execute_command",
+                expires_at=datetime.now(tz=UTC),
+                payload_hash="ph",
+                target=_vp(tmp_vault, "01_Notes/sample.md"),
+                target_command="editor:focus",
+            )
+
+    def test_command_path_collision_resistance(
+        self, tmp_vault: Path
+    ) -> None:
+        """A path 'foo' and a command 'foo' must produce different HMACs
+        (the discriminator prefix prevents collision)."""
+        registry = ConfirmRegistry(secret=b"k" * 32)
+        (tmp_vault / "foo.md").write_text("hi\n")
+        path_tok = registry.issue(
+            operation="delete_note",
+            target=_vp(tmp_vault, "foo.md"),
+            payload_hash="ph",
+        )
+        command_tok = registry.issue(
+            operation="execute_command",
+            target_command="foo.md",
+            payload_hash="ph",
+        )
+        # Tokens differ (random nonce + different HMAC inputs).
+        assert path_tok.token != command_tok.token
+
+
+# ---------------------------------------------------------------------------
 # Secret bootstrap / loading
 # ---------------------------------------------------------------------------
 

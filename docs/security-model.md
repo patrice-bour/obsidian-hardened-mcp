@@ -67,9 +67,10 @@ target either at its old content or its new content, never in between.
 
 ### LLM-driven destructive ops
 
-Destructive tools (`delete_note`, `rename_note`, `move_note`) require a
-**two-phase HMAC confirmation**. A single hallucinated tool call cannot
-mutate the vault on the first try.
+Destructive tools (`delete_note`, `rename_note`, `move_note`,
+`execute_command`) require a **two-phase HMAC confirmation**. A single
+hallucinated tool call cannot mutate the vault — or trigger an
+Obsidian command — on the first try.
 
 - **Phase 1** (`confirm_token=None`): the tool computes a preview, issues
   a single-use `OperationToken` HMAC-signed against the secret + payload,
@@ -102,6 +103,48 @@ forbidden-zone list). Manual cleanup convention: prune
 wikilink targets `[[oldname]]` / `[[oldname.md]]` are rewritten,
 free-text occurrences are left alone, and unreadable files are counted
 as `skipped_unreadable` rather than crashing the operation.
+
+### Optional Local REST API surface (M7)
+
+When `OBSIDIAN_REST_TOKEN` is set, the server can talk to the
+Obsidian Local REST API plugin running on `https://127.0.0.1:27124`.
+This unlocks `execute_command` — a tool that triggers a named
+Obsidian command (e.g. `editor:focus-current`, `workspace:close`) by
+HTTP POST.
+
+Threat-model decisions:
+
+- **`verify=False`** on the httpx client. The plugin ships a
+  self-signed certificate for `127.0.0.1`; we accept that posture
+  because (a) the endpoint is loopback only — an attacker that can
+  speak to it already has process-level access — and (b) the bearer
+  token is what actually authenticates the call. A user-provided CA
+  bundle is a v0.2 followup (M7-03).
+- **Token never logged.** `RestClient.__repr__` masks it. Audit
+  records carry `tool="execute_command"` but never the token. Auth
+  failures surface as `REST_AUTH_FAILED` with no token in the message.
+- **Two-phase HMAC for `execute_command`.** Same protocol as the file
+  ops, but the token is bound to the **command id** instead of a
+  vault path. The HMAC includes a `p:` / `c:` discriminator to
+  prevent collisions when a path and a command share the same
+  string. Phase 1 issues the token (no REST call). Phase 2 consumes
+  it then POSTs to `/commands/<id>/`.
+- **Lazy availability cache.** A `RestAvailabilityDetector` probes
+  the API at most once per 60 s; failures are cached for the same
+  window so a down endpoint isn't hammered. `get_vault_info`
+  exposes `rest_available` based on the cached state.
+- **Open command surface.** v0.1 ships without a per-command
+  allow-list — any command id the plugin accepts can run, gated
+  only by 2-phase HMAC. An allow-list is tracked as M7-04.
+- **No semantic dry-run for `execute_command`.** Unlike file ops, a
+  pre-execution `GET /commands/<id>/` lookup would add latency and
+  a second failure mode for marginal UX gain. v0.1's `dry_run=True`
+  returns the command id and the fact that REST is configured;
+  nothing more. Tracked as M7-05.
+
+`execute_command` failures emit a destructive `outcome="failure"`
+audit entry with `snapshot_id=null` (REST commands have no
+filesystem state to snapshot before-the-fact).
 
 ### Audit trail integrity (within process scope)
 
@@ -203,6 +246,10 @@ For the threat model above to hold, you must:
 4. Run **one MCP client at a time** against a given vault, or accept
    write-loss risk on concurrent edits.
 5. Don't store secrets in note bodies or frontmatter (mode-loosening).
+6. If you set `OBSIDIAN_REST_TOKEN`, treat it as a vault credential —
+   don't share it across machines, rotate it if exposed, and remember
+   that any command id valid in your Obsidian config becomes runnable
+   via `execute_command`.
 
 ## What is enforced by tests
 
@@ -224,6 +271,12 @@ For the threat model above to hold, you must:
   payload-mismatched calls are rejected, replay is rejected, HMAC
   tampering is rejected, and the secret file is refused if its mode
   is wider than `0o600`.
+- REST surface: `RestClient` masks the bearer token in `repr()` and
+  in error messages; `execute_command` short-circuits with
+  `REST_UNAVAILABLE` when no token is configured or the detector
+  reports the API down; the command-bound HMAC includes a `c:`
+  discriminator so a path target and a command target with the same
+  string never collide.
 
 What is **not** enforced by tests (yet):
 

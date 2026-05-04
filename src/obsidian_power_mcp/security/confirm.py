@@ -41,7 +41,9 @@ from typing import Literal
 
 from obsidian_power_mcp.domain.vault_path import VaultPath
 
-OperationName = Literal["delete_note", "rename_note", "move_note", "batch"]
+OperationName = Literal[
+    "delete_note", "rename_note", "move_note", "execute_command", "batch"
+]
 
 _NONCE_BYTES = 32
 _HMAC_BYTES = 32
@@ -81,13 +83,35 @@ class InsecureSecretFileError(Exception):
 
 @dataclass(frozen=True, slots=True)
 class OperationToken:
-    """A single-use confirmation token bound to a specific destructive call."""
+    """A single-use confirmation token bound to a specific destructive call.
+
+    Tokens come in two flavours:
+    - **Path-bound** (`target` set, `target_command` None) — used by
+      `delete_note`, `rename_note`, `move_note`. The HMAC binds the
+      vault-relative path of the target file.
+    - **Command-bound** (`target_command` set, `target` None) — used by
+      `execute_command` (M7). The HMAC binds the Obsidian command id.
+
+    Exactly one of `target` / `target_command` must be set; the
+    `__post_init__` enforces this. The HMAC includes a `p:` / `c:`
+    discriminator so a path target and a command target with the same
+    string can never collide.
+    """
 
     token: str
     operation: OperationName
-    target: VaultPath
     expires_at: datetime
     payload_hash: str
+    target: VaultPath | None = None
+    target_command: str | None = None
+
+    def __post_init__(self) -> None:
+        path_set = self.target is not None
+        command_set = self.target_command is not None
+        if path_set == command_set:
+            raise ValueError(
+                "OperationToken requires exactly one of target / target_command"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -130,10 +154,20 @@ class ConfirmRegistry:
         self,
         *,
         operation: OperationName,
-        target: VaultPath,
         payload_hash: str,
+        target: VaultPath | None = None,
+        target_command: str | None = None,
     ) -> OperationToken:
-        """Issue a fresh single-use token for a phase-2 destructive call."""
+        """Issue a fresh single-use token for a phase-2 destructive call.
+
+        Pass exactly one of `target` (path-bound, used by the M6 file
+        ops) or `target_command` (command-bound, used by M7's
+        `execute_command`).
+        """
+        if (target is None) == (target_command is None):
+            raise ValueError(
+                "issue requires exactly one of target / target_command"
+            )
         self._sweep_expired()
         now = self._clock()
         expires_at = now + self._ttl
@@ -141,6 +175,7 @@ class ConfirmRegistry:
         mac = self._compute_hmac(
             operation=operation,
             target=target,
+            target_command=target_command,
             payload_hash=payload_hash,
             expires_at=expires_at,
             nonce=nonce,
@@ -152,6 +187,7 @@ class ConfirmRegistry:
             token=token_str,
             operation=operation,
             target=target,
+            target_command=target_command,
             expires_at=expires_at,
             payload_hash=payload_hash,
         )
@@ -163,16 +199,27 @@ class ConfirmRegistry:
         token: str,
         *,
         expected_operation: OperationName,
-        expected_target: VaultPath,
         expected_payload_hash: str,
+        expected_target: VaultPath | None = None,
+        expected_target_command: str | None = None,
     ) -> None:
         """Verify and consume `token`. Single-use.
+
+        Pass exactly one of `expected_target` (path-bound) or
+        `expected_target_command` (command-bound). Mismatches between
+        the token's recorded kind and the caller's expectation surface
+        as `PayloadMismatchError`.
 
         Raises:
             InvalidConfirmationTokenError: token unknown / malformed / tampered.
             ExpiredConfirmationTokenError: token past its TTL.
             PayloadMismatchError: token bound to different operation/target/payload.
+            ValueError: caller passed neither or both expectation kinds.
         """
+        if (expected_target is None) == (expected_target_command is None):
+            raise ValueError(
+                "consume requires exactly one of expected_target / expected_target_command"
+            )
         if not token:
             raise InvalidConfirmationTokenError("empty token")
         # Single-use: pop on consume so a replay (or a payload-mismatched
@@ -201,10 +248,31 @@ class ConfirmRegistry:
                 f"token bound to operation {stored.operation!r}, "
                 f"got {expected_operation!r}"
             )
-        if stored.target != expected_target:
+        # Target kind must match (path vs command). Cross-kind consume
+        # surfaces as a payload mismatch — this is a security-relevant
+        # signal: someone tried to consume a path token via the command
+        # API or vice versa.
+        if expected_target is not None and stored.target is None:
+            raise PayloadMismatchError(
+                "token is command-bound but consume expected a path target"
+            )
+        if expected_target_command is not None and stored.target_command is None:
+            raise PayloadMismatchError(
+                "token is path-bound but consume expected a command target"
+            )
+        if expected_target is not None and stored.target != expected_target:
+            assert stored.target is not None  # narrowing for mypy
             raise PayloadMismatchError(
                 f"token bound to target {stored.target.relative}, "
                 f"got {expected_target.relative}"
+            )
+        if (
+            expected_target_command is not None
+            and stored.target_command != expected_target_command
+        ):
+            raise PayloadMismatchError(
+                f"token bound to command {stored.target_command!r}, "
+                f"got {expected_target_command!r}"
             )
         if not hmac.compare_digest(
             stored.payload_hash, expected_payload_hash
@@ -225,15 +293,24 @@ class ConfirmRegistry:
         self,
         *,
         operation: OperationName,
-        target: VaultPath,
         payload_hash: str,
         expires_at: datetime,
         nonce: bytes,
+        target: VaultPath | None = None,
+        target_command: str | None = None,
     ) -> bytes:
+        # Discriminator prefix `p:` (path) or `c:` (command) prevents
+        # cross-kind collisions when the path and command happen to be
+        # the same string.
+        if target is not None:
+            target_field = b"p:" + str(target.relative).encode("utf-8")
+        else:
+            assert target_command is not None  # post-init enforces this
+            target_field = b"c:" + target_command.encode("utf-8")
         message = (
             operation.encode("utf-8")
             + _FIELD_SEP
-            + str(target.relative).encode("utf-8")
+            + target_field
             + _FIELD_SEP
             + payload_hash.encode("utf-8")
             + _FIELD_SEP
@@ -255,6 +332,7 @@ class ConfirmRegistry:
         expected = self._compute_hmac(
             operation=stored.operation,
             target=stored.target,
+            target_command=stored.target_command,
             payload_hash=stored.payload_hash,
             expires_at=stored.expires_at,
             nonce=nonce,

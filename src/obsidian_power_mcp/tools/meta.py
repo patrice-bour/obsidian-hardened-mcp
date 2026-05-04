@@ -21,8 +21,15 @@ def _server_version() -> str:
 
 
 @tool_call
-def get_vault_info(config: AppConfig) -> ToolResult:
-    """Return vault metadata and server runtime info."""
+def get_vault_info(
+    config: AppConfig, *, rest_available: bool = False
+) -> ToolResult:
+    """Return vault metadata and server runtime info.
+
+    `rest_available` is supplied by the server caller from the
+    `RestAvailabilityDetector` it owns. Standalone callers (or tests)
+    that don't pass it default to False.
+    """
     note_count = sum(1 for _ in iter_markdown(config.vault_root))
     return ToolResult.success(
         data={
@@ -30,7 +37,7 @@ def get_vault_info(config: AppConfig) -> ToolResult:
             "note_count": note_count,
             "max_file_size_mb": config.max_file_size_mb,
             "max_batch": config.max_batch,
-            "rest_available": False,  # populated by REST detector in M7
+            "rest_available": rest_available,
             "server_name": SERVER_NAME,
             "server_version": _server_version(),
         }
@@ -124,6 +131,15 @@ def list_tools_capabilities(config: AppConfig) -> ToolResult:
             "description": (
                 "Move a note to another folder. Two-phase confirm; "
                 "optional best-effort wikilink rewrite."
+            ),
+        },
+        {
+            "name": "execute_command",
+            "kind": "destructive",
+            "description": (
+                "Execute a named Obsidian command via the Local REST API. "
+                "Requires the plugin to be running. Two-phase HMAC confirm; "
+                "the token is bound to the command id."
             ),
         },
         # Meta

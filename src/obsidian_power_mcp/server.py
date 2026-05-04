@@ -12,6 +12,8 @@ from mcp.server.fastmcp import FastMCP
 
 from obsidian_power_mcp.config import AppConfig
 from obsidian_power_mcp.domain.results import ToolResult
+from obsidian_power_mcp.rest.client import RestClient
+from obsidian_power_mcp.rest.detector import RestAvailabilityDetector
 from obsidian_power_mcp.security.audit_logger import AuditLogger
 from obsidian_power_mcp.security.confirm import (
     ConfirmRegistry,
@@ -19,6 +21,9 @@ from obsidian_power_mcp.security.confirm import (
 )
 from obsidian_power_mcp.tools.destructive import (
     delete_note as _delete_note_impl,
+)
+from obsidian_power_mcp.tools.destructive import (
+    execute_command as _execute_command_impl,
 )
 from obsidian_power_mcp.tools.destructive import (
     move_note as _move_note_impl,
@@ -63,6 +68,7 @@ def create_server(
     *,
     hooks: HookRegistry | None = None,
     registry: ConfirmRegistry | None = None,
+    rest_detector: RestAvailabilityDetector | None = None,
 ) -> FastMCP:
     """Build a FastMCP server bound to the given configuration.
 
@@ -76,6 +82,11 @@ def create_server(
     purely-read flows (and tests for them) never touch the on-disk HMAC
     secret. Pass an explicit `ConfirmRegistry` to override (tests do this
     to avoid the secret file altogether).
+
+    `rest_detector` enables the optional Local REST API integration. If
+    omitted, we build one automatically when `config.rest_token` is set.
+    Tests inject a fake detector (and indirectly a fake client) to
+    avoid hitting a real Obsidian instance.
     """
     app = FastMCP(name="obsidian-power-mcp")
     audit = AuditLogger(audit_dir=config.audit_dir)
@@ -91,6 +102,25 @@ def create_server(
             secret = load_or_bootstrap_secret(config.secret_file)
             _registry_slot[0] = ConfirmRegistry(secret=secret)
         return _registry_slot[0]  # type: ignore[return-value]
+
+    # ---- REST client + detector (M7) -----------------------------------
+    # When the caller injects a detector we trust them (tests do this).
+    # Otherwise we build the pair iff a token is configured. With no
+    # token there is no REST surface at all — execute_command will
+    # short-circuit with REST_UNAVAILABLE and get_vault_info reports
+    # rest_available=False.
+    rest_client: RestClient | None = None
+    if rest_detector is None and config.rest_token is not None:
+        rest_client = RestClient(
+            config.rest_url,
+            config.rest_token,
+            timeout_seconds=0.5,
+        )
+        rest_detector = RestAvailabilityDetector(rest_client, ttl_seconds=60)
+    elif rest_detector is not None:
+        # Tests pass a detector wrapping a fake client; expose the inner
+        # client so execute_command can call it.
+        rest_client = getattr(rest_detector, "_client", None)
 
     # ---- Read ----------------------------------------------------------
 
@@ -328,11 +358,38 @@ def create_server(
             dry_run=dry_run,
         )
 
+    @app.tool(
+        description=(
+            "Execute a named Obsidian command via the Local REST API plugin. "
+            "Requires the plugin to be running and `OBSIDIAN_REST_TOKEN` set. "
+            "Two-phase HMAC confirm (same protocol as delete_note); the token "
+            "is bound to the command id."
+        )
+    )
+    def execute_command(
+        command_id: str,
+        confirm_token: str | None = None,
+        dry_run: bool = False,
+    ) -> ToolResult:
+        return _execute_command_impl(
+            config,
+            audit,
+            _ensure_registry(),
+            rest_client,
+            rest_detector,
+            command_id=command_id,
+            confirm_token=confirm_token,
+            dry_run=dry_run,
+        )
+
     # ---- Meta ----------------------------------------------------------
 
     @app.tool(description="Return vault metadata (root, note count, limits, server identity).")
     def get_vault_info() -> ToolResult:
-        return _get_vault_info_impl(config)
+        rest_available = (
+            rest_detector.is_available() if rest_detector is not None else False
+        )
+        return _get_vault_info_impl(config, rest_available=rest_available)
 
     @app.tool(description="Return the manifest of tools available on this server.")
     def list_tools_capabilities() -> ToolResult:

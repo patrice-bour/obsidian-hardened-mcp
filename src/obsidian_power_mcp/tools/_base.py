@@ -42,6 +42,11 @@ from obsidian_power_mcp.fs.reader import (
     NotAFileError,
     NotFoundError,
 )
+from obsidian_power_mcp.rest.client import (
+    RestAuthError,
+    RestError,
+    RestUnavailableError,
+)
 from obsidian_power_mcp.security.audit_logger import AuditLogger
 from obsidian_power_mcp.security.confirm import (
     ExpiredConfirmationTokenError,
@@ -105,6 +110,12 @@ def map_exception(exc: Exception) -> ToolResult:
             code = ErrorCode.PAYLOAD_MISMATCH
         case InvalidConfirmationTokenError():
             code = ErrorCode.INVALID_CONFIRMATION_TOKEN
+        case RestAuthError():
+            code = ErrorCode.REST_AUTH_FAILED
+        case RestUnavailableError():
+            code = ErrorCode.REST_UNAVAILABLE
+        case RestError():
+            code = ErrorCode.REST_ERROR
         case PermissionError():
             code = ErrorCode.PERMISSION_DENIED
         case _:

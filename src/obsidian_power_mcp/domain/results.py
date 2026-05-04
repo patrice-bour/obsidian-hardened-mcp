@@ -38,6 +38,9 @@ class ErrorCode(StrEnum):
     INVALID_CONFIRMATION_TOKEN = "invalid_confirmation_token"  # noqa: S105
     EXPIRED_CONFIRMATION_TOKEN = "expired_confirmation_token"  # noqa: S105
     PAYLOAD_MISMATCH = "payload_mismatch"
+    REST_UNAVAILABLE = "rest_unavailable"
+    REST_AUTH_FAILED = "rest_auth_failed"
+    REST_ERROR = "rest_error"
     INTERNAL_ERROR = "internal_error"
 
 
