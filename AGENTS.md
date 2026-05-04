@@ -51,7 +51,7 @@ The approved v0.1 plan lives at `~/.claude/plans/les-serveurs-mcp-existants-tran
 
 ## Where to resume (for a fresh session)
 
-**Last merged on `main`**: `fix(M7.5): code-review hardening — REST surface tightening`.
+**Last merged on `main`**: `chore(M8): hardening + docs + v0.1.0 release prep`. **v0.1.0 tagged.**
 
 **Milestones progress** (commits in `git log`):
 
@@ -68,51 +68,34 @@ The approved v0.1 plan lives at `~/.claude/plans/les-serveurs-mcp-existants-tran
 | ✅ | M6.5 — code-review hardening (backlink-rewrite audit attribution) | `b5f55b7` | 410 |
 | ✅ | M7 — optional Local REST API (`execute_command` via REST + 2-phase HMAC) | `7fb3681` | 471 |
 | ✅ | M7.5 — code-review hardening (loopback-only `rest_url`, consume-before-REST ordering, `\x1e` rejection) | `182e28a` | 479 |
-| ▶ | **M8 — hardening + docs + release v0.1.0** | next | — |
+| ✅ | **M8 — hardening + README + CHANGELOG + golden round-trip + v0.1.0 tag** | `f24827b` | 530 |
+| 🎉 | **v0.1.0 tagged** | tag `v0.1.0` on `f24827b` | — |
 
-**Next task**: M8 — hardening + README + tag v0.1.0. Per the master plan
-(§"Plan d'implémentation incrémental"): "Hardening (property-based,
-golden files round-trip) + README + docs + tag v0.1.0 — 1 day". This
-is the final v0.1 milestone before release.
+**Next task**: v0.2 — pick up the v0.2 backlog in
+`docs/v0.1-followups.md` (36 entries). The master plan covered v0.1;
+v0.2 priorities (informally): ripgrep-backed `search_notes` with TTL
+index cache (M5-01 + M5-02), `path_routing` built-in hook (M4-01),
+`execute_command` allow-list (M7-04), TLS CA bundle (M7-03), and the
+`search_notes` REST routing that v0.1 deferred (M7-01). Decide a
+proper v0.2 plan + brief before opening the next worktree.
 
-Standard loop (no implementation brief needed; M8 is mostly polish +
-docs + release prep):
-
-1. Audit the v0.1 followups list (`docs/v0.1-followups.md`, 27 entries
-   from M4–M7 reviews); decide which Major items must close before v0.1
-   tag and which slip to v0.2. Document the cut.
-2. Property-based / golden-file tests as specified in the plan
-   (round-trip ruamel on 50+ pbkm-style notes, hypothesis sweep).
-3. Write `README.md` (currently a stub) — install, configure, examples,
-   security posture summary, link to `docs/security-model.md`.
-4. Polish CHANGELOG.md.
-5. Tag v0.1.0 on `main`. Create worktree only if there are non-trivial
-   tests/code changes.
-
-**Tooling sanity check** before starting:
+**Sanity check** to confirm a clean v0.1.0 base:
 
 ```bash
 cd /Users/pbr/projets/IA/MCP/obsidian-power-mcp/main
-uv run pytest -q                # expect 479 passed
+uv run pytest -q                # expect 530 passed
 uv run ruff check src tests     # expect "All checks passed"
 uv run mypy src                 # expect "no issues found"
-git log --oneline -12           # expect 11 commits, last = 182e28a
+git log --oneline -14           # expect 13 commits, last = f24827b (v0.1.0 tag)
+git tag -l                      # expect 'v0.1.0'
 ```
 
-If any of those fail, do NOT start M8 — investigate the regression first.
+**v0.2 backlog** (M8 audit, full table in `docs/v0.1-followups.md` § v0.1.0 disposition): 4 done, 36 v0.2, 2 wontfix. Top targets when v0.2 opens:
 
-**M6+M7 carryover** (deferred to v0.2 followups, see `docs/v0.1-followups.md`):
-
-*M6 (10 entries)* — HMAC field separator collisions (M6-01); snapshot
-path containment assertion (M6-02); backlink scan dead-code (M6-03);
-lazy registry thread safety (M6-04); consumed-then-failed-snapshot UX
-docs (M6-05); base64 over-padding (M6-06); mode != 0o600 strictness
-(M6-07); optional polish (M6-08..M6-10).
-
-*M7 (9 entries)* — `search_notes` REST routing (M7-01, plan deviation);
-`resolve_wikilink` REST routing (M7-02); CA bundle (M7-03);
-`execute_command` allow-list (M7-04, defense-in-depth); semantic
-dry-run via /commands/<id>/ (M7-05); RestClient lifecycle (M7-S3);
-audit `vault_path=""` sentinel (M7-S4); triple mutex check
-(M7-S6); `invalidate()` unused (M7-S7); private-attribute access in
-server (M7-S8); fragile FastMCP integration tests (M7-S9).
+- M5-01 + M5-02 — ripgrep-backed `search_notes` with TTL index cache.
+- M4-01 — `path_routing` built-in hook (last of the three planned).
+- M7-04 — `execute_command` allow-list (defense in depth).
+- M7-03 — TLS CA bundle option (relax loopback constraint).
+- M7-01 / M7-02 — REST routing for `search_notes` / `resolve_wikilink`.
+- M6-04 — lazy registry init thread safety.
+- M4-13 / M4-14 — config hot-reload + clean `ConfigError` exit.
