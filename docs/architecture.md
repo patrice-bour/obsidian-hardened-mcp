@@ -3,7 +3,7 @@
 ## Module layout
 
 ```
-src/obsidian_power_mcp/
+src/obsidian_full_mcp/
 ├── __init__.py            # version
 ├── __main__.py            # CLI entry point (argparse + create_server + run)
 ├── server.py              # FastMCP wiring — register tools
@@ -68,7 +68,7 @@ The path sandbox in `domain/vault_path.py` defends against:
 - **Path traversal** (`..`, mid-path, encoded)
 - **Absolute path injection** (`/etc/passwd`)
 - **Symlink escape** (component is a symlink to outside the vault)
-- **Forbidden zone access** (`.obsidian/`, `.git/`, `.trash/`, `.opmcp-trash/`,
+- **Forbidden zone access** (`.obsidian/`, `.git/`, `.trash/`, `.ofmcp-trash/`,
   the project config file)
 - **Length / segment count attacks** (4096-char path, 32-segment, 255-byte
   segment limits)

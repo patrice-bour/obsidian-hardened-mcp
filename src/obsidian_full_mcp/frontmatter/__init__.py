@@ -10,7 +10,7 @@ Public API:
 
 from __future__ import annotations
 
-from obsidian_power_mcp.frontmatter.parser import (
+from obsidian_full_mcp.frontmatter.parser import (
     FrontmatterError,
     FrontmatterTooLargeError,
     MalformedFrontmatterError,

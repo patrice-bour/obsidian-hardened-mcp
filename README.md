@@ -1,4 +1,4 @@
-# obsidian-power-mcp
+# obsidian-full-mcp
 
 A secure Model Context Protocol (MCP) server for [Obsidian](https://obsidian.md) vaults.
 
@@ -12,13 +12,13 @@ Existing MCP servers for Obsidian are limited:
 - Frontmatter cannot be edited atomically (set/delete/merge a single field) after creation
 - Security models are inconsistent and often missing entirely
 
-`obsidian-power-mcp` addresses these gaps with a hardened, security-first design:
+`obsidian-full-mcp` addresses these gaps with a hardened, security-first design:
 
 - **Full file modification** with atomic writes (tmp + fsync + rename)
 - **Atomic frontmatter operations** — get / set / delete / merge by field, with round-trip preservation (comments, ordering, quote styles)
 - **Path sandbox** that resists traversal, symlink escape, and absolute-path injection (1 000-example hypothesis sweep)
 - **Two-phase HMAC confirmation** for destructive ops (delete / rename / move / `execute_command`) — a single hallucinated tool call can never mutate the vault on the first try
-- **Pre-destruction snapshots** under `.opmcp-trash/` for every destructive op
+- **Pre-destruction snapshots** under `.ofmcp-trash/` for every destructive op
 - **JSONL audit log** with deterministic content hashes
 - **Pluggable validation hooks** driven by external YAML — no hardcoded vault conventions
 - **Optional REST integration** when the [Obsidian Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin is running
@@ -28,8 +28,8 @@ Existing MCP servers for Obsidian are limited:
 The server requires Python ≥ 3.11 and uses [`uv`](https://github.com/astral-sh/uv) for dependency management.
 
 ```bash
-git clone https://github.com/patrice-bour/obsidian-power-mcp.git
-cd obsidian-power-mcp
+git clone https://github.com/patrice-bour/obsidian-full-mcp.git
+cd obsidian-full-mcp
 uv sync
 ```
 
@@ -46,7 +46,7 @@ A successful run reports `530 passed`.
 Point the server at your vault root:
 
 ```bash
-uv run obsidian-power-mcp --vault /path/to/your/vault
+uv run obsidian-full-mcp --vault /path/to/your/vault
 ```
 
 The server speaks stdio MCP. For Claude Desktop, add to
@@ -55,10 +55,10 @@ The server speaks stdio MCP. For Claude Desktop, add to
 ```json
 {
   "mcpServers": {
-    "obsidian-power-mcp": {
+    "obsidian-full-mcp": {
       "command": "uv",
-      "args": ["run", "--project", "/path/to/obsidian-power-mcp",
-               "obsidian-power-mcp", "--vault", "/path/to/your/vault"]
+      "args": ["run", "--project", "/path/to/obsidian-full-mcp",
+               "obsidian-full-mcp", "--vault", "/path/to/your/vault"]
     }
   }
 }
@@ -74,7 +74,7 @@ The server speaks stdio MCP. For Claude Desktop, add to
 | `OBSIDIAN_REST_URL` | Override the Local REST API endpoint. **Must be loopback** (`127.0.0.1`, `localhost`, `[::1]`). Default `https://127.0.0.1:27124`. |
 | `OBSIDIAN_REST_TOKEN` | Bearer token for the Local REST API plugin. When set, `execute_command` becomes available. |
 
-### Vault-level config (`<vault>/.obsidian-power-mcp.yaml`)
+### Vault-level config (`<vault>/.obsidian-full-mcp.yaml`)
 
 Validation hooks load from a YAML file at the vault root. Example:
 
@@ -100,9 +100,9 @@ See [`docs/config-reference.md`](./docs/config-reference.md) for the full schema
 
 | Path | Contents | Mode |
 |---|---|---|
-| `~/.obsidian-power-mcp/audit/YYYY-MM-DD.jsonl` | Append-only JSONL audit log of every write/destructive op. | `0644` |
-| `~/.obsidian-power-mcp/secret` | HMAC secret for 2-phase confirmation tokens (auto-generated on first boot). | `0600` |
-| `<vault>/.opmcp-trash/<UTC-ts>/` | Snapshots taken before every destructive op. Manual prune. | inherited |
+| `~/.obsidian-full-mcp/audit/YYYY-MM-DD.jsonl` | Append-only JSONL audit log of every write/destructive op. | `0644` |
+| `~/.obsidian-full-mcp/secret` | HMAC secret for 2-phase confirmation tokens (auto-generated on first boot). | `0600` |
+| `<vault>/.ofmcp-trash/<UTC-ts>/` | Snapshots taken before every destructive op. Manual prune. | inherited |
 
 ## Tools exposed
 
@@ -139,7 +139,7 @@ Every destructive tool follows the same protocol:
    payload) plus a preview. **Disk untouched.**
 2. **Phase 2** — call again with the same arguments AND
    `confirm_token=<from-phase-1>`. The tool consumes the token,
-   snapshots the original state under `.opmcp-trash/`, and applies the
+   snapshots the original state under `.ofmcp-trash/`, and applies the
    change atomically.
 
 A single hallucinated call cannot mutate the vault on the first try because
@@ -152,7 +152,7 @@ threat model. The headline guarantees:
 
 - **Path sandbox** at every tool boundary (`VaultPath.from_user`):
   rejects absolute paths, traversal, symlink escape, forbidden zones
-  (`.obsidian/`, `.git/`, `.trash/`, `.opmcp-trash/`, the config file),
+  (`.obsidian/`, `.git/`, `.trash/`, `.ofmcp-trash/`, the config file),
   null bytes, oversize segments. Held to 100 % branch coverage and
   proven by a 1 000-example hypothesis sweep.
 - **Atomic writes** — tmp-in-same-dir + fsync + `os.replace` + dir-fsync.
@@ -176,7 +176,7 @@ explicitly out of scope; see `docs/security-model.md` § "Non-goals".
 
 - [`docs/architecture.md`](./docs/architecture.md) — module layout and tool flow.
 - [`docs/security-model.md`](./docs/security-model.md) — threat model + tested invariants.
-- [`docs/config-reference.md`](./docs/config-reference.md) — `.obsidian-power-mcp.yaml` schema.
+- [`docs/config-reference.md`](./docs/config-reference.md) — `.obsidian-full-mcp.yaml` schema.
 - [`docs/v0.1-followups.md`](./docs/v0.1-followups.md) — items deferred to v0.2 with rationale.
 - [`AGENTS.md`](./AGENTS.md) — agent-facing project conventions.
 

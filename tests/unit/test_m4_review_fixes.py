@@ -10,17 +10,17 @@ from pathlib import Path
 
 import pytest
 
-from obsidian_power_mcp.config import AppConfig
-from obsidian_power_mcp.domain.results import ErrorCode
-from obsidian_power_mcp.domain.vault_path import VaultPath
-from obsidian_power_mcp.security.audit_logger import AuditLogger
-from obsidian_power_mcp.tools.frontmatter import set_frontmatter_field
-from obsidian_power_mcp.validation.builtin_hooks import JsonSchemaHook
-from obsidian_power_mcp.validation.config_loader import (
+from obsidian_full_mcp.config import AppConfig
+from obsidian_full_mcp.domain.results import ErrorCode
+from obsidian_full_mcp.domain.vault_path import VaultPath
+from obsidian_full_mcp.security.audit_logger import AuditLogger
+from obsidian_full_mcp.tools.frontmatter import set_frontmatter_field
+from obsidian_full_mcp.validation.builtin_hooks import JsonSchemaHook
+from obsidian_full_mcp.validation.config_loader import (
     ConfigError,
     load_validation_config,
 )
-from obsidian_power_mcp.validation.hooks import (
+from obsidian_full_mcp.validation.hooks import (
     HookContext,
     HookRegistry,
     HookResult,
@@ -107,7 +107,7 @@ class TestHookContextIsolation:
 
 
 # ===========================================================================
-# M2 — `.obsidian-power-mcp.yaml` rejects custom YAML tags
+# M2 — `.obsidian-full-mcp.yaml` rejects custom YAML tags
 # ===========================================================================
 
 
@@ -115,7 +115,7 @@ class TestConfigYamlSafety:
     def test_custom_tag_in_config_is_rejected(self, tmp_vault: Path) -> None:
         # `!Untrusted` would otherwise survive ruamel rt loading and travel
         # into hook construction as a `TaggedScalar` — refused at parse.
-        (tmp_vault / ".obsidian-power-mcp.yaml").write_text(
+        (tmp_vault / ".obsidian-full-mcp.yaml").write_text(
             "hooks:\n"
             "  - reserved_tags:\n"
             "      forbidden: !Untrusted\n"
@@ -128,7 +128,7 @@ class TestConfigYamlSafety:
     def test_python_object_tag_in_config_is_rejected(
         self, tmp_vault: Path
     ) -> None:
-        (tmp_vault / ".obsidian-power-mcp.yaml").write_text(
+        (tmp_vault / ".obsidian-full-mcp.yaml").write_text(
             "hooks:\n"
             "  - reserved_tags:\n"
             "      forbidden: !!python/object/apply:os.system ['id']\n"
@@ -139,7 +139,7 @@ class TestConfigYamlSafety:
 
     def test_default_tags_in_config_are_accepted(self, tmp_vault: Path) -> None:
         # Plain str/list/int/bool/null still work.
-        (tmp_vault / ".obsidian-power-mcp.yaml").write_text(
+        (tmp_vault / ".obsidian-full-mcp.yaml").write_text(
             "hooks:\n"
             "  - reserved_tags:\n"
             "      forbidden: [migration-cc]\n"
@@ -157,7 +157,7 @@ class TestConfigYamlSafety:
 
 class TestJsonSchemaCyclicRefGuard:
     def test_mutually_recursive_refs_rejected_at_construction(self) -> None:
-        from obsidian_power_mcp.validation.builtin_hooks import CyclicRefError
+        from obsidian_full_mcp.validation.builtin_hooks import CyclicRefError
 
         cyclic = {
             "$ref": "#/$defs/A",
@@ -172,7 +172,7 @@ class TestJsonSchemaCyclicRefGuard:
         assert "cyclic" in str(exc_info.value).lower()
 
     def test_self_ref_rejected_at_construction(self) -> None:
-        from obsidian_power_mcp.validation.builtin_hooks import CyclicRefError
+        from obsidian_full_mcp.validation.builtin_hooks import CyclicRefError
 
         self_ref = {"$ref": "#"}
         with pytest.raises(CyclicRefError):
@@ -186,7 +186,7 @@ class TestJsonSchemaCyclicRefGuard:
             '{"$ref": "#/$defs/A", "$defs": {'
             '"A": {"$ref": "#/$defs/B"}, "B": {"$ref": "#/$defs/A"}}}'
         )
-        (tmp_vault / ".obsidian-power-mcp.yaml").write_text(
+        (tmp_vault / ".obsidian-full-mcp.yaml").write_text(
             "hooks:\n"
             "  - json_schema:\n"
             "      schemas:\n"

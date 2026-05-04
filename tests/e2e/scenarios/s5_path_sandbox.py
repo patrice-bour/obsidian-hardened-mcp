@@ -32,12 +32,12 @@ _CASES: list[tuple[str, frozenset[str], str]] = [
         "forbidden zone .git/",
     ),
     (
-        ".opmcp-trash/x.md",
+        ".ofmcp-trash/x.md",
         frozenset({"forbidden_zone", "invalid_path"}),
-        "forbidden zone .opmcp-trash/",
+        "forbidden zone .ofmcp-trash/",
     ),
     (
-        ".obsidian-power-mcp.yaml",
+        ".obsidian-full-mcp.yaml",
         frozenset({"forbidden_zone", "invalid_path", "not_a_file"}),
         "config file is reserved",
     ),

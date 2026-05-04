@@ -10,57 +10,57 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from obsidian_power_mcp.config import AppConfig
-from obsidian_power_mcp.domain.results import ToolResult
-from obsidian_power_mcp.rest.client import RestClient
-from obsidian_power_mcp.rest.detector import RestAvailabilityDetector
-from obsidian_power_mcp.security.audit_logger import AuditLogger
-from obsidian_power_mcp.security.confirm import (
+from obsidian_full_mcp.config import AppConfig
+from obsidian_full_mcp.domain.results import ToolResult
+from obsidian_full_mcp.rest.client import RestClient
+from obsidian_full_mcp.rest.detector import RestAvailabilityDetector
+from obsidian_full_mcp.security.audit_logger import AuditLogger
+from obsidian_full_mcp.security.confirm import (
     ConfirmRegistry,
     load_or_bootstrap_secret,
 )
-from obsidian_power_mcp.tools.destructive import (
+from obsidian_full_mcp.tools.destructive import (
     delete_note as _delete_note_impl,
 )
-from obsidian_power_mcp.tools.destructive import (
+from obsidian_full_mcp.tools.destructive import (
     execute_command as _execute_command_impl,
 )
-from obsidian_power_mcp.tools.destructive import (
+from obsidian_full_mcp.tools.destructive import (
     move_note as _move_note_impl,
 )
-from obsidian_power_mcp.tools.destructive import (
+from obsidian_full_mcp.tools.destructive import (
     rename_note as _rename_note_impl,
 )
-from obsidian_power_mcp.tools.frontmatter import (
+from obsidian_full_mcp.tools.frontmatter import (
     delete_frontmatter_field as _delete_frontmatter_field_impl,
 )
-from obsidian_power_mcp.tools.frontmatter import (
+from obsidian_full_mcp.tools.frontmatter import (
     get_frontmatter as _get_frontmatter_impl,
 )
-from obsidian_power_mcp.tools.frontmatter import (
+from obsidian_full_mcp.tools.frontmatter import (
     merge_frontmatter as _merge_frontmatter_impl,
 )
-from obsidian_power_mcp.tools.frontmatter import (
+from obsidian_full_mcp.tools.frontmatter import (
     set_frontmatter_field as _set_frontmatter_field_impl,
 )
-from obsidian_power_mcp.tools.meta import get_vault_info as _get_vault_info_impl
-from obsidian_power_mcp.tools.meta import (
+from obsidian_full_mcp.tools.meta import get_vault_info as _get_vault_info_impl
+from obsidian_full_mcp.tools.meta import (
     list_tools_capabilities as _list_tools_capabilities_impl,
 )
-from obsidian_power_mcp.tools.read import list_notes as _list_notes_impl
-from obsidian_power_mcp.tools.read import read_note as _read_note_impl
-from obsidian_power_mcp.tools.search import search_notes as _search_notes_impl
-from obsidian_power_mcp.tools.wikilink import (
+from obsidian_full_mcp.tools.read import list_notes as _list_notes_impl
+from obsidian_full_mcp.tools.read import read_note as _read_note_impl
+from obsidian_full_mcp.tools.search import search_notes as _search_notes_impl
+from obsidian_full_mcp.tools.wikilink import (
     resolve_wikilink as _resolve_wikilink_impl,
 )
-from obsidian_power_mcp.tools.write import (
+from obsidian_full_mcp.tools.write import (
     append_to_note as _append_to_note_impl,
 )
-from obsidian_power_mcp.tools.write import create_note as _create_note_impl
-from obsidian_power_mcp.tools.write import patch_note as _patch_note_impl
-from obsidian_power_mcp.tools.write import update_note as _update_note_impl
-from obsidian_power_mcp.validation.config_loader import load_validation_config
-from obsidian_power_mcp.validation.hooks import HookRegistry
+from obsidian_full_mcp.tools.write import create_note as _create_note_impl
+from obsidian_full_mcp.tools.write import patch_note as _patch_note_impl
+from obsidian_full_mcp.tools.write import update_note as _update_note_impl
+from obsidian_full_mcp.validation.config_loader import load_validation_config
+from obsidian_full_mcp.validation.hooks import HookRegistry
 
 
 def create_server(
@@ -73,7 +73,7 @@ def create_server(
     """Build a FastMCP server bound to the given configuration.
 
     `hooks` is the validation registry; if omitted the server loads it from
-    `<vault_root>/.obsidian-power-mcp.yaml` (and falls back to an empty
+    `<vault_root>/.obsidian-full-mcp.yaml` (and falls back to an empty
     registry if the file is absent). Pass an explicit `HookRegistry([])`
     to skip auto-loading entirely (used by tests).
 
@@ -88,7 +88,7 @@ def create_server(
     Tests inject a fake detector (and indirectly a fake client) to
     avoid hitting a real Obsidian instance.
     """
-    app = FastMCP(name="obsidian-power-mcp")
+    app = FastMCP(name="obsidian-full-mcp")
     audit = AuditLogger(audit_dir=config.audit_dir)
     if hooks is None:
         hooks = load_validation_config(config.vault_root)
@@ -267,7 +267,7 @@ def create_server(
         dry_run: bool = False,
     ) -> ToolResult:
         if mode not in ("shallow", "deep"):
-            from obsidian_power_mcp.domain.results import ErrorCode
+            from obsidian_full_mcp.domain.results import ErrorCode
 
             return ToolResult.failure(
                 ErrorCode.INVALID_PATH, f"unknown merge mode: {mode!r}"
@@ -288,7 +288,7 @@ def create_server(
         description=(
             "Delete a note. Two-phase: first call returns a `confirm_token` "
             "and a preview without touching the disk; second call with the "
-            "same token snapshots the file under `.opmcp-trash/` and unlinks "
+            "same token snapshots the file under `.ofmcp-trash/` and unlinks "
             "it. Pass `dry_run=True` to preview without issuing a token."
         )
     )

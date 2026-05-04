@@ -3,7 +3,7 @@
 `snapshot_for_destruction` copies the targeted file into
 `<snapshot_root>/<UTC-ts>-<short-hash>/<original-relative-path>` BEFORE
 any destructive op runs. The destination lives under the vault's
-`.opmcp-trash/` (a forbidden zone for read tools), so snapshots are
+`.ofmcp-trash/` (a forbidden zone for read tools), so snapshots are
 preserved but never re-exposed via the MCP surface.
 """
 
@@ -16,8 +16,8 @@ from pathlib import Path
 
 import pytest
 
-from obsidian_power_mcp.domain.vault_path import VaultPath
-from obsidian_power_mcp.fs.snapshot import (
+from obsidian_full_mcp.domain.vault_path import VaultPath
+from obsidian_full_mcp.fs.snapshot import (
     SnapshotError,
     snapshot_for_destruction,
 )
@@ -30,7 +30,7 @@ def _vp(tmp_vault: Path, rel: str) -> VaultPath:
 
 
 def _trash(tmp_vault: Path) -> Path:
-    return tmp_vault / ".opmcp-trash"
+    return tmp_vault / ".ofmcp-trash"
 
 
 class TestSnapshotFile:
@@ -110,8 +110,8 @@ class TestSnapshotIdUniqueness:
 
 
 class TestSnapshotDestinationIsTrash:
-    def test_destination_under_opmcp_trash(self, tmp_vault: Path) -> None:
-        # The caller passes <vault>/.opmcp-trash; the resulting snapshot
+    def test_destination_under_ofmcp_trash(self, tmp_vault: Path) -> None:
+        # The caller passes <vault>/.ofmcp-trash; the resulting snapshot
         # path MUST stay inside that forbidden zone (no traversal possible
         # since we use the file's vault-relative path verbatim).
         vp = _vp(tmp_vault, "01_Notes/sample.md")

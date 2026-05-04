@@ -1,4 +1,4 @@
-"""End-to-end runner for `obsidian-power-mcp` v0.1.0.
+"""End-to-end runner for `obsidian-full-mcp` v0.1.0.
 
 Orchestrates scenarios S0-S9 against a fresh seeded test vault, talking
 to the server through a real stdio MCP subprocess. Prints a final
@@ -79,7 +79,7 @@ async def main() -> int:
         _print_scenario(rep)
 
     # Phase 2: S7 spawns a fresh harness internally (restart required to
-    # auto-load the dropped `.obsidian-power-mcp.yaml`).
+    # auto-load the dropped `.obsidian-full-mcp.yaml`).
     print("--- s7_validation_hooks ---")
     rep = await s7_validation_hooks.run(vault)
     reports.append(rep)

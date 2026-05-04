@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from obsidian_power_mcp.config import AppConfig
-from obsidian_power_mcp.domain.results import ErrorCode
-from obsidian_power_mcp.tools.wikilink import resolve_wikilink
+from obsidian_full_mcp.config import AppConfig
+from obsidian_full_mcp.domain.results import ErrorCode
+from obsidian_full_mcp.tools.wikilink import resolve_wikilink
 
 
 @pytest.fixture

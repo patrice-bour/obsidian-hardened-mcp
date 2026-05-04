@@ -12,9 +12,9 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-DEFAULT_AUDIT_DIR = Path.home() / ".obsidian-power-mcp" / "audit"
-DEFAULT_SECRET_FILE = Path.home() / ".obsidian-power-mcp" / "secret"
-DEFAULT_CONFIG_FILE_NAME = ".obsidian-power-mcp.yaml"
+DEFAULT_AUDIT_DIR = Path.home() / ".obsidian-full-mcp" / "audit"
+DEFAULT_SECRET_FILE = Path.home() / ".obsidian-full-mcp" / "secret"
+DEFAULT_CONFIG_FILE_NAME = ".obsidian-full-mcp.yaml"
 DEFAULT_MAX_FILE_SIZE_MB = 10
 DEFAULT_MAX_BATCH = 500
 DEFAULT_REST_URL = "https://127.0.0.1:27124"

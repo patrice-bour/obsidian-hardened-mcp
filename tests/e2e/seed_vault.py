@@ -200,7 +200,7 @@ def seed(
         _write(target / "unsafe-yaml.md", _UNSAFE_YAML_BODY)
 
     if with_hooks_config:
-        _write(target / ".obsidian-power-mcp.yaml", _HOOKS_CONFIG)
+        _write(target / ".obsidian-full-mcp.yaml", _HOOKS_CONFIG)
 
     return target
 

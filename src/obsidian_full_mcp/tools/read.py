@@ -8,12 +8,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from obsidian_power_mcp.config import AppConfig
-from obsidian_power_mcp.domain.results import ToolResult
-from obsidian_power_mcp.domain.vault_path import VaultPath
-from obsidian_power_mcp.fs.listing import iter_markdown
-from obsidian_power_mcp.fs.reader import read_text
-from obsidian_power_mcp.tools._base import tool_call
+from obsidian_full_mcp.config import AppConfig
+from obsidian_full_mcp.domain.results import ToolResult
+from obsidian_full_mcp.domain.vault_path import VaultPath
+from obsidian_full_mcp.fs.listing import iter_markdown
+from obsidian_full_mcp.fs.reader import read_text
+from obsidian_full_mcp.tools._base import tool_call
 
 
 @tool_call
@@ -38,7 +38,7 @@ def list_notes(
 ) -> ToolResult:
     """List markdown notes under the vault, optionally filtered by folder.
 
-    Forbidden directories (`.obsidian/`, `.git/`, `.trash/`, `.opmcp-trash/`)
+    Forbidden directories (`.obsidian/`, `.git/`, `.trash/`, `.ofmcp-trash/`)
     are pruned from the traversal — they are never visible to clients.
     """
     if limit <= 0 or limit > config.max_batch:

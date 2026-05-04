@@ -59,6 +59,6 @@ jobs:
       - name: VaultPath sandbox must have 100% coverage
         run: >
           uv run pytest tests/security
-          --cov=obsidian_power_mcp.domain.vault_path
+          --cov=obsidian_full_mcp.domain.vault_path
           --cov-report=term-missing
           --cov-fail-under=100

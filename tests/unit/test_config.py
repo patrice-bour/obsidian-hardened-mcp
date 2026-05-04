@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from obsidian_power_mcp.config import AppConfig
+from obsidian_full_mcp.config import AppConfig
 
 
 class TestVaultRootValidation:

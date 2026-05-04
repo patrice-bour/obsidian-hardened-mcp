@@ -3,7 +3,7 @@
 `enforce_default_tags_only` walks a ruamel-parsed structure and refuses any
 explicit YAML tag that is not on the YAML 1.2 default whitelist. Used
 both for note frontmatter (`frontmatter.parser`) and for the project
-config file `.obsidian-power-mcp.yaml` (`validation.config_loader`).
+config file `.obsidian-full-mcp.yaml` (`validation.config_loader`).
 
 ruamel's round-trip loader does NOT execute Python object tags (it just
 drops the tag and returns a plain list/dict-like value), but the tag is

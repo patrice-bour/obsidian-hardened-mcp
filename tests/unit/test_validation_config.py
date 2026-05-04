@@ -7,12 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from obsidian_power_mcp.validation.builtin_hooks import (
+from obsidian_full_mcp.validation.builtin_hooks import (
     IsoDateHook,
     JsonSchemaHook,
     ReservedTagsHook,
 )
-from obsidian_power_mcp.validation.config_loader import (
+from obsidian_full_mcp.validation.config_loader import (
     ConfigError,
     load_validation_config,
 )
@@ -27,7 +27,7 @@ class TestNoConfigFile:
 
 class TestSimpleHooks:
     def test_iso_date_hook_with_no_args(self, tmp_vault: Path) -> None:
-        (tmp_vault / ".obsidian-power-mcp.yaml").write_text(
+        (tmp_vault / ".obsidian-full-mcp.yaml").write_text(
             "hooks:\n  - iso_date\n"
         )
         registry = load_validation_config(tmp_vault)
@@ -35,7 +35,7 @@ class TestSimpleHooks:
         assert isinstance(registry.hooks[0], IsoDateHook)
 
     def test_reserved_tags_hook_with_args(self, tmp_vault: Path) -> None:
-        (tmp_vault / ".obsidian-power-mcp.yaml").write_text(
+        (tmp_vault / ".obsidian-full-mcp.yaml").write_text(
             "hooks:\n"
             "  - reserved_tags:\n"
             "      forbidden:\n"
@@ -49,7 +49,7 @@ class TestSimpleHooks:
         assert isinstance(hook, ReservedTagsHook)
 
     def test_iso_date_with_custom_fields(self, tmp_vault: Path) -> None:
-        (tmp_vault / ".obsidian-power-mcp.yaml").write_text(
+        (tmp_vault / ".obsidian-full-mcp.yaml").write_text(
             "hooks:\n"
             "  - iso_date:\n"
             "      fields: [date, due-date]\n"
@@ -58,7 +58,7 @@ class TestSimpleHooks:
         assert isinstance(registry.hooks[0], IsoDateHook)
 
     def test_multiple_hooks_in_declared_order(self, tmp_vault: Path) -> None:
-        (tmp_vault / ".obsidian-power-mcp.yaml").write_text(
+        (tmp_vault / ".obsidian-full-mcp.yaml").write_text(
             "hooks:\n"
             "  - iso_date\n"
             "  - reserved_tags:\n"
@@ -85,7 +85,7 @@ class TestJsonSchemaHook:
                 "properties": {"recruteur": {"type": "string"}},
             },
         )
-        (tmp_vault / ".obsidian-power-mcp.yaml").write_text(
+        (tmp_vault / ".obsidian-full-mcp.yaml").write_text(
             "hooks:\n"
             "  - json_schema:\n"
             "      schemas:\n"
@@ -95,7 +95,7 @@ class TestJsonSchemaHook:
         assert isinstance(registry.hooks[0], JsonSchemaHook)
 
     def test_missing_schema_file_is_rejected(self, tmp_vault: Path) -> None:
-        (tmp_vault / ".obsidian-power-mcp.yaml").write_text(
+        (tmp_vault / ".obsidian-full-mcp.yaml").write_text(
             "hooks:\n"
             "  - json_schema:\n"
             "      schemas:\n"
@@ -107,7 +107,7 @@ class TestJsonSchemaHook:
 
     def test_schema_path_must_stay_inside_vault(self, tmp_vault: Path) -> None:
         # Path traversal in the schemas map MUST be rejected.
-        (tmp_vault / ".obsidian-power-mcp.yaml").write_text(
+        (tmp_vault / ".obsidian-full-mcp.yaml").write_text(
             "hooks:\n"
             "  - json_schema:\n"
             "      schemas:\n"
@@ -122,7 +122,7 @@ class TestJsonSchemaHook:
         (tmp_vault / "_schemas" / "bad.json").write_text(
             json.dumps({"type": ["not", "a", "valid", "type"]})
         )
-        (tmp_vault / ".obsidian-power-mcp.yaml").write_text(
+        (tmp_vault / ".obsidian-full-mcp.yaml").write_text(
             "hooks:\n"
             "  - json_schema:\n"
             "      schemas:\n"
@@ -134,7 +134,7 @@ class TestJsonSchemaHook:
 
 class TestErrorHandling:
     def test_unknown_hook_name_is_rejected(self, tmp_vault: Path) -> None:
-        (tmp_vault / ".obsidian-power-mcp.yaml").write_text(
+        (tmp_vault / ".obsidian-full-mcp.yaml").write_text(
             "hooks:\n  - mystery_hook\n"
         )
         with pytest.raises(ConfigError) as exc_info:
@@ -142,14 +142,14 @@ class TestErrorHandling:
         assert "mystery_hook" in str(exc_info.value)
 
     def test_invalid_yaml_is_rejected(self, tmp_vault: Path) -> None:
-        (tmp_vault / ".obsidian-power-mcp.yaml").write_text(
+        (tmp_vault / ".obsidian-full-mcp.yaml").write_text(
             "hooks:\n  - [unclosed\n"
         )
         with pytest.raises(ConfigError):
             load_validation_config(tmp_vault)
 
     def test_unknown_hook_arg_is_rejected(self, tmp_vault: Path) -> None:
-        (tmp_vault / ".obsidian-power-mcp.yaml").write_text(
+        (tmp_vault / ".obsidian-full-mcp.yaml").write_text(
             "hooks:\n"
             "  - iso_date:\n"
             "      not_a_real_arg: 1\n"
@@ -159,7 +159,7 @@ class TestErrorHandling:
         assert "not_a_real_arg" in str(exc_info.value)
 
     def test_top_level_must_be_mapping(self, tmp_vault: Path) -> None:
-        (tmp_vault / ".obsidian-power-mcp.yaml").write_text("- not\n- a\n- mapping\n")
+        (tmp_vault / ".obsidian-full-mcp.yaml").write_text("- not\n- a\n- mapping\n")
         with pytest.raises(ConfigError):
             load_validation_config(tmp_vault)
 
@@ -168,7 +168,7 @@ class TestNoHooksSection:
     def test_config_without_hooks_yields_empty_registry(
         self, tmp_vault: Path
     ) -> None:
-        (tmp_vault / ".obsidian-power-mcp.yaml").write_text(
+        (tmp_vault / ".obsidian-full-mcp.yaml").write_text(
             "schemas: {}\nlimits:\n  max_file_size_mb: 5\n"
         )
         registry = load_validation_config(tmp_vault)

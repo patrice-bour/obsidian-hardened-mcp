@@ -1,4 +1,4 @@
-"""Loader for `.obsidian-power-mcp.yaml` (vault-root configuration).
+"""Loader for `.obsidian-full-mcp.yaml` (vault-root configuration).
 
 The config file is OPTIONAL — when absent, an empty `HookRegistry` is
 returned and writes proceed without any pluggable validation. The presence
@@ -39,15 +39,15 @@ import jsonschema
 from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 
-from obsidian_power_mcp.frontmatter.yaml_safety import enforce_default_tags_only
-from obsidian_power_mcp.validation.builtin_hooks import (
+from obsidian_full_mcp.frontmatter.yaml_safety import enforce_default_tags_only
+from obsidian_full_mcp.validation.builtin_hooks import (
     IsoDateHook,
     JsonSchemaHook,
     ReservedTagsHook,
 )
-from obsidian_power_mcp.validation.hooks import HookRegistry, ValidationHook
+from obsidian_full_mcp.validation.hooks import HookRegistry, ValidationHook
 
-CONFIG_FILE_NAME = ".obsidian-power-mcp.yaml"
+CONFIG_FILE_NAME = ".obsidian-full-mcp.yaml"
 
 # `type[X]` is invariant; the registry just needs callables that produce a
 # `ValidationHook`. Using `Any` here keeps mypy happy without losing type
@@ -65,7 +65,7 @@ class ConfigError(Exception):
 
 
 def load_validation_config(vault_root: Path) -> HookRegistry:
-    """Load `.obsidian-power-mcp.yaml` (if present) and return a
+    """Load `.obsidian-full-mcp.yaml` (if present) and return a
     `HookRegistry` ready to plug into the write path.
 
     Raises `ConfigError` on any malformed input — never returns a half-built

@@ -12,11 +12,11 @@ from pathlib import Path
 
 import pytest
 
-from obsidian_power_mcp.config import AppConfig
-from obsidian_power_mcp.domain.results import ErrorCode
-from obsidian_power_mcp.frontmatter import parse_note
-from obsidian_power_mcp.security.audit_logger import AuditLogger
-from obsidian_power_mcp.tools.frontmatter import (
+from obsidian_full_mcp.config import AppConfig
+from obsidian_full_mcp.domain.results import ErrorCode
+from obsidian_full_mcp.frontmatter import parse_note
+from obsidian_full_mcp.security.audit_logger import AuditLogger
+from obsidian_full_mcp.tools.frontmatter import (
     merge_frontmatter,
     set_frontmatter_field,
 )

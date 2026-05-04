@@ -1,7 +1,7 @@
 """Read + verify the JSONL audit log emitted by the server.
 
 The server appends one JSON line per write/destructive operation to
-`~/.obsidian-power-mcp/audit/YYYY-MM-DD.jsonl`. We don't try to match
+`~/.obsidian-full-mcp/audit/YYYY-MM-DD.jsonl`. We don't try to match
 the on-disk hash function exactly (the audit_id formula is internal to
 `security.audit_logger`); instead we assert format, presence, and
 correlation properties:
@@ -24,7 +24,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-DEFAULT_AUDIT_DIR = Path.home() / ".obsidian-power-mcp" / "audit"
+DEFAULT_AUDIT_DIR = Path.home() / ".obsidian-full-mcp" / "audit"
 
 
 def today_log_path(audit_dir: Path = DEFAULT_AUDIT_DIR) -> Path:

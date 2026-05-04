@@ -21,13 +21,13 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from obsidian_power_mcp.config import AppConfig
-from obsidian_power_mcp.domain.results import ErrorCode, ToolResult
-from obsidian_power_mcp.domain.vault_path import VaultPath
-from obsidian_power_mcp.frontmatter import parse_note
-from obsidian_power_mcp.fs.listing import iter_markdown
-from obsidian_power_mcp.fs.reader import read_text
-from obsidian_power_mcp.tools._base import map_exception, to_plain_dict
+from obsidian_full_mcp.config import AppConfig
+from obsidian_full_mcp.domain.results import ErrorCode, ToolResult
+from obsidian_full_mcp.domain.vault_path import VaultPath
+from obsidian_full_mcp.frontmatter import parse_note
+from obsidian_full_mcp.fs.listing import iter_markdown
+from obsidian_full_mcp.fs.reader import read_text
+from obsidian_full_mcp.tools._base import map_exception, to_plain_dict
 
 SearchMode = Literal["fulltext", "frontmatter", "combined"]
 _VALID_MODES: frozenset[str] = frozenset({"fulltext", "frontmatter", "combined"})

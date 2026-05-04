@@ -1,7 +1,7 @@
-# Config reference — `.obsidian-power-mcp.yaml`
+# Config reference — `.obsidian-full-mcp.yaml`
 
 The validation config file lives at the **root of the vault**, named
-`.obsidian-power-mcp.yaml`. The file is **optional**: if it is absent, no
+`.obsidian-full-mcp.yaml`. The file is **optional**: if it is absent, no
 hooks run and writes proceed with the baseline safety only (path sandbox,
 atomic writer, YAML safety, write-time type whitelist).
 
@@ -114,7 +114,7 @@ Example schema (`_schemas/offre-emploi.json`):
 ## Operational notes
 
 - The config file lives in the **forbidden write zone**: tools cannot
-  modify `.obsidian-power-mcp.yaml` themselves. Edit it manually with
+  modify `.obsidian-full-mcp.yaml` themselves. Edit it manually with
   your text editor, then restart the server.
 - Hooks see the **post-write** state (frontmatter + body), not the
   inputs that produced it. This means a `set_frontmatter_field` and a

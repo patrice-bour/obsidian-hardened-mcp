@@ -7,8 +7,8 @@ Threat model covered:
     - Absolute path injection (`/etc/passwd`)
     - Path traversal (`..`, mid-path, encoded)
     - Symlink escape (component is a symlink that resolves outside the vault)
-    - Forbidden zone access (`.obsidian/`, `.git/`, `.trash/`, `.opmcp-trash/`,
-      and the project config file `.obsidian-power-mcp.yaml`)
+    - Forbidden zone access (`.obsidian/`, `.git/`, `.trash/`, `.ofmcp-trash/`,
+      and the project config file `.obsidian-full-mcp.yaml`)
     - Length / segment count attacks
     - Null byte injection
     - Unicode NFD vs NFC confusion (HFS+/APFS, iCloud)
@@ -27,9 +27,9 @@ _MAX_SEGMENTS = 32
 _MAX_SEGMENT_BYTES = 255
 
 _FORBIDDEN_DIR_PREFIXES: frozenset[str] = frozenset(
-    {".obsidian", ".git", ".trash", ".opmcp-trash"}
+    {".obsidian", ".git", ".trash", ".ofmcp-trash"}
 )
-_FORBIDDEN_FILES: frozenset[str] = frozenset({".obsidian-power-mcp.yaml"})
+_FORBIDDEN_FILES: frozenset[str] = frozenset({".obsidian-full-mcp.yaml"})
 
 
 class VaultPathError(Exception):

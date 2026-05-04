@@ -5,12 +5,12 @@ from __future__ import annotations
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
-from obsidian_power_mcp.config import AppConfig
-from obsidian_power_mcp.domain.results import ToolResult
-from obsidian_power_mcp.fs.listing import iter_markdown
-from obsidian_power_mcp.tools._base import tool_call
+from obsidian_full_mcp.config import AppConfig
+from obsidian_full_mcp.domain.results import ToolResult
+from obsidian_full_mcp.fs.listing import iter_markdown
+from obsidian_full_mcp.tools._base import tool_call
 
-SERVER_NAME = "obsidian-power-mcp"
+SERVER_NAME = "obsidian-full-mcp"
 
 
 def _server_version() -> str:
@@ -114,7 +114,7 @@ def list_tools_capabilities(config: AppConfig) -> ToolResult:
             "kind": "destructive",
             "description": (
                 "Delete a note. Two-phase HMAC confirm + snapshot under "
-                ".opmcp-trash/."
+                ".ofmcp-trash/."
             ),
         },
         {

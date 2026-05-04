@@ -1,7 +1,7 @@
-"""Entry point for `obsidian-power-mcp`.
+"""Entry point for `obsidian-full-mcp`.
 
 Usage:
-    obsidian-power-mcp --vault /path/to/vault
+    obsidian-full-mcp --vault /path/to/vault
 
 Environment variables:
     OBSIDIAN_VAULT_ROOT   Default vault root if `--vault` is not provided.
@@ -16,13 +16,13 @@ import os
 import sys
 from pathlib import Path
 
-from obsidian_power_mcp.config import AppConfig
-from obsidian_power_mcp.server import create_server
+from obsidian_full_mcp.config import AppConfig
+from obsidian_full_mcp.server import create_server
 
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="obsidian-power-mcp",
+        prog="obsidian-full-mcp",
         description=(
             "Secure MCP server for Obsidian vaults. Talks stdio MCP."
         ),

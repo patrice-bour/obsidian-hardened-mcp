@@ -7,8 +7,8 @@ from unittest.mock import patch
 
 import pytest
 
-from obsidian_power_mcp.domain.vault_path import VaultPath
-from obsidian_power_mcp.fs.writer import (
+from obsidian_full_mcp.domain.vault_path import VaultPath
+from obsidian_full_mcp.fs.writer import (
     AlreadyExistsError,
     atomic_write_text,
 )

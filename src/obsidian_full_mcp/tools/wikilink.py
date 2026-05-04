@@ -38,11 +38,11 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any
 
-from obsidian_power_mcp.config import AppConfig
-from obsidian_power_mcp.domain.results import ErrorCode, ToolResult
-from obsidian_power_mcp.domain.vault_path import VaultPath
-from obsidian_power_mcp.fs.listing import iter_markdown
-from obsidian_power_mcp.tools._base import map_exception
+from obsidian_full_mcp.config import AppConfig
+from obsidian_full_mcp.domain.results import ErrorCode, ToolResult
+from obsidian_full_mcp.domain.vault_path import VaultPath
+from obsidian_full_mcp.fs.listing import iter_markdown
+from obsidian_full_mcp.tools._base import map_exception
 
 
 @dataclass(frozen=True)

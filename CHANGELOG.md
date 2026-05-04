@@ -38,7 +38,7 @@ strict mypy clean.
 - Atomic filesystem writer (M3): same-directory tmp + write + flush +
   fsync + `os.replace` + dir-fsync; tmp file cleaned on every error path
 - `AuditEvent` model + `AuditLogger`: append-only daily JSONL files
-  under `~/.obsidian-power-mcp/audit/`, `audit_id` is the SHA256 of the
+  under `~/.obsidian-full-mcp/audit/`, `audit_id` is the SHA256 of the
   canonical payload (deterministic for replay/correlation)
 - `create_note`, `update_note`, `append_to_note`, `patch_note` MCP
   tools (M3) — every one supports `dry_run=true` to preview changes
@@ -94,13 +94,13 @@ strict mypy clean.
     fields (e.g. migration markers).
   - `JsonSchemaHook` — validate frontmatter against a JSON Schema
     (Draft 2020-12) selected by the `type:` field.
-- `.obsidian-power-mcp.yaml` config loader (`validation.config_loader`):
+- `.obsidian-full-mcp.yaml` config loader (`validation.config_loader`):
   resolves hook names → built-in classes, validates kwargs against each
   hook's signature, loads schema files relative to the vault, refuses
   schema paths that escape the vault, and surfaces errors at boot via
   `ConfigError` rather than at first write.
 - `create_server(config, hooks=None)` auto-loads
-  `<vault_root>/.obsidian-power-mcp.yaml` when `hooks` is omitted; pass
+  `<vault_root>/.obsidian-full-mcp.yaml` when `hooks` is omitted; pass
   `HookRegistry([])` to skip auto-load entirely.
 - All write tools and frontmatter atomic operations accept an optional
   `hooks: HookRegistry | None` keyword argument and run validation
@@ -118,7 +118,7 @@ strict mypy clean.
   limit at construction. Mutually-recursive `$refs` (e.g. `A → B → A`)
   are rejected with `CyclicRefError` at server boot rather than
   exploding with `RecursionError` on the first real write.
-- **YAML config file safety**: `.obsidian-power-mcp.yaml` is now
+- **YAML config file safety**: `.obsidian-full-mcp.yaml` is now
   enforced under the same custom-tag whitelist as note frontmatter.
   An attacker cannot smuggle `!!python/object/...` or any non-default
   YAML 1.2 tag into the project config. Shared primitive
@@ -162,16 +162,16 @@ strict mypy clean.
 - `delete_note`, `rename_note`, `move_note` MCP tools, each guarded by
   the same 2-phase confirmation protocol: phase 1 returns a single-use
   HMAC token + preview without touching the disk; phase 2 consumes the
-  token, snapshots the original under `.opmcp-trash/<UTC-ts>-<hash>/`,
+  token, snapshots the original under `.ofmcp-trash/<UTC-ts>-<hash>/`,
   and applies the change atomically (`Path.unlink` for delete,
   `os.replace` for rename/move). 90 s TTL, single-use, payload-bound.
 - `security.confirm` module with `OperationToken`, `ConfirmRegistry`,
   `load_or_bootstrap_secret`. HMAC-SHA256 over secret + (op, target,
   payload_hash, expires_at, nonce). Secret bootstrapped to
-  `~/.obsidian-power-mcp/secret` with mode `0o600` enforced;
+  `~/.obsidian-full-mcp/secret` with mode `0o600` enforced;
   any wider mode is refused.
 - `fs.snapshot.snapshot_for_destruction`: best-effort copy under
-  `.opmcp-trash/`. The directory is in the VaultPath forbidden-zone
+  `.ofmcp-trash/`. The directory is in the VaultPath forbidden-zone
   list so MCP read tools cannot expose snapshots back to clients.
 - `update_backlinks=True` (rename/move): best-effort scan + rewrite
   of `[[oldname]]` / `[[oldname.md]]` wikilinks across the vault.
@@ -253,4 +253,4 @@ strict mypy clean.
   cataloguing every entry as `done` / `v0.2` / `wontfix` per the
   "implemented or explicitly closed" rule.
 
-[0.1.0]: https://github.com/patrice-bour/obsidian-power-mcp/releases/tag/v0.1.0
+[0.1.0]: https://github.com/patrice-bour/obsidian-full-mcp/releases/tag/v0.1.0

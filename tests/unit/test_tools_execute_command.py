@@ -16,17 +16,17 @@ from pathlib import Path
 
 import pytest
 
-from obsidian_power_mcp.config import AppConfig
-from obsidian_power_mcp.domain.results import ErrorCode
-from obsidian_power_mcp.rest.client import (
+from obsidian_full_mcp.config import AppConfig
+from obsidian_full_mcp.domain.results import ErrorCode
+from obsidian_full_mcp.rest.client import (
     RestAuthError,
     RestError,
     RestUnavailableError,
 )
-from obsidian_power_mcp.rest.detector import RestAvailabilityDetector
-from obsidian_power_mcp.security.audit_logger import AuditLogger
-from obsidian_power_mcp.security.confirm import ConfirmRegistry
-from obsidian_power_mcp.tools.destructive import execute_command
+from obsidian_full_mcp.rest.detector import RestAvailabilityDetector
+from obsidian_full_mcp.security.audit_logger import AuditLogger
+from obsidian_full_mcp.security.confirm import ConfirmRegistry
+from obsidian_full_mcp.tools.destructive import execute_command
 
 # ---------------------------------------------------------------------------
 # Fakes

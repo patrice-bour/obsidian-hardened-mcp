@@ -1,4 +1,4 @@
-"""S7 — validation hooks: drop a `.obsidian-power-mcp.yaml` at the
+"""S7 — validation hooks: drop a `.obsidian-full-mcp.yaml` at the
 vault root, restart the server, and verify the hooks block invalid
 writes (iso_date, reserved_tags, json_schema).
 
@@ -45,7 +45,7 @@ async def run(vault: Path) -> ScenarioReport:
 
     # 1 — drop config + schema files, then spawn a fresh server so it
     # auto-loads the hooks at boot.
-    config_path = vault / ".obsidian-power-mcp.yaml"
+    config_path = vault / ".obsidian-full-mcp.yaml"
     schema_dir = vault / "_schemas"
     schema_path = schema_dir / "journal.json"
     schema_dir.mkdir(parents=True, exist_ok=True)

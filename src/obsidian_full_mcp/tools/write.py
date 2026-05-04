@@ -21,15 +21,15 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from obsidian_power_mcp.config import AppConfig
-from obsidian_power_mcp.domain.audit import OpKind
-from obsidian_power_mcp.domain.results import ErrorCode, ToolResult
-from obsidian_power_mcp.domain.vault_path import VaultPath
-from obsidian_power_mcp.frontmatter import parse_note
-from obsidian_power_mcp.fs.reader import read_text
-from obsidian_power_mcp.fs.writer import AlreadyExistsError, atomic_write_text
-from obsidian_power_mcp.security.audit_logger import AuditLogger
-from obsidian_power_mcp.tools._base import (
+from obsidian_full_mcp.config import AppConfig
+from obsidian_full_mcp.domain.audit import OpKind
+from obsidian_full_mcp.domain.results import ErrorCode, ToolResult
+from obsidian_full_mcp.domain.vault_path import VaultPath
+from obsidian_full_mcp.frontmatter import parse_note
+from obsidian_full_mcp.fs.reader import read_text
+from obsidian_full_mcp.fs.writer import AlreadyExistsError, atomic_write_text
+from obsidian_full_mcp.security.audit_logger import AuditLogger
+from obsidian_full_mcp.tools._base import (
     emit_audit,
     map_exception,
     new_request_id,
@@ -37,7 +37,7 @@ from obsidian_power_mcp.tools._base import (
     run_validation_hooks,
     to_plain_dict,
 )
-from obsidian_power_mcp.validation.hooks import HookContext, HookRegistry
+from obsidian_full_mcp.validation.hooks import HookContext, HookRegistry
 
 
 def _execute_write(

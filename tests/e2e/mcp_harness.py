@@ -6,13 +6,13 @@ Usage:
         assert result.ok
 
 The harness:
-- spawns `uv run obsidian-power-mcp --vault <vault>` in a subprocess
+- spawns `uv run obsidian-full-mcp --vault <vault>` in a subprocess
 - pipes stdio MCP frames through `ClientSession`
 - normalises tool results to a tiny dataclass (`.ok`, `.data`, `.error_code`,
   `.error_message`, `.dry_run`, `.audit_id`, `.raw`)
 
 The server module's `__main__` is invoked through the same Python
-interpreter that runs the harness, via `python -m obsidian_power_mcp` —
+interpreter that runs the harness, via `python -m obsidian_full_mcp` —
 this avoids the cold start of `uv run` for every spawn while still
 exercising the real CLI entrypoint.
 """
@@ -91,7 +91,7 @@ class E2EHarness:
             command=sys.executable,
             args=[
                 "-m",
-                "obsidian_power_mcp",
+                "obsidian_full_mcp",
                 "--vault",
                 str(self.vault),
             ],

@@ -17,7 +17,7 @@ import os
 import secrets
 from pathlib import Path
 
-from obsidian_power_mcp.domain.vault_path import VaultPath
+from obsidian_full_mcp.domain.vault_path import VaultPath
 
 
 class WriterError(Exception):

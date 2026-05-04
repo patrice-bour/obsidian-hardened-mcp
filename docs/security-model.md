@@ -1,6 +1,6 @@
 # Security model
 
-This document states what `obsidian-power-mcp` defends against, what it
+This document states what `obsidian-full-mcp` defends against, what it
 does *not* defend against, and the operational assumptions that make the
 defences valid. Read it before deploying.
 
@@ -20,7 +20,7 @@ Any string a tool receives as a path is funnelled through
 - Absolute paths (`/etc/passwd`, `/Users/...`, etc.)
 - Path traversal (`..`, mid-path `..`)
 - Symlink escape — components that resolve outside the vault root
-- Forbidden zones — `.obsidian/`, `.git/`, `.trash/`, `.opmcp-trash/`,
+- Forbidden zones — `.obsidian/`, `.git/`, `.trash/`, `.ofmcp-trash/`,
   the project config file
 - Length attacks — > 4096 chars total, > 32 segments, > 255-byte segments
 - Null byte injection
@@ -77,7 +77,7 @@ Obsidian command — on the first try.
   and returns it. The disk is **not** touched.
 - **Phase 2** (`confirm_token=<from phase 1>`): the registry verifies the
   token (single-use, TTL-bound, payload-bound), the original file is
-  copied into `<vault>/.opmcp-trash/<UTC-ts>-<short-hash>/`, then the
+  copied into `<vault>/.ofmcp-trash/<UTC-ts>-<short-hash>/`, then the
   destructive op runs atomically (`os.replace` for rename/move,
   `Path.unlink` for delete).
 
@@ -85,19 +85,19 @@ Token format: `base64url(nonce || HMAC_SHA256(secret, op || target ||
 payload_hash || expires_at || nonce))`. 32-byte nonce + 32-byte HMAC =
 86 base64url chars.
 
-The HMAC secret lives at `~/.obsidian-power-mcp/secret` with mode
+The HMAC secret lives at `~/.obsidian-full-mcp/secret` with mode
 `0o600`. Any wider mode is treated as compromised — the loader refuses
-and the server aborts. Manual rotation: `rm ~/.obsidian-power-mcp/secret`,
+and the server aborts. Manual rotation: `rm ~/.obsidian-full-mcp/secret`,
 restart. There is no automatic rotation in v0.1.
 
 In-memory storage is **by design**: a server restart invalidates all
 phase-1 tokens. The 90 s TTL makes that acceptable; phase-1 issuances
 older than 90 s would have expired anyway.
 
-Snapshots accumulate under `<vault>/.opmcp-trash/`. They are NEVER
+Snapshots accumulate under `<vault>/.ofmcp-trash/`. They are NEVER
 re-exposed by read tools (the directory is in the VaultPath
 forbidden-zone list). Manual cleanup convention: prune
-`.opmcp-trash/` yourself when disk usage matters.
+`.ofmcp-trash/` yourself when disk usage matters.
 
 `update_backlinks=True` (rename/move) is best-effort: only exact
 wikilink targets `[[oldname]]` / `[[oldname.md]]` are rewritten,
@@ -149,7 +149,7 @@ filesystem state to snapshot before-the-fact).
 ### Audit trail integrity (within process scope)
 
 Every write or destructive operation emits a JSONL line to
-`~/.obsidian-power-mcp/audit/YYYY-MM-DD.jsonl` (off-vault, so vault sync
+`~/.obsidian-full-mcp/audit/YYYY-MM-DD.jsonl` (off-vault, so vault sync
 or git operations cannot rewrite it). Each entry carries:
 
 - `request_id` — unique per MCP tool call (propagated through every
@@ -176,9 +176,9 @@ can:
 - Insert a symlink between `VaultPath.from_user()` validation and
   `atomic_write_text()` execution (TOCTOU). The sandbox does NOT
   re-validate at write time using a held file descriptor.
-- Read or rewrite the audit log under `~/.obsidian-power-mcp/audit/` if
+- Read or rewrite the audit log under `~/.obsidian-full-mcp/audit/` if
   the home directory permissions allow it.
-- Read the HMAC secret at `~/.obsidian-power-mcp/secret` if home
+- Read the HMAC secret at `~/.obsidian-full-mcp/secret` if home
   permissions allow it.
 
 If your vault sits on a shared filesystem with mutually-distrusting users,
@@ -199,7 +199,7 @@ release; v0.1 will not.
 
 ### Restore-from-snapshot
 
-Destructive ops write a snapshot under `.opmcp-trash/` before mutating.
+Destructive ops write a snapshot under `.ofmcp-trash/` before mutating.
 v0.1 ships **no restore tool** — restoration is a manual operation
 (copy the snapshot back to its original path). A scripted
 `restore_from_snapshot` is on the v0.2 roadmap.
@@ -207,7 +207,7 @@ v0.1 ships **no restore tool** — restoration is a manual operation
 ### Disk pressure from snapshots
 
 Snapshots are **not** automatically pruned. Long-running deployments
-with frequent destructive ops will see `<vault>/.opmcp-trash/` grow.
+with frequent destructive ops will see `<vault>/.ofmcp-trash/` grow.
 Treat it as your manual responsibility to prune (the directory is in
 the VaultPath forbidden-zone list, so no MCP tool will ever read or
 delete from it on your behalf).
@@ -241,7 +241,7 @@ the new content. iCloud history may diverge from the file timeline.
 For the threat model above to hold, you must:
 
 1. Run the server on a machine you trust, under your own user account.
-2. Keep `~/.obsidian-power-mcp/` permissions tight (owner-only).
+2. Keep `~/.obsidian-full-mcp/` permissions tight (owner-only).
 3. Treat the audit log as evidence — don't share or sync the directory.
 4. Run **one MCP client at a time** against a given vault, or accept
    write-loss risk on concurrent edits.
