@@ -109,14 +109,23 @@ async def main() -> int:
     return _print_summary(reports)
 
 
+# Use Unicode marks when stdout can render them (UTF-8), otherwise fall
+# back to ASCII so legacy Windows consoles and pipe-to-file flows don't
+# mojibake. Same applies to the arrow used in the per-scenario footer.
+_UTF8_OUT = (sys.stdout.encoding or "").lower().replace("-", "").startswith("utf")
+_MARK_OK = "✓" if _UTF8_OUT else "[OK]  "
+_MARK_FAIL = "✗" if _UTF8_OUT else "[FAIL]"
+_ARROW = "→" if _UTF8_OUT else "->"
+
+
 def _print_scenario(rep: ScenarioReport) -> None:
     for step in rep.steps:
-        mark = "✓" if step.ok else "✗"
+        mark = _MARK_OK if step.ok else _MARK_FAIL
         line = f"  {mark} {step.name}"
         if not step.ok and step.detail:
-            line += f"  — {step.detail}"
+            line += f"  — {step.detail}" if _UTF8_OUT else f"  - {step.detail}"
         print(line)
-    print(f"  → {rep.passed}/{rep.total}")
+    print(f"  {_ARROW} {rep.passed}/{rep.total}")
     print()
 
 

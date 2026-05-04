@@ -10,6 +10,7 @@ SKIPPED rather than failing.
 from __future__ import annotations
 
 import os
+import traceback
 
 from mcp_harness import E2EHarness
 
@@ -61,10 +62,16 @@ async def run(h: E2EHarness) -> ScenarioReport:
                         f"got ok={p2.ok} code={p2.error_code} msg={p2.error_message!r}",
                     )
         except Exception as exc:  # pragma: no cover
+            # Bare-except is intentional here: the with-token branch is
+            # opt-in and the most common failure mode is "Obsidian
+            # not running" or "plugin not installed". Surface the full
+            # traceback so a real bug (e.g., MCP transport crash, token
+            # decode error) doesn't get silently rebadged as that.
             rep.add(
                 "execute_command with token (Obsidian probably not running)",
                 False,
-                f"exception: {type(exc).__name__}: {exc}",
+                f"exception: {type(exc).__name__}: {exc}\n"
+                f"{traceback.format_exc()}",
             )
 
     return rep

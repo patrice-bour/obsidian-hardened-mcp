@@ -11,7 +11,8 @@ from ._assert import ScenarioReport, expect_ok, field_value
 async def run(h: E2EHarness) -> ScenarioReport:
     rep = ScenarioReport("S1", "read")
 
-    # list_notes — expect 10 vault-relative paths
+    # list_notes — expect the seeded 10 vault-relative paths.
+    # (Source of truth: the `_write` calls in tests/e2e/seed_vault.py.)
     listing = await h.call("list_notes")
     ok, why = expect_ok(listing, where="list_notes")
     rep.add("list_notes ok", ok, why)

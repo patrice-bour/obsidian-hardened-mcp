@@ -78,6 +78,10 @@ async def run(h: E2EHarness) -> ScenarioReport:
     )
 
     # --- patch_note --------------------------------------------------------
+    # Order-dependent: this step assumes update_note above ran and wrote
+    # body_v2 (which contains "Replaced content"). If S2 is ever broken
+    # into independent step modules, replace this with a self-contained
+    # setup (create + patch on a fresh sandbox file).
     p = await h.call(
         "patch_note", path=target, find="Replaced content", replace="Patched body"
     )

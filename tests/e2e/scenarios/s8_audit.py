@@ -32,7 +32,10 @@ async def run(audit_baseline: int, log_path: Path) -> ScenarioReport:
         f"baseline={audit_baseline} now={current} delta={delta}",
     )
 
-    # Spot check: shape of the last 20 entries.
+    # Spot check: shape of the last 20 entries. 20 is roughly two full
+    # write+destructive scenarios worth of audit lines — enough to
+    # surface a regression in entry shape without making this step's
+    # cost grow with audit log size.
     sample = audit_inspector.read_recent(log_path, 20)
     bad: list[str] = []
     for entry in sample:

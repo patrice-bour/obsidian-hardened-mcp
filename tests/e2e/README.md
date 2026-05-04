@@ -25,6 +25,21 @@ TOTAL                        PASS       100/100
 Exit code is `0` on full pass, `1` if any scenario has at least one
 failing step.
 
+### Determinism notes
+
+The `100/100` figure assumes:
+
+- **S9 with-token** is SKIPPED (no `OBSIDIAN_E2E_REST_TOKEN` set). The
+  SKIPPED row counts as passing in the totals; setting the env var
+  flips it into a real check that depends on Obsidian + Local REST API
+  plugin being live.
+- **S5 oversize segment** triggers both the server's path validator and
+  the OS's per-segment byte limit (255 on macOS / Linux / Windows in
+  practice). It can in theory produce different error codes on a
+  filesystem with a more permissive limit.
+- All other scenarios are deterministic against a freshly seeded
+  `.test-vault/`.
+
 ## Optional opt-in: REST API with token (S9)
 
 By default S9 only verifies the no-token branch (`execute_command`

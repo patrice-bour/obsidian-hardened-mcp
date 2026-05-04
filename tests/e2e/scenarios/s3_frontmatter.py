@@ -20,7 +20,6 @@ TARGET = "frontmatter-rich.md"
 async def run(h: E2EHarness) -> ScenarioReport:
     rep = ScenarioReport("S3", "frontmatter")
     abs_path = h.vault / TARGET
-    initial_text = abs_path.read_text(encoding="utf-8")
 
     # --- set_frontmatter_field --------------------------------------------
     s = await h.call(
@@ -109,8 +108,11 @@ async def run(h: E2EHarness) -> ScenarioReport:
         f"nested.beta lost: {nested_block!r}",
     )
 
-    # Restore the original file so other scenarios see a clean state.
-    abs_path.write_text(initial_text, encoding="utf-8")
+    # No manual restore: run_e2e re-seeds the vault at the start of every
+    # full run, so leaving frontmatter-rich.md in its post-S3 state is
+    # safe. Restoring from a pre-S3 read would risk writing back a
+    # partially-mutated state if S3 itself failed midway. Downstream
+    # scenarios in the same run don't depend on this file's pre-S3 state.
     return rep
 
 

@@ -46,6 +46,13 @@ _CASES: list[tuple[str, frozenset[str], str]] = [
         frozenset({"invalid_path"}),
         "null byte",
     ),
+    # Caveat: VaultPath._MAX_SEGMENT_BYTES (255) matches the typical OS
+    # limit (255 bytes on macOS APFS, ext4, NTFS). A 259-char segment is
+    # therefore rejected by *both* the server's path validator AND the
+    # filesystem call, so this case can't disambiguate which layer
+    # caught it. The point is the server catches it before the FS would
+    # — verified by the unit-level test_vault_path tests against an
+    # in-memory path.
     (
         ("a" * 256) + ".md",
         frozenset({"invalid_path"}),

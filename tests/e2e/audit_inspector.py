@@ -22,6 +22,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+from collections import deque
 from pathlib import Path
 from typing import Any
 
@@ -57,16 +58,16 @@ def line_count(path: Path) -> int:
 
 def read_recent(path: Path, n: int) -> list[dict[str, Any]]:
     """Return the last `n` JSON entries from the audit log. If fewer than
-    `n` entries exist, returns all of them."""
+    `n` entries exist, returns all of them.
+
+    Uses `deque(maxlen=n)` so memory is bounded by `n` instead of file
+    size — relevant once audit logs grow over months of use.
+    """
     if not path.exists():
         return []
-    out: list[dict[str, Any]] = []
     with path.open("r", encoding="utf-8") as fh:
-        for line in fh:
-            line = line.strip()
-            if line:
-                out.append(json.loads(line))
-    return out[-n:]
+        tail = deque(fh, maxlen=n)
+    return [json.loads(line) for line in tail if line.strip()]
 
 
 _REQUIRED_KEYS = frozenset(
