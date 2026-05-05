@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/patrice-bour/obsidian-full-mcp/security/advisories/new
+    about: Please report security issues privately via GitHub Security Advisories. Do NOT open a public issue.
+  - name: v0.2 backlog
+    url: https://github.com/patrice-bour/obsidian-full-mcp/blob/main/docs/v0.1-followups.md
+    about: Most obvious extensions are already tracked here. Check before filing a feature request.

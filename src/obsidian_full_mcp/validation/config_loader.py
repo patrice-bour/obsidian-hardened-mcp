@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Loader for `.obsidian-full-mcp.yaml` (vault-root configuration).
 
 The config file is OPTIONAL — when absent, an empty `HookRegistry` is

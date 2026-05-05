@@ -86,7 +86,7 @@ proper v0.2 plan + brief before opening the next worktree.
 **Sanity check** to confirm a clean v0.1.1 base:
 
 ```bash
-cd /Users/pbr/projets/IA/MCP/obsidian-full-mcp/main
+cd <repo-root>
 uv run pytest -q                                    # expect 533 passed
 uv run python tests/e2e/run_e2e.py                  # expect 101/101 PASS
 uv run ruff check src tests                         # expect "All checks passed"

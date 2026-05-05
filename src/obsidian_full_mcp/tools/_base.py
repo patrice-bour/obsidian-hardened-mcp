@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Shared helpers for tool implementations.
 
 - `map_exception` / `tool_call`: turn internal exceptions into public

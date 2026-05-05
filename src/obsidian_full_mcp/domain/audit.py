@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Audit event model.
 
 Every write or destructive operation emits an `AuditEvent` to the JSONL

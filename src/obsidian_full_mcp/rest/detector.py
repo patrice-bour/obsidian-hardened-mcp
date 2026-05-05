@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """TTL-cached REST availability detector.
 
 The Obsidian Local REST API plugin may or may not be running at any

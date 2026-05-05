@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Atomic filesystem writes.
 
 Writes go to a temporary file in the same directory, are flushed and fsynced,

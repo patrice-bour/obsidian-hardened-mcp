@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tool result and error types.
 
 Tools return `ToolResult` objects. The MCP layer serialises these to JSON.

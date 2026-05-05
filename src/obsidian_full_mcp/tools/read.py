@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Read tools — `read_note`, `list_notes`, `get_frontmatter`.
 
 (Frontmatter operations are added in M2; only `read_note` and `list_notes`

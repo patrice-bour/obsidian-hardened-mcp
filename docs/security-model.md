@@ -4,6 +4,19 @@ This document states what `obsidian-full-mcp` defends against, what it
 does *not* defend against, and the operational assumptions that make the
 defences valid. Read it before deploying.
 
+## Are you the right kind of user?
+
+In one paragraph: this is an **MCP server speaking stdio over a local
+subprocess** that lets a single LLM client (Claude Code, Claude Desktop,
+similar) read and write files inside one Obsidian vault on the same
+machine. It is built for one human running one client against one vault
+they own. It is not a multi-tenant service, it does not bind a network
+port, it has no authentication of its own, and it does not defend
+against malicious code already running with your user privileges. If
+you were hoping to run this as a shared service, expose it over a
+network, or sandbox an LLM that you don't trust to read your
+filesystem, this is the wrong tool — see "Out of scope" below.
+
 ## Threat model — what we defend against
 
 The server is designed for a **single-user, locally-trusted** context: one

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """MCP server registration.
 
 `create_server(config)` builds a `FastMCP` instance wired to every tool

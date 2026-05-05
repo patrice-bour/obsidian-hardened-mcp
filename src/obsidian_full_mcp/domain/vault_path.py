@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Vault path sandbox.
 
 Cornerstone of the security model. ALL filesystem-bound user inputs in tools

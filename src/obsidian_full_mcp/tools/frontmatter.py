@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Frontmatter tools.
 
 `get_frontmatter` (M2) is read-only.

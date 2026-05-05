@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Destructive tools — `delete_note`, `rename_note`, `move_note`.
 
 Each follows a 2-phase confirmation protocol:

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Frontmatter parser.
 
 Splits a Markdown note into a YAML frontmatter block and a body, parsing the

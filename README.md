@@ -2,7 +2,7 @@
 
 A secure Model Context Protocol (MCP) server for [Obsidian](https://obsidian.md) vaults.
 
-> **Status:** v0.1.0. Local-first single-user use is production-ready; public release is community-preview.
+> **Status:** v0.1.1. Local-first single-user use is production-ready; public release is community-preview.
 
 ## Why another Obsidian MCP server?
 
@@ -39,7 +39,7 @@ Run the test suite to confirm the install:
 uv run pytest -q
 ```
 
-A successful run reports `530 passed`.
+A successful run reports `533 passed`. To also exercise the end-to-end harness (10 scenarios driven through a real MCP subprocess), run `uv run python tests/e2e/run_e2e.py` — expect `101/101 PASS`.
 
 ## Quick start
 
@@ -72,7 +72,7 @@ The server speaks stdio MCP. For Claude Desktop, add to
 |---|---|
 | `OBSIDIAN_VAULT_ROOT` | Default vault root when `--vault` isn't passed. |
 | `OBSIDIAN_REST_URL` | Override the Local REST API endpoint. **Must be loopback** (`127.0.0.1`, `localhost`, `[::1]`). Default `https://127.0.0.1:27124`. |
-| `OBSIDIAN_REST_TOKEN` | Bearer token for the Local REST API plugin. When set, `execute_command` becomes available. **Don't paste it inline** — see [security note in `tests/e2e/README.md`](tests/e2e/README.md#optional-opt-in-rest-api-with-token-s9). |
+| `OBSIDIAN_REST_TOKEN` | Bearer token for the Local REST API plugin. When set, `execute_command` becomes available. **Don't paste it inline in shells that persist history** (zsh `SHARE_HISTORY`, bash default `HISTFILE`) — the token grants write access to your live vault. Prefer `direnv` with a gitignored `.envrc`, `read -rs OBSIDIAN_REST_TOKEN && export OBSIDIAN_REST_TOKEN`, or prefix with `HISTFILE=/dev/null` (zsh). See also the [security note in `tests/e2e/README.md`](tests/e2e/README.md#optional-opt-in-rest-api-with-token-s9). |
 | `OBSIDIAN_AUDIT_DIR` | Override the audit log directory. Default `~/.obsidian-full-mcp/audit/`. Useful for CI runners that publish test artefacts (avoids `$HOME` leakage). |
 
 ### Vault-level config (`<vault>/.obsidian-full-mcp.yaml`)

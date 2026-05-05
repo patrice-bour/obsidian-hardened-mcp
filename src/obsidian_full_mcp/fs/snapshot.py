@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Pre-destruction file snapshots.
 
 Before any destructive op (`delete_note`, `rename_note`, `move_note`)

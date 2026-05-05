@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """JSONL append-only audit logger.
 
 One file per UTC date, named `YYYY-MM-DD.jsonl`. Each line is a JSON object

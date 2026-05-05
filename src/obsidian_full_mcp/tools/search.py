@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Note search.
 
 `search_notes` walks the vault (with forbidden-zone pruning), parses each

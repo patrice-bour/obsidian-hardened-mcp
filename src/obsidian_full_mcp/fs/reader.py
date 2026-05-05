@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Filesystem read operations.
 
 Read functions accept already-validated `VaultPath` objects only.

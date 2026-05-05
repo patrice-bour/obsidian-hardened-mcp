@@ -336,7 +336,7 @@ GOLDEN_NOTES: list[str] = [
     # 39 — field whose name has dots (less common but valid)
     (
         "---\n"
-        "first.last: Patrice Bour\n"
+        "first.last: Jane Doe\n"
         "---\n"
         "Body.\n"
     ),

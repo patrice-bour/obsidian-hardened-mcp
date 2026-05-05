@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Write tools — `create_note`, `update_note`, `append_to_note`, `patch_note`.
 
 Every write op:

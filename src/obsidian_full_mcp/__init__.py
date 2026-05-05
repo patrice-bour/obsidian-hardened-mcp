@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Secure MCP server for Obsidian vaults."""
 
 __all__ = ["__version__"]

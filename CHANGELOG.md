@@ -7,8 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-(Nothing yet — v0.2 will pick up the deferred items in
-`docs/v0.1-followups.md`.)
+Public-flip preparation pass — no code behaviour change, only
+metadata / docs / file-layout adjustments to make the repository
+suitable for public release.
+
+### Added
+- `SECURITY.md` with private vulnerability reporting via GitHub Security
+  Advisories.
+- `CONTRIBUTING.md` covering dev setup, conventional commits, and the
+  security-coverage gate.
+- `CODE_OF_CONDUCT.md` adopting Contributor Covenant 2.1 by reference.
+- `.github/ISSUE_TEMPLATE/{bug_report,feature_request,config}.yml` and
+  `.github/PULL_REQUEST_TEMPLATE.md`.
+- `# SPDX-License-Identifier: Apache-2.0` header on every Python source
+  file under `src/obsidian_full_mcp/` (35 files).
+- "Are you the right kind of user?" preamble on `docs/security-model.md`
+  so an outsider lands on the threat-model assumptions before the
+  invariants.
+- `docs/internal/README.md` redirecting users to the right
+  user-facing doc.
+
+### Changed
+- `docs/m{6,7}-implementation-brief.md` moved under `docs/internal/`
+  (historical handoff docs, not user-facing).
+- README env-var table now spells out the shell-history caveat for
+  `OBSIDIAN_REST_TOKEN` inline (was a click-through to the e2e README).
+
+### Fixed
+- README status line now says v0.1.1 (was v0.1.0).
+- README test-count drift: `533 passed` (was `530 passed`); E2E
+  invocation documented.
+- `AGENTS.md` sanity-check block: replaced personal absolute path with
+  `<repo-root>` placeholder.
+- `CHANGELOG.md` now defines `[Unreleased]` and `[0.1.1]` compare
+  links (the v0.1.1 link was missing on tag-cut day).
+- `tests/security/test_round_trip_golden.py` golden #39 swapped
+  `Patrice Bour` → `Jane Doe` in the dotted-key fixture.
 
 ## [0.1.1] - 2026-05-04
 
@@ -330,4 +364,6 @@ strict mypy clean.
   cataloguing every entry as `done` / `v0.2` / `wontfix` per the
   "implemented or explicitly closed" rule.
 
+[Unreleased]: https://github.com/patrice-bour/obsidian-full-mcp/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/patrice-bour/obsidian-full-mcp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/patrice-bour/obsidian-full-mcp/releases/tag/v0.1.0

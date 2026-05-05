@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Application configuration.
 
 Loaded once at server startup from CLI args + environment variables.

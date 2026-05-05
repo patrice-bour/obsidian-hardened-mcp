@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Markdown file enumeration with forbidden-zone pruning.
 
 Used by `tools.read.list_notes` and `tools.meta.get_vault_info`.

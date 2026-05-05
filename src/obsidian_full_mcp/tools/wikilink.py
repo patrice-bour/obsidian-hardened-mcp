@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Wikilink resolution.
 
 `resolve_wikilink` parses an Obsidian-style `[[...]]` link content (without

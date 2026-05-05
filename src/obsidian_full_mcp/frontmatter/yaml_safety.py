@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Shared YAML safety helpers.
 
 `enforce_default_tags_only` walks a ruamel-parsed structure and refuses any

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Meta tools — `get_vault_info`, `list_tools_capabilities`."""
 
 from __future__ import annotations

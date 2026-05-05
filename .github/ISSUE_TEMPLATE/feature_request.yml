@@ -1,0 +1,39 @@
+name: Feature request
+description: Suggest a new capability or improvement.
+title: "[feat] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before opening a feature request, please check whether the idea
+        is already in [`docs/v0.1-followups.md`](../../docs/v0.1-followups.md)
+        — many obvious extensions are already on the v0.2 backlog.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What can't you do today, or what's awkward?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: What would you like the server to do? If you have an idea of the tool surface or config knob, sketch it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other ways you've thought about (workarounds, neighbouring tools, doing nothing).
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Is this a v0.2 priority, or a long-term idea? Any dependency on other items in `docs/v0.1-followups.md`?

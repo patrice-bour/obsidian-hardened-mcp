@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Thin httpx wrapper for the Obsidian Local REST API plugin.
 
 The plugin listens on `https://127.0.0.1:27124` by default and uses a

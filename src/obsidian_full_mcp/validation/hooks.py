@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Pluggable validation hooks.
 
 Hooks are short, focused validators that run BEFORE any write or destructive

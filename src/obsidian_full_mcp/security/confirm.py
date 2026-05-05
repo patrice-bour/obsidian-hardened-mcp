@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Two-phase confirmation registry for destructive operations.
 
 Destructive tools (`delete_note`, `rename_note`, `move_note`) follow a

@@ -1,0 +1,111 @@
+name: Bug report
+description: Something doesn't behave as documented.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Please **never include
+        the contents of your vault, audit log entries, REST bearer
+        tokens, or HMAC secrets** in this issue — they may contain
+        personal data or credentials. For security vulnerabilities use
+        the private channel in [`SECURITY.md`](../../SECURITY.md)
+        instead.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `uv run obsidian-full-mcp --version` or the git tag/commit you're running.
+      placeholder: "v0.1.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Linux
+        - Windows (WSL)
+        - Windows (native)
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      description: "`python --version`"
+      placeholder: "3.11.x"
+    validations:
+      required: true
+
+  - type: input
+    id: client
+    attributes:
+      label: MCP client
+      description: Which client is talking to the server.
+      placeholder: "Claude Code 1.x / Claude Desktop / custom"
+    validations:
+      required: true
+
+  - type: input
+    id: obsidian
+    attributes:
+      label: Obsidian version (if relevant)
+      placeholder: "1.5.x"
+
+  - type: dropdown
+    id: rest
+    attributes:
+      label: Local REST API plugin
+      description: Are you running with `OBSIDIAN_REST_TOKEN` set?
+      options:
+        - "No (default — REST disabled)"
+        - "Yes — REST enabled with bearer token"
+    validations:
+      required: true
+
+  - type: input
+    id: vault_size
+    attributes:
+      label: Approximate vault size
+      description: Rough order of magnitude — affects path-walking and search performance.
+      placeholder: "500 notes / 50 MB"
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Tool calls, in order. Sanitise any vault paths.
+      placeholder: |
+        1. Configure server with vault `<path>`
+        2. Call `create_note(path="...", content="...")`
+        3. Call `delete_note(path="...")` then phase 2 with confirm token
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Include the exact `error_code` and `error_message` from the tool response if relevant. Audit log entries may help — redact paths.
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: Logs, screenshots, related issues. Redact anything sensitive first.
