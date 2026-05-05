@@ -12,7 +12,7 @@ from pathlib import Path
 # Mirror of `_FORBIDDEN_DIR_PREFIXES` in `domain.vault_path`. Kept here as a
 # separate constant to avoid an import cycle (vault_path is a leaf module).
 _PRUNED_DIRS: frozenset[str] = frozenset(
-    {".obsidian", ".git", ".trash", ".ofmcp-trash"}
+    {".obsidian", ".git", ".trash", ".ohmcp-trash"}
 )
 
 

@@ -63,7 +63,7 @@ dmypy.json
 
 # Project-specific
 audit-logs/
-.ofmcp-trash/
+.ohmcp-trash/
 secret
 
 # E2E test vault (ephemeral, recreated by tests/e2e/seed_vault.py)

@@ -2,7 +2,7 @@
 """Built-in validation hooks.
 
 Each hook here implements the `ValidationHook` Protocol from
-`validation.hooks`. They are configured in `.obsidian-full-mcp.yaml`:
+`validation.hooks`. They are configured in `.obsidian-hardened-mcp.yaml`:
 
 ```yaml
 hooks:
@@ -35,7 +35,7 @@ from typing import Any
 
 import jsonschema
 
-from obsidian_full_mcp.validation.hooks import HookContext, HookResult
+from obsidian_hardened_mcp.validation.hooks import HookContext, HookResult
 
 
 class CyclicRefError(ValueError):

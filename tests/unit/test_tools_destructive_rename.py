@@ -14,11 +14,11 @@ from pathlib import Path
 
 import pytest
 
-from obsidian_full_mcp.config import AppConfig
-from obsidian_full_mcp.domain.results import ErrorCode
-from obsidian_full_mcp.security.audit_logger import AuditLogger
-from obsidian_full_mcp.security.confirm import ConfirmRegistry
-from obsidian_full_mcp.tools.destructive import rename_note
+from obsidian_hardened_mcp.config import AppConfig
+from obsidian_hardened_mcp.domain.results import ErrorCode
+from obsidian_hardened_mcp.security.audit_logger import AuditLogger
+from obsidian_hardened_mcp.security.confirm import ConfirmRegistry
+from obsidian_hardened_mcp.tools.destructive import rename_note
 
 
 @pytest.fixture
@@ -248,7 +248,7 @@ class TestRenamePhase2:
         assert commit.data is not None
         snap_id = commit.data["snapshot_id"]
         snap_copy = (
-            tmp_vault / ".ofmcp-trash" / snap_id / "01_Notes" / "sample.md"
+            tmp_vault / ".ohmcp-trash" / snap_id / "01_Notes" / "sample.md"
         )
         assert snap_copy.exists()
         assert snap_copy.read_text() == "# Sample\n"

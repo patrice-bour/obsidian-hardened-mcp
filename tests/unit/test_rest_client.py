@@ -15,7 +15,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from obsidian_full_mcp.rest.client import (
+from obsidian_hardened_mcp.rest.client import (
     RestAuthError,
     RestClient,
     RestError,

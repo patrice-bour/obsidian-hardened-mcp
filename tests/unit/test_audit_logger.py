@@ -18,8 +18,8 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from obsidian_full_mcp.domain.audit import AuditEvent
-from obsidian_full_mcp.security.audit_logger import AuditLogger
+from obsidian_hardened_mcp.domain.audit import AuditEvent
+from obsidian_hardened_mcp.security.audit_logger import AuditLogger
 
 
 def _event(**overrides: object) -> AuditEvent:

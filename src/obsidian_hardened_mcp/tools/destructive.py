@@ -9,7 +9,7 @@ Each follows a 2-phase confirmation protocol:
 
     Phase 2 (`confirm_token=<from phase 1>`):
         Re-validate path -> consume token (single-use, TTL-bound,
-        payload-bound) -> snapshot to .ofmcp-trash -> mutate atomically
+        payload-bound) -> snapshot to .ohmcp-trash -> mutate atomically
         -> emit audit with snapshot_id.
 
 `dry_run=True` is a separate orthogonal mode: preview only, no token,
@@ -28,22 +28,22 @@ import time
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from obsidian_full_mcp.config import AppConfig
-from obsidian_full_mcp.domain.results import ErrorCode, ToolResult
-from obsidian_full_mcp.domain.vault_path import VaultPath
-from obsidian_full_mcp.fs.listing import iter_markdown
-from obsidian_full_mcp.fs.snapshot import SnapshotError, snapshot_for_destruction
-from obsidian_full_mcp.fs.writer import atomic_write_text
-from obsidian_full_mcp.security.audit_logger import AuditLogger
-from obsidian_full_mcp.security.confirm import ConfirmRegistry, OperationName
-from obsidian_full_mcp.tools._base import (
+from obsidian_hardened_mcp.config import AppConfig
+from obsidian_hardened_mcp.domain.results import ErrorCode, ToolResult
+from obsidian_hardened_mcp.domain.vault_path import VaultPath
+from obsidian_hardened_mcp.fs.listing import iter_markdown
+from obsidian_hardened_mcp.fs.snapshot import SnapshotError, snapshot_for_destruction
+from obsidian_hardened_mcp.fs.writer import atomic_write_text
+from obsidian_hardened_mcp.security.audit_logger import AuditLogger
+from obsidian_hardened_mcp.security.confirm import ConfirmRegistry, OperationName
+from obsidian_hardened_mcp.tools._base import (
     emit_audit,
     map_exception,
     new_request_id,
     params_hash,
 )
 
-_TRASH_DIRNAME = ".ofmcp-trash"
+_TRASH_DIRNAME = ".ohmcp-trash"
 
 # Wikilink: `[[<content>]]` where content has no `[` or `]`. The whole match
 # is the wikilink; group 1 is the inner content. We deliberately do NOT

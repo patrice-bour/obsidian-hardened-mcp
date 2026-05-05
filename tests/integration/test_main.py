@@ -8,13 +8,13 @@ from unittest.mock import patch
 
 import pytest
 
-from obsidian_full_mcp.__main__ import main
+from obsidian_hardened_mcp.__main__ import main
 
 
 def test_main_without_vault_exits_with_error_code(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    monkeypatch.setattr(sys, "argv", ["obsidian-full-mcp"])
+    monkeypatch.setattr(sys, "argv", ["obsidian-hardened-mcp"])
     monkeypatch.delenv("OBSIDIAN_VAULT_ROOT", raising=False)
     with pytest.raises(SystemExit) as exc_info:
         main()
@@ -28,8 +28,8 @@ def test_main_with_valid_vault_constructs_server(
     """We don't exercise the full stdio loop here — just verify that argument
     parsing builds an `AppConfig` and instantiates the server before `run()`
     would block on stdio."""
-    monkeypatch.setattr(sys, "argv", ["obsidian-full-mcp", "--vault", str(tmp_vault)])
-    with patch("obsidian_full_mcp.server.FastMCP.run") as fake_run:
+    monkeypatch.setattr(sys, "argv", ["obsidian-hardened-mcp", "--vault", str(tmp_vault)])
+    with patch("obsidian_hardened_mcp.server.FastMCP.run") as fake_run:
         main()
     fake_run.assert_called_once()
 
@@ -41,7 +41,7 @@ def test_main_accepts_max_file_size_flag(
         sys,
         "argv",
         [
-            "obsidian-full-mcp",
+            "obsidian-hardened-mcp",
             "--vault",
             str(tmp_vault),
             "--max-file-size-mb",
@@ -54,6 +54,6 @@ def test_main_accepts_max_file_size_flag(
         captured["cfg"] = cfg
         return type("Stub", (), {"run": lambda self: None})()
 
-    with patch("obsidian_full_mcp.__main__.create_server", side_effect=fake_create_server):
+    with patch("obsidian_hardened_mcp.__main__.create_server", side_effect=fake_create_server):
         main()
     assert captured["cfg"].max_file_size_mb == 25  # type: ignore[attr-defined]

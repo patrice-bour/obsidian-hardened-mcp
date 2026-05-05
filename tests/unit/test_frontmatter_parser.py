@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from obsidian_full_mcp.frontmatter import (
+from obsidian_hardened_mcp.frontmatter import (
     FrontmatterTooLargeError,
     MalformedFrontmatterError,
     UnsafeYamlError,
@@ -97,7 +97,7 @@ class TestRoundTrip:
 
 class TestRenderEdgeCases:
     def test_render_with_no_frontmatter_returns_body_only(self) -> None:
-        from obsidian_full_mcp.frontmatter import ParsedNote
+        from obsidian_hardened_mcp.frontmatter import ParsedNote
 
         rendered = render_note(ParsedNote(frontmatter=None, body="# Plain\n"))
         assert rendered == "# Plain\n"

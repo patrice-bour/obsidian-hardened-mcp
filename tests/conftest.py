@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for obsidian-full-mcp tests."""
+"""Shared pytest fixtures for obsidian-hardened-mcp tests."""
 
 from __future__ import annotations
 
@@ -18,8 +18,8 @@ def tmp_vault(tmp_path: Path) -> Iterator[Path]:
         │   └── config.json
         ├── .git/                  # forbidden zone
         ├── .trash/                # forbidden zone
-        ├── .ofmcp-trash/          # forbidden zone
-        ├── .obsidian-full-mcp.yaml   # forbidden file
+        ├── .ohmcp-trash/          # forbidden zone
+        ├── .obsidian-hardened-mcp.yaml   # forbidden file
         ├── 00_Journal/
         │   └── 2026-05-04.md
         ├── 01_Notes/
@@ -32,8 +32,8 @@ def tmp_vault(tmp_path: Path) -> Iterator[Path]:
     (root / ".obsidian" / "config.json").write_text("{}")
     (root / ".git").mkdir()
     (root / ".trash").mkdir()
-    (root / ".ofmcp-trash").mkdir()
-    (root / ".obsidian-full-mcp.yaml").write_text("schemas: {}\n")
+    (root / ".ohmcp-trash").mkdir()
+    (root / ".obsidian-hardened-mcp.yaml").write_text("schemas: {}\n")
     (root / "00_Journal").mkdir()
     (root / "00_Journal" / "2026-05-04.md").write_text("# Today\n")
     (root / "01_Notes").mkdir()

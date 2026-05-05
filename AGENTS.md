@@ -1,4 +1,4 @@
-# obsidian-full-mcp — Agent Instructions
+# obsidian-hardened-mcp — Agent Instructions
 
 Secure MCP server for Obsidian vaults. Filesystem-first with optional Local REST API enrichment.
 
@@ -22,7 +22,7 @@ for the threat model and operational assumptions. Key invariants:
 5. **Frontmatter parser is `ruamel.yaml` round-trip with custom-tag rejection** — no PyYAML, no unsafe loaders, whitelist of YAML 1.2 default tags only
 6. **Frontmatter writers validate the value type whitelist** (`tools.frontmatter._ensure_safe_value`) — no bytes/Path/set/custom classes can enter the file
 7. **Audit `audit_id` is a CONTENT HASH** of `(tool, vault_path, op_kind, outcome, params_hash, dry_run, snapshot_id)`; `request_id` is generated ONCE per tool call and propagated through every `emit_audit`
-8. **Validation hooks run in declared order** before any write touches disk (`validation.hooks.HookRegistry`, loaded from `.obsidian-full-mcp.yaml` at boot — see `docs/config-reference.md`); first reject short-circuits, crashes are rejections
+8. **Validation hooks run in declared order** before any write touches disk (`validation.hooks.HookRegistry`, loaded from `.obsidian-hardened-mcp.yaml` at boot — see `docs/config-reference.md`); first reject short-circuits, crashes are rejections
 9. **Single-writer assumption**: no advisory lock between concurrent calls; v0.1 documents this and expects the user to run one MCP client at a time
 
 ## Forbidden patterns
@@ -32,8 +32,8 @@ for the threat model and operational assumptions. Key invariants:
 - Bypassing the audit logger on write operations
 - Generating `request_id` inside `emit_audit` — always generate once at the tool boundary via `new_request_id()`
 - Using `repr()` for hashing parameters — use `params_hash()` from `tools/_base.py` (canonical JSON)
-- Storing HMAC secret anywhere except `~/.obsidian-full-mcp/secret` (mode 0600)
-- Writing into `.obsidian/`, `.git/`, `.trash/`, `.ofmcp-trash/` or the config file
+- Storing HMAC secret anywhere except `~/.obsidian-hardened-mcp/secret` (mode 0600)
+- Writing into `.obsidian/`, `.git/`, `.trash/`, `.ohmcp-trash/` or the config file
 
 ## Running tests
 

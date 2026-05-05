@@ -1,4 +1,4 @@
-"""End-to-end runner for `obsidian-full-mcp` v0.1.0.
+"""End-to-end runner for `obsidian-hardened-mcp` v0.1.0.
 
 Orchestrates scenarios S0-S9 against a fresh seeded test vault, talking
 to the server through a real stdio MCP subprocess. Prints a final
@@ -55,7 +55,7 @@ async def main() -> int:
 
     # Sandbox audit logs under .runs/audit/ unless the caller already
     # set OBSIDIAN_AUDIT_DIR (e.g., a CI tmp_path). This isolates E2E
-    # writes from the user's ~/.obsidian-full-mcp/audit/ and makes
+    # writes from the user's ~/.obsidian-hardened-mcp/audit/ and makes
     # publishable test artefacts safe (no $HOME leakage).
     os.environ.setdefault(
         "OBSIDIAN_AUDIT_DIR", str(HERE / ".runs" / "audit")
@@ -94,7 +94,7 @@ async def main() -> int:
         _print_scenario(rep)
 
     # Phase 2: S7 spawns a fresh harness internally (restart required to
-    # auto-load the dropped `.obsidian-full-mcp.yaml`).
+    # auto-load the dropped `.obsidian-hardened-mcp.yaml`).
     print("--- s7_validation_hooks ---")
     rep = await s7_validation_hooks.run(vault)
     reports.append(rep)

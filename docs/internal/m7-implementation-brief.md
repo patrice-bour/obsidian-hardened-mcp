@@ -16,7 +16,7 @@ trigger arbitrary Obsidian behaviour. We mitigate with the same
 - `AppConfig.rest_url` defaults to `https://127.0.0.1:27124`.
 - `AppConfig.rest_token` defaults to `None`; loaded from
   `OBSIDIAN_REST_TOKEN` via `AppConfig.from_env`.
-- `src/obsidian_full_mcp/rest/__init__.py` is an empty placeholder.
+- `src/obsidian_hardened_mcp/rest/__init__.py` is an empty placeholder.
 - `tools/meta.py:get_vault_info` reports
   `"rest_available": False  # populated by REST detector in M7`.
 

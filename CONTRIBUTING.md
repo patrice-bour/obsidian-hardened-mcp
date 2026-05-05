@@ -1,4 +1,4 @@
-# Contributing to `obsidian-full-mcp`
+# Contributing to `obsidian-hardened-mcp`
 
 Thanks for taking the time to look at this. The project is small and
 opinionated — please read the security model and the existing tests
@@ -17,8 +17,8 @@ before opening a pull request.
 Requires Python ≥ 3.11 and [`uv`](https://github.com/astral-sh/uv).
 
 ```bash
-git clone https://github.com/patrice-bour/obsidian-full-mcp.git
-cd obsidian-full-mcp
+git clone https://github.com/patrice-bour/obsidian-hardened-mcp.git
+cd obsidian-hardened-mcp
 uv sync
 ```
 

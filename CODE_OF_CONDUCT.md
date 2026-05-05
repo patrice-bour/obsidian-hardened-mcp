@@ -13,7 +13,7 @@ discussions).
 
 To report a Code of Conduct concern, contact the maintainer at the
 email address listed in [`pyproject.toml`](pyproject.toml) with the
-subject prefix `[obsidian-full-mcp coc]`. Reports are handled
+subject prefix `[obsidian-hardened-mcp coc]`. Reports are handled
 privately. For security vulnerabilities, see
 [`SECURITY.md`](SECURITY.md) instead — that has its own private
 channel.

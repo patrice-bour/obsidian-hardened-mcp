@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Public-flip preparation pass — no code behaviour change, only
-metadata / docs / file-layout adjustments to make the repository
-suitable for public release.
+Public-flip preparation pass plus a final naming change — `obsidian-full-mcp`
+becomes `obsidian-hardened-mcp` to better reflect the project's
+positioning (security envelope first, not "kitchen-sink"). No code
+behaviour change beyond identifiers; the rename is breaking for anyone
+who installed pre-flip from `obsidian-full-mcp`.
 
 ### Added
 - README "End users — zero install with `uvx`" path: a single
@@ -25,7 +27,7 @@ suitable for public release.
 - `.github/ISSUE_TEMPLATE/{bug_report,feature_request,config}.yml` and
   `.github/PULL_REQUEST_TEMPLATE.md`.
 - `# SPDX-License-Identifier: Apache-2.0` header on every Python source
-  file under `src/obsidian_full_mcp/` (35 files).
+  file under `src/obsidian_hardened_mcp/` (35 files).
 - "Are you the right kind of user?" preamble on `docs/security-model.md`
   so an outsider lands on the threat-model assumptions before the
   invariants.
@@ -33,6 +35,15 @@ suitable for public release.
   user-facing doc.
 
 ### Changed
+- **Breaking** — package, CLI bin, vault config, HMAC secret dir, and
+  trash slug all migrated from `obsidian-full-mcp` / `.ofmcp-trash`
+  family to `obsidian-hardened-mcp` / `.ohmcp-trash`. Module:
+  `obsidian_full_mcp → obsidian_hardened_mcp`. Vault config:
+  `<vault>/.obsidian-full-mcp.yaml → .obsidian-hardened-mcp.yaml`.
+  HMAC secret dir: `~/.obsidian-full-mcp/ → ~/.obsidian-hardened-mcp/`.
+  Audit dir default: `~/.obsidian-full-mcp/audit/ → ~/.obsidian-hardened-mcp/audit/`.
+  GitHub repo: `patrice-bour/obsidian-full-mcp → patrice-bour/obsidian-hardened-mcp`
+  (GitHub auto-redirects clone URLs and tag links).
 - `docs/m{6,7}-implementation-brief.md` moved under `docs/internal/`
   (historical handoff docs, not user-facing).
 - README env-var table now spells out the shell-history caveat for
@@ -55,7 +66,9 @@ Cosmetic + quality pass on top of v0.1.0:
 
 - **Repository renamed** from `obsidian-power-mcp` to `obsidian-full-mcp`
   (Python module, CLI entry point, vault config file, HMAC secret
-  directory, and `.opmcp-trash/ → .ofmcp-trash/` slug).
+  directory, and `.opmcp-trash/ → .ofmcp-trash/` slug). *(Note: a
+  second rename to `obsidian-hardened-mcp` happened post-v0.1.1; see
+  [Unreleased] above.)*
 - **End-to-end test harness** (`tests/e2e/`) — 10 scenarios driven
   through a real `python -m obsidian_full_mcp` subprocess on a freshly
   seeded vault: smoke, read, write, frontmatter atomic ops, destructive
@@ -154,7 +167,7 @@ strict mypy clean.
 - Atomic filesystem writer (M3): same-directory tmp + write + flush +
   fsync + `os.replace` + dir-fsync; tmp file cleaned on every error path
 - `AuditEvent` model + `AuditLogger`: append-only daily JSONL files
-  under `~/.obsidian-full-mcp/audit/`, `audit_id` is the SHA256 of the
+  under `~/.obsidian-power-mcp/audit/`, `audit_id` is the SHA256 of the
   canonical payload (deterministic for replay/correlation)
 - `create_note`, `update_note`, `append_to_note`, `patch_note` MCP
   tools (M3) — every one supports `dry_run=true` to preview changes
@@ -210,13 +223,13 @@ strict mypy clean.
     fields (e.g. migration markers).
   - `JsonSchemaHook` — validate frontmatter against a JSON Schema
     (Draft 2020-12) selected by the `type:` field.
-- `.obsidian-full-mcp.yaml` config loader (`validation.config_loader`):
+- `.obsidian-power-mcp.yaml` config loader (`validation.config_loader`):
   resolves hook names → built-in classes, validates kwargs against each
   hook's signature, loads schema files relative to the vault, refuses
   schema paths that escape the vault, and surfaces errors at boot via
   `ConfigError` rather than at first write.
 - `create_server(config, hooks=None)` auto-loads
-  `<vault_root>/.obsidian-full-mcp.yaml` when `hooks` is omitted; pass
+  `<vault_root>/.obsidian-power-mcp.yaml` when `hooks` is omitted; pass
   `HookRegistry([])` to skip auto-load entirely.
 - All write tools and frontmatter atomic operations accept an optional
   `hooks: HookRegistry | None` keyword argument and run validation
@@ -234,7 +247,7 @@ strict mypy clean.
   limit at construction. Mutually-recursive `$refs` (e.g. `A → B → A`)
   are rejected with `CyclicRefError` at server boot rather than
   exploding with `RecursionError` on the first real write.
-- **YAML config file safety**: `.obsidian-full-mcp.yaml` is now
+- **YAML config file safety**: `.obsidian-power-mcp.yaml` is now
   enforced under the same custom-tag whitelist as note frontmatter.
   An attacker cannot smuggle `!!python/object/...` or any non-default
   YAML 1.2 tag into the project config. Shared primitive
@@ -278,16 +291,16 @@ strict mypy clean.
 - `delete_note`, `rename_note`, `move_note` MCP tools, each guarded by
   the same 2-phase confirmation protocol: phase 1 returns a single-use
   HMAC token + preview without touching the disk; phase 2 consumes the
-  token, snapshots the original under `.ofmcp-trash/<UTC-ts>-<hash>/`,
+  token, snapshots the original under `.opmcp-trash/<UTC-ts>-<hash>/`,
   and applies the change atomically (`Path.unlink` for delete,
   `os.replace` for rename/move). 90 s TTL, single-use, payload-bound.
 - `security.confirm` module with `OperationToken`, `ConfirmRegistry`,
   `load_or_bootstrap_secret`. HMAC-SHA256 over secret + (op, target,
   payload_hash, expires_at, nonce). Secret bootstrapped to
-  `~/.obsidian-full-mcp/secret` with mode `0o600` enforced;
+  `~/.obsidian-power-mcp/secret` with mode `0o600` enforced;
   any wider mode is refused.
 - `fs.snapshot.snapshot_for_destruction`: best-effort copy under
-  `.ofmcp-trash/`. The directory is in the VaultPath forbidden-zone
+  `.opmcp-trash/`. The directory is in the VaultPath forbidden-zone
   list so MCP read tools cannot expose snapshots back to clients.
 - `update_backlinks=True` (rename/move): best-effort scan + rewrite
   of `[[oldname]]` / `[[oldname.md]]` wikilinks across the vault.
@@ -369,6 +382,6 @@ strict mypy clean.
   cataloguing every entry as `done` / `v0.2` / `wontfix` per the
   "implemented or explicitly closed" rule.
 
-[Unreleased]: https://github.com/patrice-bour/obsidian-full-mcp/compare/v0.1.1...HEAD
-[0.1.1]: https://github.com/patrice-bour/obsidian-full-mcp/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/patrice-bour/obsidian-full-mcp/releases/tag/v0.1.0
+[Unreleased]: https://github.com/patrice-bour/obsidian-hardened-mcp/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/patrice-bour/obsidian-hardened-mcp/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/patrice-bour/obsidian-hardened-mcp/releases/tag/v0.1.0

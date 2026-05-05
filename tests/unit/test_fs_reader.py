@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from obsidian_full_mcp.domain.vault_path import VaultPath
-from obsidian_full_mcp.fs.reader import (
+from obsidian_hardened_mcp.domain.vault_path import VaultPath
+from obsidian_hardened_mcp.fs.reader import (
     FileOffloadedError,
     FileTooLargeError,
     NotAFileError,

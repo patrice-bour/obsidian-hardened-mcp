@@ -12,7 +12,7 @@ materialise it via `brctl download`.
 
 from __future__ import annotations
 
-from obsidian_full_mcp.domain.vault_path import VaultPath
+from obsidian_hardened_mcp.domain.vault_path import VaultPath
 
 DEFAULT_MAX_SIZE_BYTES = 10 * 1024 * 1024
 

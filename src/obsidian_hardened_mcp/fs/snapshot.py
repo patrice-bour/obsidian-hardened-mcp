@@ -3,11 +3,11 @@
 
 Before any destructive op (`delete_note`, `rename_note`, `move_note`)
 mutates the vault, the original file is copied into the vault's
-`.ofmcp-trash/<UTC-ts>-<short-hash>/<original-relative-path>`. The
+`.ohmcp-trash/<UTC-ts>-<short-hash>/<original-relative-path>`. The
 snapshot is best-effort: if the copy fails, the destructive call aborts
 without touching the source.
 
-`.ofmcp-trash/` is in the VaultPath sandbox's forbidden zones, so MCP
+`.ohmcp-trash/` is in the VaultPath sandbox's forbidden zones, so MCP
 read tools cannot expose snapshots back to clients. Restoration is a
 manual / out-of-band operation in v0.1 (tracked as a v0.2 followup).
 
@@ -22,7 +22,7 @@ import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
-from obsidian_full_mcp.domain.vault_path import VaultPath
+from obsidian_hardened_mcp.domain.vault_path import VaultPath
 
 
 class SnapshotError(Exception):
@@ -48,7 +48,7 @@ def snapshot_for_destruction(
     Args:
         vp: validated `VaultPath` of the file to snapshot.
         snapshot_root: directory under which the snapshot tree is written
-            (typically `<vault_root>/.ofmcp-trash`).
+            (typically `<vault_root>/.ohmcp-trash`).
 
     Raises:
         SnapshotError: source file is missing, is not a regular file, or the

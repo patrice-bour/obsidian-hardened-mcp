@@ -4,21 +4,21 @@ from __future__ import annotations
 
 import pytest
 
-from obsidian_full_mcp.domain.results import ErrorCode, ToolResult
-from obsidian_full_mcp.domain.vault_path import (
+from obsidian_hardened_mcp.domain.results import ErrorCode, ToolResult
+from obsidian_hardened_mcp.domain.vault_path import (
     AbsolutePathError,
     ForbiddenZoneError,
     InvalidPathError,
     PathEscapeError,
     SymlinkEscapeError,
 )
-from obsidian_full_mcp.fs.reader import (
+from obsidian_hardened_mcp.fs.reader import (
     FileOffloadedError,
     FileTooLargeError,
     NotAFileError,
     NotFoundError,
 )
-from obsidian_full_mcp.tools._base import map_exception, tool_call
+from obsidian_hardened_mcp.tools._base import map_exception, tool_call
 
 
 @pytest.mark.parametrize(

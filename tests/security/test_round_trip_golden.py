@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import pytest
 
-from obsidian_full_mcp.frontmatter import parse_note, render_note
+from obsidian_hardened_mcp.frontmatter import parse_note, render_note
 
 # Each entry is a stand-alone note string. The test asserts:
 #     render_note(parse_note(text)) == text

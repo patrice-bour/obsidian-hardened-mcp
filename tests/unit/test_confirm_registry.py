@@ -7,7 +7,7 @@ every destructive op consumes the token; the registry guarantees:
 - payload binding (caller cannot swap target / operation / params),
 - tamper resistance (flipping a token byte rejects the call).
 
-The HMAC secret is bootstrapped to `~/.obsidian-full-mcp/secret` with
+The HMAC secret is bootstrapped to `~/.obsidian-hardened-mcp/secret` with
 mode 0o600. Loading refuses any wider mode.
 """
 
@@ -22,8 +22,8 @@ from pathlib import Path
 
 import pytest
 
-from obsidian_full_mcp.domain.vault_path import VaultPath
-from obsidian_full_mcp.security.confirm import (
+from obsidian_hardened_mcp.domain.vault_path import VaultPath
+from obsidian_hardened_mcp.security.confirm import (
     ConfirmRegistry,
     ExpiredConfirmationTokenError,
     InsecureSecretFileError,

@@ -14,7 +14,7 @@ that includes an `audit_id` plus `request_id`:
   tool boundary through every `_emit` made within a single tool call. It
   answers "what events came from THAT MCP call?".
 
-The logger lives **outside** the vault — under `~/.obsidian-full-mcp/audit/`
+The logger lives **outside** the vault — under `~/.obsidian-hardened-mcp/audit/`
 by default — so audit trails are not touched by vault sync (iCloud, git)
 and cannot be silently rewritten by a tool call.
 """
@@ -25,7 +25,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from obsidian_full_mcp.domain.audit import AuditEvent
+from obsidian_hardened_mcp.domain.audit import AuditEvent
 
 _CONTENT_HASH_KEYS = (
     "tool",

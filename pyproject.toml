@@ -1,5 +1,5 @@
 [project]
-name = "obsidian-full-mcp"
+name = "obsidian-hardened-mcp"
 version = "0.1.1"
 description = "Secure MCP server for Obsidian vaults — full file modification, atomic frontmatter ops, hardened path sandbox"
 readme = "README.md"
@@ -29,12 +29,12 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/patrice-bour/obsidian-full-mcp"
-Repository = "https://github.com/patrice-bour/obsidian-full-mcp"
-Issues = "https://github.com/patrice-bour/obsidian-full-mcp/issues"
+Homepage = "https://github.com/patrice-bour/obsidian-hardened-mcp"
+Repository = "https://github.com/patrice-bour/obsidian-hardened-mcp"
+Issues = "https://github.com/patrice-bour/obsidian-hardened-mcp/issues"
 
 [project.scripts]
-obsidian-full-mcp = "obsidian_full_mcp.__main__:main"
+obsidian-hardened-mcp = "obsidian_hardened_mcp.__main__:main"
 
 [build-system]
 requires = ["uv_build>=0.11.8,<0.12.0"]
@@ -63,7 +63,7 @@ filterwarnings = ["error"]
 
 [tool.coverage.run]
 branch = true
-source = ["obsidian_full_mcp"]
+source = ["obsidian_hardened_mcp"]
 
 [tool.coverage.report]
 exclude_lines = [

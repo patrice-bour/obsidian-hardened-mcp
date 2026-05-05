@@ -573,7 +573,7 @@ wheels = [
 ]
 
 [[package]]
-name = "obsidian-full-mcp"
+name = "obsidian-hardened-mcp"
 version = "0.1.1"
 source = { editable = "." }
 dependencies = [

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from obsidian_full_mcp.config import AppConfig
+from obsidian_hardened_mcp.config import AppConfig
 
 
 class TestVaultRootValidation:
@@ -60,7 +60,7 @@ class TestFromEnv:
         cfg = AppConfig.from_env(tmp_vault)
         assert cfg.rest_token is None
         assert cfg.rest_url == "https://127.0.0.1:27124"
-        assert cfg.audit_dir == Path.home() / ".obsidian-full-mcp" / "audit"
+        assert cfg.audit_dir == Path.home() / ".obsidian-hardened-mcp" / "audit"
 
     def test_audit_dir_env_override(
         self, monkeypatch: pytest.MonkeyPatch, tmp_vault: Path, tmp_path: Path

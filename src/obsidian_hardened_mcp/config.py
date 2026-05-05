@@ -13,9 +13,9 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-DEFAULT_AUDIT_DIR = Path.home() / ".obsidian-full-mcp" / "audit"
-DEFAULT_SECRET_FILE = Path.home() / ".obsidian-full-mcp" / "secret"
-DEFAULT_CONFIG_FILE_NAME = ".obsidian-full-mcp.yaml"
+DEFAULT_AUDIT_DIR = Path.home() / ".obsidian-hardened-mcp" / "audit"
+DEFAULT_SECRET_FILE = Path.home() / ".obsidian-hardened-mcp" / "secret"
+DEFAULT_CONFIG_FILE_NAME = ".obsidian-hardened-mcp.yaml"
 DEFAULT_MAX_FILE_SIZE_MB = 10
 DEFAULT_MAX_BATCH = 500
 DEFAULT_REST_URL = "https://127.0.0.1:27124"
@@ -102,7 +102,7 @@ class AppConfig(BaseModel):
             kwargs["rest_url"] = url
         if (audit := os.getenv("OBSIDIAN_AUDIT_DIR")) is not None:
             # Allows CI runners (or paranoid users) to relocate audit logs
-            # outside the default ~/.obsidian-full-mcp/audit/. Useful when
+            # outside the default ~/.obsidian-hardened-mcp/audit/. Useful when
             # publishing test artefacts that would otherwise leak $HOME.
             kwargs["audit_dir"] = Path(audit).expanduser()
         kwargs.update(overrides)

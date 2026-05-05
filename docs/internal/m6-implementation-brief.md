@@ -24,7 +24,7 @@ Phase 2 (caller passes the same `confirm_token` back):
 - If the token is unknown, expired, or its bound payload differs from
   the current call, the operation is rejected with
   `ErrorCode.CONFIRMATION_REQUIRED`.
-- A snapshot of the original state is taken under `.ofmcp-trash/<ts>/`
+- A snapshot of the original state is taken under `.ohmcp-trash/<ts>/`
   before any mutation.
 - The op runs; the audit event records `op_kind="destructive"` plus the
   `snapshot_id`.
@@ -56,7 +56,7 @@ class ConfirmRegistry:
 
 ### HMAC secret bootstrapping
 
-- Path: `~/.obsidian-full-mcp/secret`
+- Path: `~/.obsidian-hardened-mcp/secret`
 - Mode: `0o600` (enforced at write; refuse to load if mode is wider — single
   finding to log + abort load).
 - Generated on first boot (`secrets.token_bytes(32)`) if absent.
@@ -92,7 +92,7 @@ def snapshot_for_destruction(vp: VaultPath, *, snapshot_root: Path) -> str:
     Returns the snapshot_id (the timestamp directory name)."""
 ```
 
-- Snapshots live in `<vault_root>/.ofmcp-trash/` (already in the forbidden
+- Snapshots live in `<vault_root>/.ohmcp-trash/` (already in the forbidden
   zones so MCP tools can never read them back).
 - Per snapshot: `YYYYMMDDTHHMMSSZ-<short-hash>/<original-relative-path>`.
 - Use `shutil.copy2` for files (preserves metadata). For directory ops in
@@ -205,7 +205,7 @@ plus `tests/unit/test_confirm_registry.py`, `tests/unit/test_fs_snapshot.py`).
 ### Snapshot
 - Snapshot a file → copy exists at expected path; original still in place.
 - Snapshot id is unique across rapid successive calls (timestamp + hash).
-- Snapshot dir lands in `<vault>/.ofmcp-trash/` (forbidden zone).
+- Snapshot dir lands in `<vault>/.ohmcp-trash/` (forbidden zone).
 - Snapshot of a missing file → raise.
 
 ### `delete_note`
@@ -256,7 +256,7 @@ plus `tests/unit/test_confirm_registry.py`, `tests/unit/test_fs_snapshot.py`).
 Update `docs/security-model.md`:
 - The HMAC secret rotation is manual (delete the file, restart).
 - Destructive operations now produce snapshots — disk usage grows.
-  Document a manual cleanup convention (`.ofmcp-trash/` is yours to
+  Document a manual cleanup convention (`.ohmcp-trash/` is yours to
   prune).
 
 ## Suggested commit shape
@@ -271,7 +271,7 @@ applies the change atomically.
 
 - security/confirm.py: ConfirmRegistry (HMAC-SHA256 over secret +
   payload + nonce + exp; single-use; 90s TTL).
-- fs/snapshot.py: snapshot_for_destruction → .ofmcp-trash/<ts>/.
+- fs/snapshot.py: snapshot_for_destruction → .ohmcp-trash/<ts>/.
 - tools/destructive.py: the three tools, with `confirm_token`,
   `dry_run`, and `update_backlinks` (rename/move).
 - New error codes: CONFIRMATION_REQUIRED, INVALID_CONFIRMATION_TOKEN,

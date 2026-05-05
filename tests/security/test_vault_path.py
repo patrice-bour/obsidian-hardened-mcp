@@ -22,7 +22,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from obsidian_full_mcp.domain.vault_path import (
+from obsidian_hardened_mcp.domain.vault_path import (
     AbsolutePathError,
     ForbiddenZoneError,
     InvalidPathError,
@@ -165,9 +165,9 @@ class TestForbiddenZones:
             ".git",
             ".trash/old.md",
             ".trash",
-            ".ofmcp-trash/2026-05-04/note.md",
-            ".ofmcp-trash",
-            ".obsidian-full-mcp.yaml",
+            ".ohmcp-trash/2026-05-04/note.md",
+            ".ohmcp-trash",
+            ".obsidian-hardened-mcp.yaml",
         ],
     )
     def test_forbidden_zones_are_rejected(self, tmp_vault: Path, forbidden_path: str) -> None:

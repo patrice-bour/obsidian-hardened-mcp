@@ -27,17 +27,17 @@ from typing import Any, Literal
 
 from ruamel.yaml.comments import CommentedMap
 
-from obsidian_full_mcp.config import AppConfig
-from obsidian_full_mcp.domain.results import ErrorCode, ToolResult
-from obsidian_full_mcp.domain.vault_path import VaultPath
-from obsidian_full_mcp.frontmatter import (
+from obsidian_hardened_mcp.config import AppConfig
+from obsidian_hardened_mcp.domain.results import ErrorCode, ToolResult
+from obsidian_hardened_mcp.domain.vault_path import VaultPath
+from obsidian_hardened_mcp.frontmatter import (
     ParsedNote,
     parse_note,
     render_note,
 )
-from obsidian_full_mcp.fs.reader import read_text
-from obsidian_full_mcp.security.audit_logger import AuditLogger
-from obsidian_full_mcp.tools._base import (
+from obsidian_hardened_mcp.fs.reader import read_text
+from obsidian_hardened_mcp.security.audit_logger import AuditLogger
+from obsidian_hardened_mcp.tools._base import (
     emit_audit,
     map_exception,
     new_request_id,
@@ -46,7 +46,7 @@ from obsidian_full_mcp.tools._base import (
     to_plain_dict,
     tool_call,
 )
-from obsidian_full_mcp.validation.hooks import HookContext, HookRegistry
+from obsidian_hardened_mcp.validation.hooks import HookContext, HookRegistry
 
 _BODY_PREVIEW_BYTES = 4096
 
@@ -266,7 +266,7 @@ def _mutate_frontmatter(
             audit_id=audit_id,
         )
 
-    from obsidian_full_mcp.fs.writer import atomic_write_text
+    from obsidian_hardened_mcp.fs.writer import atomic_write_text
 
     try:
         atomic_write_text(vp, new_content)

@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-`obsidian-full-mcp` is currently in community-preview. Security fixes
+`obsidian-hardened-mcp` is currently in community-preview. Security fixes
 land on the latest minor only.
 
 | Version | Supported |
@@ -15,7 +15,7 @@ land on the latest minor only.
 **Please do not file public issues for security bugs.** The reporting
 channel is GitHub Security Advisories:
 
-1. Go to the [Security tab](https://github.com/patrice-bour/obsidian-full-mcp/security)
+1. Go to the [Security tab](https://github.com/patrice-bour/obsidian-hardened-mcp/security)
    of this repository.
 2. Click **Report a vulnerability**.
 3. Describe the issue with enough detail to reproduce: affected
@@ -28,7 +28,7 @@ disclosure with you.
 
 If GitHub Security Advisories are unavailable to you, email the
 maintainer through the address listed in `pyproject.toml` with the
-subject prefix `[obsidian-full-mcp security]`.
+subject prefix `[obsidian-hardened-mcp security]`.
 
 ## Scope
 

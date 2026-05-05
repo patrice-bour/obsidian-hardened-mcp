@@ -11,7 +11,7 @@ Public API:
 
 from __future__ import annotations
 
-from obsidian_full_mcp.frontmatter.parser import (
+from obsidian_hardened_mcp.frontmatter.parser import (
     FrontmatterError,
     FrontmatterTooLargeError,
     MalformedFrontmatterError,

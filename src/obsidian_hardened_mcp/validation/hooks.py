@@ -7,7 +7,7 @@ post-write state, then asks each hook in order whether it accepts the
 operation. The first `reject` short-circuits and aborts. `warn` results
 accumulate into the report and are surfaced to the caller without blocking.
 
-Hooks are loaded from `.obsidian-full-mcp.yaml` at the vault root (see
+Hooks are loaded from `.obsidian-hardened-mcp.yaml` at the vault root (see
 `validation.config_loader`). Built-in hooks live in `validation.builtin_hooks`;
 plugins can register their own classes implementing the `ValidationHook`
 Protocol.
@@ -25,7 +25,7 @@ import copy
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol, runtime_checkable
 
-from obsidian_full_mcp.domain.vault_path import VaultPath
+from obsidian_hardened_mcp.domain.vault_path import VaultPath
 
 Phase = Literal["pre_write"]
 Decision = Literal["accept", "warn", "reject"]

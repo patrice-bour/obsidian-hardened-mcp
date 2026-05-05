@@ -1,4 +1,4 @@
-"""S7 — validation hooks: drop a `.obsidian-full-mcp.yaml` at the
+"""S7 — validation hooks: drop a `.obsidian-hardened-mcp.yaml` at the
 vault root, restart the server, and verify the hooks block invalid
 writes (iso_date, reserved_tags, json_schema).
 
@@ -48,7 +48,7 @@ async def run(vault: Path) -> ScenarioReport:
     # a partial failure (e.g., one drop succeeds, the next raises, or the
     # harness fails to start) cannot leave orphan config files in the
     # vault for subsequent runs to trip over.
-    config_path = vault / ".obsidian-full-mcp.yaml"
+    config_path = vault / ".obsidian-hardened-mcp.yaml"
     schema_dir = vault / "_schemas"
     schema_path = schema_dir / "journal.json"
 

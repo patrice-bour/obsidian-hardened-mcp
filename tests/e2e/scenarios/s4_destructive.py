@@ -1,7 +1,7 @@
 """S4 — destructive ops with 2-phase HMAC confirm.
 
 Covers:
-- delete_note: phase 1 -> token -> phase 2 -> .ofmcp-trash snapshot
+- delete_note: phase 1 -> token -> phase 2 -> .ohmcp-trash snapshot
 - rename_note + update_backlinks: rewrite of [[old]] in linked notes
 - move_note + update_backlinks
 - token tampering -> invalid_confirmation_token
@@ -29,7 +29,7 @@ from ._assert import (
 async def run(h: E2EHarness) -> ScenarioReport:
     rep = ScenarioReport("S4", "destructive")
     vault = h.vault
-    trash = vault / ".ofmcp-trash"
+    trash = vault / ".ohmcp-trash"
 
     # ---------- delete_note ----------
     # Use a throwaway file we can recreate freely.
@@ -72,9 +72,9 @@ async def run(h: E2EHarness) -> ScenarioReport:
         [p.name for p in trash.iterdir()] if trash.exists() else "absent"
     )
     rep.add(
-        ".ofmcp-trash holds the snapshot",
+        ".ohmcp-trash holds the snapshot",
         bool(_find_snapshot(trash, snap_id)),
-        f".ofmcp-trash listing: {trash_listing}",
+        f".ohmcp-trash listing: {trash_listing}",
     )
 
     # ---------- rename_note + update_backlinks ----------

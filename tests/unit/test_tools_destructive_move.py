@@ -12,11 +12,11 @@ from pathlib import Path
 
 import pytest
 
-from obsidian_full_mcp.config import AppConfig
-from obsidian_full_mcp.domain.results import ErrorCode
-from obsidian_full_mcp.security.audit_logger import AuditLogger
-from obsidian_full_mcp.security.confirm import ConfirmRegistry
-from obsidian_full_mcp.tools.destructive import move_note
+from obsidian_hardened_mcp.config import AppConfig
+from obsidian_hardened_mcp.domain.results import ErrorCode
+from obsidian_hardened_mcp.security.audit_logger import AuditLogger
+from obsidian_hardened_mcp.security.confirm import ConfirmRegistry
+from obsidian_hardened_mcp.tools.destructive import move_note
 
 
 @pytest.fixture
@@ -256,7 +256,7 @@ class TestMovePhase2:
         snap_id = commit.data["snapshot_id"]  # type: ignore[index]
         assert (
             tmp_vault
-            / ".ofmcp-trash"
+            / ".ohmcp-trash"
             / snap_id
             / "01_Notes"
             / "sample.md"
@@ -310,7 +310,7 @@ class TestMoveBacklinks:
         helper is shared with rename_note and any future op)."""
         from pathlib import PurePosixPath
 
-        from obsidian_full_mcp.tools.destructive import (
+        from obsidian_hardened_mcp.tools.destructive import (
             _rewrite_backlinks_phase2,
         )
 

@@ -18,11 +18,11 @@ from pathlib import Path
 
 import pytest
 
-from obsidian_full_mcp.config import AppConfig
-from obsidian_full_mcp.domain.results import ErrorCode
-from obsidian_full_mcp.security.audit_logger import AuditLogger
-from obsidian_full_mcp.security.confirm import ConfirmRegistry
-from obsidian_full_mcp.tools.destructive import delete_note
+from obsidian_hardened_mcp.config import AppConfig
+from obsidian_hardened_mcp.domain.results import ErrorCode
+from obsidian_hardened_mcp.security.audit_logger import AuditLogger
+from obsidian_hardened_mcp.security.confirm import ConfirmRegistry
+from obsidian_hardened_mcp.tools.destructive import delete_note
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -185,7 +185,7 @@ class TestDeleteNotePhase2:
         # File is gone.
         assert not (tmp_vault / "01_Notes" / "sample.md").exists()
 
-    def test_phase2_creates_snapshot_in_ofmcp_trash(
+    def test_phase2_creates_snapshot_in_ohmcp_trash(
         self,
         config: AppConfig,
         audit: AuditLogger,
@@ -209,7 +209,7 @@ class TestDeleteNotePhase2:
         snapshot_id = second.data["snapshot_id"]
         assert isinstance(snapshot_id, str) and snapshot_id
         snap_copy = (
-            tmp_vault / ".ofmcp-trash" / snapshot_id / "01_Notes" / "sample.md"
+            tmp_vault / ".ohmcp-trash" / snapshot_id / "01_Notes" / "sample.md"
         )
         assert snap_copy.exists()
         assert snap_copy.read_text() == "# Sample\n"

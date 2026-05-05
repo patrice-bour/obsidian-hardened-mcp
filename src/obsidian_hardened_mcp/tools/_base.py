@@ -22,9 +22,9 @@ from datetime import UTC, datetime
 from functools import wraps
 from typing import Any, ParamSpec, TypeVar
 
-from obsidian_full_mcp.domain.audit import AuditEvent, OpKind, Outcome
-from obsidian_full_mcp.domain.results import ErrorCode, ToolResult
-from obsidian_full_mcp.domain.vault_path import (
+from obsidian_hardened_mcp.domain.audit import AuditEvent, OpKind, Outcome
+from obsidian_hardened_mcp.domain.results import ErrorCode, ToolResult
+from obsidian_hardened_mcp.domain.vault_path import (
     AbsolutePathError,
     ForbiddenZoneError,
     InvalidPathError,
@@ -32,29 +32,29 @@ from obsidian_full_mcp.domain.vault_path import (
     SymlinkEscapeError,
     VaultPathError,
 )
-from obsidian_full_mcp.frontmatter import (
+from obsidian_hardened_mcp.frontmatter import (
     FrontmatterTooLargeError,
     MalformedFrontmatterError,
     UnsafeYamlError,
 )
-from obsidian_full_mcp.fs.reader import (
+from obsidian_hardened_mcp.fs.reader import (
     FileOffloadedError,
     FileTooLargeError,
     NotAFileError,
     NotFoundError,
 )
-from obsidian_full_mcp.rest.client import (
+from obsidian_hardened_mcp.rest.client import (
     RestAuthError,
     RestError,
     RestUnavailableError,
 )
-from obsidian_full_mcp.security.audit_logger import AuditLogger
-from obsidian_full_mcp.security.confirm import (
+from obsidian_hardened_mcp.security.audit_logger import AuditLogger
+from obsidian_hardened_mcp.security.confirm import (
     ExpiredConfirmationTokenError,
     InvalidConfirmationTokenError,
     PayloadMismatchError,
 )
-from obsidian_full_mcp.validation.hooks import (
+from obsidian_hardened_mcp.validation.hooks import (
     HookContext,
     HookRegistry,
     HookViolationError,

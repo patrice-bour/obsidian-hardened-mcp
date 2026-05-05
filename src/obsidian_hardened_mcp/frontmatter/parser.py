@@ -31,7 +31,7 @@ from ruamel.yaml.comments import CommentedMap
 from ruamel.yaml.constructor import ConstructorError
 from ruamel.yaml.error import YAMLError
 
-from obsidian_full_mcp.frontmatter.yaml_safety import enforce_default_tags_only
+from obsidian_hardened_mcp.frontmatter.yaml_safety import enforce_default_tags_only
 
 DEFAULT_MAX_FRONTMATTER_BYTES = 64 * 1024
 

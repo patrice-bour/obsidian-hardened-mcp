@@ -14,11 +14,11 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from obsidian_full_mcp.rest.client import (
+from obsidian_hardened_mcp.rest.client import (
     RestAuthError,
     RestUnavailableError,
 )
-from obsidian_full_mcp.rest.detector import RestAvailabilityDetector
+from obsidian_hardened_mcp.rest.detector import RestAvailabilityDetector
 
 
 class _FakeClient:

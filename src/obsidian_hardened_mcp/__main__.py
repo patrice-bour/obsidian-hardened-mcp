@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Entry point for `obsidian-full-mcp`.
+"""Entry point for `obsidian-hardened-mcp`.
 
 Usage:
-    obsidian-full-mcp --vault /path/to/vault
+    obsidian-hardened-mcp --vault /path/to/vault
 
 Environment variables:
     OBSIDIAN_VAULT_ROOT   Default vault root if `--vault` is not provided.
@@ -18,13 +18,13 @@ import os
 import sys
 from pathlib import Path
 
-from obsidian_full_mcp.config import AppConfig
-from obsidian_full_mcp.server import create_server
+from obsidian_hardened_mcp.config import AppConfig
+from obsidian_hardened_mcp.server import create_server
 
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="obsidian-full-mcp",
+        prog="obsidian-hardened-mcp",
         description=(
             "Secure MCP server for Obsidian vaults. Talks stdio MCP."
         ),

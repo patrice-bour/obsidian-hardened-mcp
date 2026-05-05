@@ -17,7 +17,7 @@ body:
     id: version
     attributes:
       label: Version
-      description: Output of `uv run obsidian-full-mcp --version` or the git tag/commit you're running.
+      description: Output of `uv run obsidian-hardened-mcp --version` or the git tag/commit you're running.
       placeholder: "v0.1.1"
     validations:
       required: true

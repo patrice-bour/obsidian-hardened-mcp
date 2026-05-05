@@ -7,13 +7,13 @@ from typing import Any
 
 import pytest
 
-from obsidian_full_mcp.domain.vault_path import VaultPath
-from obsidian_full_mcp.validation.builtin_hooks import (
+from obsidian_hardened_mcp.domain.vault_path import VaultPath
+from obsidian_hardened_mcp.validation.builtin_hooks import (
     IsoDateHook,
     JsonSchemaHook,
     ReservedTagsHook,
 )
-from obsidian_full_mcp.validation.hooks import HookContext
+from obsidian_hardened_mcp.validation.hooks import HookContext
 
 
 def _ctx(

@@ -7,15 +7,15 @@ from pathlib import Path
 import pytest
 from mcp.server.fastmcp import FastMCP
 
-from obsidian_full_mcp.config import AppConfig
-from obsidian_full_mcp.rest.detector import RestAvailabilityDetector
-from obsidian_full_mcp.server import create_server
+from obsidian_hardened_mcp.config import AppConfig
+from obsidian_hardened_mcp.rest.detector import RestAvailabilityDetector
+from obsidian_hardened_mcp.server import create_server
 
 
 @pytest.fixture
 def config(tmp_vault: Path, tmp_path: Path) -> AppConfig:
     # Redirect audit_dir AND secret_file into the per-test tmp tree so we
-    # never pollute the user's `~/.obsidian-full-mcp/` directory.
+    # never pollute the user's `~/.obsidian-hardened-mcp/` directory.
     return AppConfig(
         vault_root=tmp_vault,
         audit_dir=tmp_path / "audit",
@@ -26,7 +26,7 @@ def config(tmp_vault: Path, tmp_path: Path) -> AppConfig:
 def test_create_server_returns_fastmcp_instance(config: AppConfig) -> None:
     server = create_server(config)
     assert isinstance(server, FastMCP)
-    assert server.name == "obsidian-full-mcp"
+    assert server.name == "obsidian-hardened-mcp"
 
 
 @pytest.mark.asyncio
@@ -74,7 +74,7 @@ async def test_get_vault_info_tool_is_callable_through_mcp(
 ) -> None:
     server = create_server(config)
     raw = await server.call_tool("get_vault_info", {})
-    assert "obsidian-full-mcp" in str(raw)
+    assert "obsidian-hardened-mcp" in str(raw)
 
 
 @pytest.mark.asyncio
@@ -104,9 +104,9 @@ async def test_server_auto_loads_validation_config_from_vault(
     config: AppConfig, tmp_vault: Path
 ) -> None:
     """`create_server` (with no explicit `hooks=`) reads
-    `<vault_root>/.obsidian-full-mcp.yaml` at boot and applies the hooks
+    `<vault_root>/.obsidian-hardened-mcp.yaml` at boot and applies the hooks
     to write tools."""
-    (tmp_vault / ".obsidian-full-mcp.yaml").write_text("hooks:\n  - iso_date\n")
+    (tmp_vault / ".obsidian-hardened-mcp.yaml").write_text("hooks:\n  - iso_date\n")
 
     server = create_server(config)
     raw = await server.call_tool(
@@ -123,9 +123,9 @@ async def test_server_with_explicit_empty_registry_skips_validation(
     config: AppConfig, tmp_vault: Path
 ) -> None:
     """Passing `hooks=HookRegistry([])` overrides the auto-load."""
-    from obsidian_full_mcp.validation.hooks import HookRegistry
+    from obsidian_hardened_mcp.validation.hooks import HookRegistry
 
-    (tmp_vault / ".obsidian-full-mcp.yaml").write_text("hooks:\n  - iso_date\n")
+    (tmp_vault / ".obsidian-hardened-mcp.yaml").write_text("hooks:\n  - iso_date\n")
     server = create_server(config, hooks=HookRegistry([]))
 
     await server.call_tool(
@@ -168,7 +168,7 @@ async def test_delete_note_two_phase_through_mcp(
 ) -> None:
     """End-to-end: phase 1 returns a token, file untouched; phase 2 with
     that token deletes the file."""
-    from obsidian_full_mcp.security.confirm import ConfirmRegistry
+    from obsidian_hardened_mcp.security.confirm import ConfirmRegistry
 
     # Use an explicit registry so the server doesn't bootstrap the secret
     # from disk for this isolated assertion.
@@ -205,7 +205,7 @@ async def test_delete_note_two_phase_through_mcp(
 async def test_delete_without_token_does_not_mutate_through_mcp(
     config: AppConfig, tmp_vault: Path
 ) -> None:
-    from obsidian_full_mcp.security.confirm import ConfirmRegistry
+    from obsidian_hardened_mcp.security.confirm import ConfirmRegistry
 
     registry = ConfirmRegistry(secret=b"k" * 32)
     server = create_server(config, registry=registry)
@@ -240,7 +240,7 @@ class _FakeRestClient:
 
     def health_check(self) -> bool:
         if not self.healthy:
-            from obsidian_full_mcp.rest.client import RestUnavailableError
+            from obsidian_hardened_mcp.rest.client import RestUnavailableError
 
             raise RestUnavailableError("not running")
         return True
@@ -306,7 +306,7 @@ async def test_execute_command_two_phase_through_mcp(
 ) -> None:
     """End-to-end via FastMCP: phase 1 returns a token, phase 2 with the
     same token + matching command_id triggers the REST POST."""
-    from obsidian_full_mcp.security.confirm import ConfirmRegistry
+    from obsidian_hardened_mcp.security.confirm import ConfirmRegistry
 
     client = _FakeRestClient(healthy=True)
     detector = _detector_with_state(client)

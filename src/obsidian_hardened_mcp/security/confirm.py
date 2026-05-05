@@ -19,7 +19,7 @@ mutate the vault on the first try — the LLM would have to call the same
 tool twice with the matching token, which it has no way to fabricate
 without the secret.
 
-The HMAC secret lives at `~/.obsidian-full-mcp/secret` (mode 0o600).
+The HMAC secret lives at `~/.obsidian-hardened-mcp/secret` (mode 0o600).
 We refuse to load it under any wider mode — a permission slip would let
 local users forge tokens.
 
@@ -40,7 +40,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
-from obsidian_full_mcp.domain.vault_path import VaultPath
+from obsidian_hardened_mcp.domain.vault_path import VaultPath
 
 OperationName = Literal[
     "delete_note", "rename_note", "move_note", "execute_command"

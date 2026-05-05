@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from obsidian_full_mcp.config import AppConfig
-from obsidian_full_mcp.tools.meta import get_vault_info, list_tools_capabilities
+from obsidian_hardened_mcp.config import AppConfig
+from obsidian_hardened_mcp.tools.meta import get_vault_info, list_tools_capabilities
 
 
 @pytest.fixture

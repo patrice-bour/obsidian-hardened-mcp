@@ -1,14 +1,14 @@
 # tests/e2e — End-to-end harness
 
-Subprocess-based harness that drives every tool of `obsidian-full-mcp`
+Subprocess-based harness that drives every tool of `obsidian-hardened-mcp`
 through the **real stdio MCP wire**, on a freshly seeded test vault.
 
 The unit and in-process integration suites (`tests/unit/`,
 `tests/integration/`) cover correctness of the tool implementations.
 This harness covers what those tests can't: the actual subprocess
 launch, the JSON-RPC framing through `stdio_client`, the disk effects
-of atomic writes, the `.ofmcp-trash/` snapshot directory layout, and
-the audit log written to `~/.obsidian-full-mcp/audit/`.
+of atomic writes, the `.ohmcp-trash/` snapshot directory layout, and
+the audit log written to `~/.obsidian-hardened-mcp/audit/`.
 
 ## Run
 
@@ -76,7 +76,7 @@ side-effect-free Obsidian command).
 
 By default, the runner sets `OBSIDIAN_AUDIT_DIR` to
 `tests/e2e/.runs/audit/` so test runs don't pollute the user's
-`~/.obsidian-full-mcp/audit/`. Set the env var explicitly to override
+`~/.obsidian-hardened-mcp/audit/`. Set the env var explicitly to override
 (useful for CI tmp paths). The audit inspector honours the same
 variable so it always reads what the server wrote.
 
@@ -91,7 +91,7 @@ variable so it always reads what the server wrote.
 | S4 | destructive | `delete_note` / `rename_note` / `move_note` 2-phase + backlink rewrite, token tampering, token reuse |
 | S5 | path sandbox | 8 malicious paths × 2 entrypoints (read + create) — all rejected |
 | S6 | yaml safety | non-default YAML tag in frontmatter rejected by the parser |
-| S7 | validation hooks | `.obsidian-full-mcp.yaml` with `iso_date` + `reserved_tags` + `json_schema` blocks invalid writes |
+| S7 | validation hooks | `.obsidian-hardened-mcp.yaml` with `iso_date` + `reserved_tags` + `json_schema` blocks invalid writes |
 | S8 | audit | JSONL log grows, every entry has the canonical schema |
 | S9 | rest api | no-token branch returns `rest_unavailable`; with-token opt-in |
 
@@ -102,7 +102,7 @@ run_e2e.py
   │
   ├─ seed_vault.seed(.test-vault/)        # 10 synthetic notes
   ├─ open E2EHarness:
-  │     spawn `python -m obsidian_full_mcp --vault .test-vault`
+  │     spawn `python -m obsidian_hardened_mcp --vault .test-vault`
   │     stdio_client + ClientSession  ←  full MCP wire
   │
   ├─ run S0..S6, S9 in the same long-lived session
@@ -117,7 +117,7 @@ run_e2e.py
 | `run_e2e.py` | Orchestrator — spawns harness, runs scenarios, prints table |
 | `mcp_harness.py` | `E2EHarness` async context manager wrapping `stdio_client` + `ClientSession`; `CallResult` decoder |
 | `seed_vault.py` | `seed(target)` produces the 10-note canonical test vault |
-| `audit_inspector.py` | Reads `<OBSIDIAN_AUDIT_DIR or ~/.obsidian-full-mcp/audit/>/<today>.jsonl`, verifies entry shape |
+| `audit_inspector.py` | Reads `<OBSIDIAN_AUDIT_DIR or ~/.obsidian-hardened-mcp/audit/>/<today>.jsonl`, verifies entry shape |
 | `scenarios/_assert.py` | `Step`, `ScenarioReport`, expectation helpers |
 | `scenarios/sN_*.py` | One module per scenario, all expose `async def run(h) -> ScenarioReport` |
 
@@ -131,7 +131,7 @@ here are deliberately not prefixed with `test_` so pytest skips them.
 ## Troubleshooting
 
 **`Connection closed` during S7 boot** — the dropped
-`.obsidian-full-mcp.yaml` references a schema file the sandbox cannot
+`.obsidian-hardened-mcp.yaml` references a schema file the sandbox cannot
 reach. Confirm `_schemas/journal.json` exists at the vault root.
 
 **`payload_mismatch` on phase 2** — phase 1 and phase 2 must have
@@ -141,7 +141,7 @@ classic foot-gun.
 
 **Audit assertions fail / no log file** — the server lazily creates
 the audit log (under `OBSIDIAN_AUDIT_DIR`, falling back to
-`~/.obsidian-full-mcp/audit/`) on the first write. If the run only
+`~/.obsidian-hardened-mcp/audit/`) on the first write. If the run only
 contained reads, the file may not exist yet. The harness's S2/S4
 always trigger writes, so this should not happen in practice.
 
