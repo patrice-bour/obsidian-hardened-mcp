@@ -25,7 +25,27 @@ Existing MCP servers for Obsidian are limited:
 
 ## Installation
 
-The server requires Python ≥ 3.11 and uses [`uv`](https://github.com/astral-sh/uv) for dependency management.
+The server requires Python ≥ 3.11. Install [`uv`](https://github.com/astral-sh/uv) first if you don't have it — it provisions Python and runs the bin entry point in an isolated environment.
+
+### End users — zero install with `uvx`
+
+```bash
+uvx --from git+https://github.com/patrice-bour/obsidian-full-mcp obsidian-full-mcp --vault /path/to/your/vault
+```
+
+`uvx` clones the package, builds an isolated environment, and runs the
+bin. Subsequent runs hit the local cache. Nothing to install manually.
+
+For reproducible setups, pin to a release tag:
+
+```bash
+uvx --from git+https://github.com/patrice-bour/obsidian-full-mcp@v0.1.1 obsidian-full-mcp --vault /path/to/your/vault
+```
+
+> **Heads-up.** A PyPI publish is on the v0.2 short list. Once there,
+> the command shortens to `uvx obsidian-full-mcp --vault /path/to/your/vault`.
+
+### Developers — clone + `uv sync`
 
 ```bash
 git clone https://github.com/patrice-bour/obsidian-full-mcp.git
@@ -33,32 +53,73 @@ cd obsidian-full-mcp
 uv sync
 ```
 
-Run the test suite to confirm the install:
+Run the in-process suite (≈ 5 s) and the end-to-end harness
+(≈ 30 s, real subprocess):
 
 ```bash
-uv run pytest -q
+uv run pytest -q                            # 533 passed
+uv run python tests/e2e/run_e2e.py          # 101/101 PASS
 ```
-
-A successful run reports `533 passed`. To also exercise the end-to-end harness (10 scenarios driven through a real MCP subprocess), run `uv run python tests/e2e/run_e2e.py` — expect `101/101 PASS`.
 
 ## Quick start
 
 Point the server at your vault root:
 
 ```bash
-uv run obsidian-full-mcp --vault /path/to/your/vault
+uvx --from git+https://github.com/patrice-bour/obsidian-full-mcp obsidian-full-mcp --vault /path/to/your/vault
 ```
 
-The server speaks stdio MCP. For Claude Desktop, add to
-`~/Library/Application Support/Claude/claude_desktop_config.json`:
+The server speaks stdio MCP. Add it to your client's configuration:
+
+### Claude Desktop
+
+`~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
+or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
 ```json
 {
   "mcpServers": {
     "obsidian-full-mcp": {
-      "command": "uv",
-      "args": ["run", "--project", "/path/to/obsidian-full-mcp",
-               "obsidian-full-mcp", "--vault", "/path/to/your/vault"]
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/patrice-bour/obsidian-full-mcp",
+        "obsidian-full-mcp",
+        "--vault",
+        "/path/to/your/vault"
+      ]
+    }
+  }
+}
+```
+
+### Claude Code
+
+`~/.claude.json` (project-scoped) or via `claude mcp add`:
+
+```bash
+claude mcp add obsidian-full-mcp \
+  -- uvx --from git+https://github.com/patrice-bour/obsidian-full-mcp \
+     obsidian-full-mcp --vault /path/to/your/vault
+```
+
+### Multiple vaults
+
+Register one entry per vault with distinct names — the server itself is
+single-vault by design (the `--vault` flag is required at boot):
+
+```json
+{
+  "mcpServers": {
+    "obsidian-personal": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/patrice-bour/obsidian-full-mcp",
+               "obsidian-full-mcp", "--vault", "/Users/you/Vaults/personal"]
+    },
+    "obsidian-work": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/patrice-bour/obsidian-full-mcp",
+               "obsidian-full-mcp", "--vault", "/Users/you/Vaults/work"]
     }
   }
 }

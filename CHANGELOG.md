@@ -12,6 +12,11 @@ metadata / docs / file-layout adjustments to make the repository
 suitable for public release.
 
 ### Added
+- README "End users — zero install with `uvx`" path: a single
+  `uvx --from git+...` invocation replaces the previous clone +
+  `uv sync` + `uv run` four-step install for non-developer users.
+  Quick-start, Claude Desktop, and Claude Code config examples now
+  use `uvx` directly. Multiple-vaults section added.
 - `SECURITY.md` with private vulnerability reporting via GitHub Security
   Advisories.
 - `CONTRIBUTING.md` covering dev setup, conventional commits, and the
