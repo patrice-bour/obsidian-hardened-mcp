@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+(Nothing yet — v0.2 will pick up the deferred items in
+`docs/v0.1-followups.md`.)
+
+## [0.1.2] - 2026-05-05
+
 Public-flip preparation pass plus a final naming change — `obsidian-full-mcp`
 becomes `obsidian-hardened-mcp` to better reflect the project's
 positioning (security envelope first, not "kitchen-sink"). No code
@@ -382,6 +387,7 @@ strict mypy clean.
   cataloguing every entry as `done` / `v0.2` / `wontfix` per the
   "implemented or explicitly closed" rule.
 
-[Unreleased]: https://github.com/patrice-bour/obsidian-hardened-mcp/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/patrice-bour/obsidian-hardened-mcp/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/patrice-bour/obsidian-hardened-mcp/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/patrice-bour/obsidian-hardened-mcp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/patrice-bour/obsidian-hardened-mcp/releases/tag/v0.1.0
