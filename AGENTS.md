@@ -52,22 +52,29 @@ The approved v0.1 plan lives at `~/.claude/plans/les-serveurs-mcp-existants-tran
 ## Where to resume (for a fresh session)
 
 **TL;DR for a Claude Code session resuming a long-running thread**:
-the project is at **v0.2.0**, ready to flip from private to public on
-GitHub. The reference plan for the pre-public-flip work lives at
-`/Users/pbr/.claude/plans/avant-de-publier-sur-zippy-simon.md`. Read
-that file, then come back here for the milestones / sanity check.
-The user (Patrice) is preparing to flip; ask which step to pick up
-before doing anything visible (push, gh repo edit, PyPI publish).
+the project is at **v0.2.1**, ready to flip from private to public on
+GitHub. The reference plans for the pre-public-flip work live at
+`~/.claude/plans/avant-de-publier-sur-zippy-simon.md` (parent flip
+plan) and `~/.claude/plans/v0.2.1-v0.2.2-pre-flip-fixes.md` (the
+v0.2.0 → v0.2.1/v0.2.2 patch fixes). Read those, then come back here
+for the milestones / sanity check. The user (Patrice) is preparing to
+flip; ask which step to pick up before doing anything visible (push,
+gh repo edit, PyPI publish).
 
-**Last merged on `main`**: `chore(release): v0.2.0` — pre-public-flip
-baseline. Contains the HMAC honesty pass (doc-only), the README
-revamp for non-developers, the auto-cleanup of `.ohmcp-trash/` with
-configurable retention policy, and a few extras (`.gitattributes`,
-docs coherence post Lot-B). **v0.2.0 tagged.** v0.1.0 (`f24827b`),
-v0.1.1, v0.1.2 tags preserved.
+**Last merged on `main`**: `fix(release): v0.2.1` — pre-public-flip
+patch closing the credibility gaps from the v0.1.2..v0.2.0 code
+review. Doc/version coherence only (no behavioural change):
+`__version__` now derives from `importlib.metadata`; `Status:` /
+install pin / supported-versions table all bumped; stale `v0.2
+followup` labels (M6-11, restore_from_snapshot, M7-03 TLS CA bundle)
+relabelled to `v0.3`; personal `migration/pbr` example replaced with
+generic `migration/legacy`; off-repo plan paths in this section
+generalised to `~/.claude/plans/...`. Adds `RELEASE-CHECKLIST.md`
+to prevent future drift. **v0.2.1 tagged.** v0.1.0 (`f24827b`),
+v0.1.1, v0.1.2, v0.2.0 tags preserved.
 
 **State of the public-flip plan** (per
-`/Users/pbr/.claude/plans/avant-de-publier-sur-zippy-simon.md`):
+`~/.claude/plans/avant-de-publier-sur-zippy-simon.md`):
 
 - ✅ PR1 — Lot B (HMAC honesty doc) — commit `d86a608`
 - ✅ PR2 — Lot A (README revamp) — commit `cf6bc50`
@@ -115,12 +122,13 @@ v0.1.1, v0.1.2 tags preserved.
 | 🎉 | **v0.1.1 tagged** — E2E harness + repo rename `power → full` + code-review pass | tag `v0.1.1` | 533 + 101 E2E |
 | 🎉 | **v0.1.2 tagged** — public-flip prep (SECURITY/CONTRIBUTING/CoC/templates/SPDX/uvx docs) + repo rename `full → hardened` | tag `v0.1.2` | 533 + 101 E2E |
 | 🎉 | **v0.2.0 tagged** — HMAC honesty + README revamp + trash auto-cleanup + pre-flip extras | tag `v0.2.0` | 558 + 101 E2E |
+| 🎉 | **v0.2.1 tagged** — pre-flip credibility fixes (`__version__` via importlib.metadata, doc/version coherence, `migration/legacy`, `RELEASE-CHECKLIST.md`) | tag `v0.2.1` | 558 + 101 E2E |
 
 **Next task** (in this exact order):
 
 1. Verify GitHub repo metadata (Issues ON / Wiki OFF / Discussions OFF /
    Projects OFF). Pre-flip extra #3 from
-   `/Users/pbr/.claude/plans/avant-de-publier-sur-zippy-simon.md`.
+   `~/.claude/plans/avant-de-publier-sur-zippy-simon.md`.
 2. Flip GitHub repo from private to public + activate branch
    protection on `main` (commands in the `Where to resume` block
    above).
@@ -138,7 +146,7 @@ bundle (M7-03), `search_notes` REST routing (M7-01), and **M6-11 —
 out-of-band confirmation via MCP `Context.elicit()`** (the real fix
 for the HMAC coherent-hallucination gap surfaced in v0.2.0).
 
-**Sanity check** to confirm a clean v0.2.0 base:
+**Sanity check** to confirm a clean v0.2.1 base:
 
 ```bash
 cd <repo-root>
@@ -146,7 +154,7 @@ uv run pytest -q                                    # expect 558 passed
 uv run python tests/e2e/run_e2e.py                  # expect 101/101 PASS
 uv run ruff check src tests                         # expect "All checks passed"
 uv run mypy src                                     # expect "no issues found"
-git tag -l                                          # expect 'v0.1.0', 'v0.1.1', 'v0.1.2', 'v0.2.0'
+git tag -l                                          # expect 'v0.1.0', 'v0.1.1', 'v0.1.2', 'v0.2.0', 'v0.2.1'
 ```
 
 **Detailed backlog** lives in `docs/v0.1-followups.md` (36 v0.2/v0.3

@@ -8,7 +8,7 @@ Each hook here implements the `ValidationHook` Protocol from
 hooks:
   - iso_date
   - reserved_tags:
-      forbidden: [migration-cc, migration/pbr]
+      forbidden: [migration-cc, migration/legacy]
       forbidden_fields: [source-vault]
   - json_schema:
       schemas:

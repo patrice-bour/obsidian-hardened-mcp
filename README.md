@@ -2,7 +2,7 @@
 
 A safe, audited bridge between any [Obsidian](https://obsidian.md) vault and any MCP-compatible AI assistant — Claude Desktop, Claude Code, and friends.
 
-> **Status**: v0.1.2, community-preview. Solo, local-first use is production-ready.
+> **Status**: v0.2.1, community-preview. Solo, local-first use is production-ready.
 
 The headline difference vs. lighter Obsidian MCP servers: this one assumes the AI **will eventually make a mistake**, and is built so that mistake is recoverable. Every write is atomic, every destruction leaves a copy in trash, every action is logged, and every path is checked before it touches disk.
 
@@ -25,7 +25,7 @@ uvx --from git+https://github.com/patrice-bour/obsidian-hardened-mcp obsidian-ha
 
 `uvx` clones the package into an isolated environment, installs it, and runs the bin. The server speaks MCP over standard input/output — there's no port to open, no service to manage. Press `Ctrl+C` once you've confirmed it boots cleanly.
 
-For reproducible setups, pin to a release tag: `git+https://github.com/patrice-bour/obsidian-hardened-mcp@v0.1.2`.
+For reproducible setups, pin to a release tag: `git+https://github.com/patrice-bour/obsidian-hardened-mcp@v0.2.1`.
 
 ### 2. Wire it into your AI client
 
@@ -176,7 +176,7 @@ We defend against:
 
 We do **not** defend against:
 
-- A coherently-hallucinating LLM that walks both phases of the destructive protocol legitimately. The recovery path is the snapshot trash + audit log; the real fix (out-of-band confirmation via the MCP `Context.elicit()` capability) is on the v0.2 roadmap.
+- A coherently-hallucinating LLM that walks both phases of the destructive protocol legitimately. The recovery path is the snapshot trash + audit log; the real fix (out-of-band confirmation via the MCP `Context.elicit()` capability) is on the v0.3 roadmap.
 - Code running under your user account. An attacker with shell access can already do anything the server can.
 - Concurrent writers. The server is single-writer by design — two clients pointed at the same vault can corrupt each other.
 

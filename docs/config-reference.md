@@ -52,13 +52,13 @@ newly-authored notes.
 
 ```yaml
 - reserved_tags:
-    forbidden: [migration-cc, migration/pbr]
+    forbidden: [migration-cc, migration/legacy]
     forbidden_fields: [source-vault]
 ```
 
 `forbidden`: tag values that must NOT appear in `tags:` (exact-match;
 hierarchical tags compare as full strings, so `migration` and
-`migration/pbr` are distinct).
+`migration/legacy` are distinct).
 
 `forbidden_fields`: top-level frontmatter keys that must NOT exist.
 

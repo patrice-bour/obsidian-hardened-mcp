@@ -10,6 +10,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 (Nothing yet — next stop is the public flip on GitHub and the PyPI
 publish.)
 
+## [0.2.1] - 2026-05-06
+
+Pre-public-flip patch closing the credibility gaps surfaced by the
+v0.1.2..v0.2.0 code review. No behavioural change for users.
+
+### Fixed
+- `obsidian_hardened_mcp.__version__` now derives from
+  `importlib.metadata.version("obsidian-hardened-mcp")` instead of a
+  hardcoded constant, eliminating the regression class that left it
+  at `"0.1.0"` after v0.2.0 shipped.
+- `docs/security-model.md` no longer claims auto-cleanup is "in
+  flight" (it shipped in v0.2.0) and no longer lists snapshot
+  pruning under "Non-goals".
+- `SECURITY.md` supported-versions table now lists `0.2.x` as
+  supported and demotes `< 0.2`.
+- M6-11 (out-of-band confirmation via `Context.elicit()`) is now
+  consistently labelled as a v0.3 followup across `README.md`,
+  `SECURITY.md`, `docs/security-model.md`, and
+  `docs/v0.1-followups.md` — v0.2.0 shipped without it. Same fix
+  applied to `restore_from_snapshot` and the M7-03 TLS CA bundle
+  references.
+- README `Status:` line and the install-from-source pin example now
+  point at `v0.2.1`.
+
+### Changed
+- Renamed the `migration/pbr` example tag (a personal vault
+  convention) to the generic `migration/legacy` in
+  `docs/config-reference.md`, the `ReservedTagsHook` docstring, and
+  the corresponding test fixture. No public API impact.
+- Generalised the off-repo plan paths in `AGENTS.md` "Where to
+  resume" from `/Users/pbr/.claude/plans/...` to
+  `~/.claude/plans/...`.
+
+### Added
+- `RELEASE-CHECKLIST.md` documents the per-release knobs that drift
+  silently (`__version__`, `Status:` line, supported-versions table,
+  followup target labels) so the v0.2.0 → v0.2.1 regression class
+  cannot recur.
+
 ## [0.2.0] - 2026-05-06
 
 Pre-public-flip baseline. Three docs PRs (HMAC honesty, README revamp
