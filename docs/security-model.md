@@ -138,7 +138,7 @@ story for v0.1 is:
    a confirm UI before tool calls. The human in the loop is the last
    line of defence against a hallucinated chain.
 
-#### Real out-of-band confirmation (v0.2 followup)
+#### Real out-of-band confirmation (v0.3 followup)
 
 The honest answer to "what stops a coherently-hallucinating LLM from
 walking both phases?" is **nothing in the HMAC mechanism alone** — by
@@ -152,7 +152,7 @@ response because it routes through the client, not the model.
 
 This is tracked as
 [M6-11](v0.1-followups.md#m6-11--2-phase-hmac-does-not-stop-a-coherently-hallucinating-llm)
-for v0.2. The plan is to wrap phase-2 entry points in a thin layer that
+for v0.3. The plan is to wrap phase-2 entry points in a thin layer that
 calls `ctx.elicit("Confirm <op> on <target>?")` before consuming the
 HMAC token, with graceful soft-fail for clients that don't implement
 elicitation (an explicit `elicitation_unsupported` error code, so
@@ -161,9 +161,12 @@ the layer).
 
 Snapshots accumulate under `<vault>/.ohmcp-trash/`. They are NEVER
 re-exposed by read tools (the directory is in the VaultPath
-forbidden-zone list). Manual cleanup convention: prune
-`.ohmcp-trash/` yourself when disk usage matters. *(Auto-cleanup with
-configurable retention is in flight as a separate v0.1.x followup.)*
+forbidden-zone list). Since v0.2.0 the server prunes them automatically
+according to the `trash:` block in `<vault>/.obsidian-hardened-mcp.yaml`
+(see [`docs/config-reference.md`](config-reference.md#trash-block--auto-cleanup-of-ohmcp-trash)).
+The defaults retain ≥1 most-recent snapshot per source path, ≥5
+snapshots globally, and 30 days of history; opt out by setting both
+`keep_at_least_*` to `0` and `retention_days: null`.
 
 `update_backlinks=True` (rename/move) is best-effort: only exact
 wikilink targets `[[oldname]]` / `[[oldname.md]]` are rewritten,
@@ -185,7 +188,7 @@ Threat-model decisions:
   because (a) the endpoint is loopback only — an attacker that can
   speak to it already has process-level access — and (b) the bearer
   token is what actually authenticates the call. A user-provided CA
-  bundle is a v0.2 followup (M7-03).
+  bundle is a v0.3 followup (M7-03).
 - **Token never logged.** `RestClient.__repr__` masks it. Audit
   records carry `tool="execute_command"` but never the token. Auth
   failures surface as `REST_AUTH_FAILED` with no token in the message.
@@ -266,17 +269,9 @@ release; v0.1 will not.
 ### Restore-from-snapshot
 
 Destructive ops write a snapshot under `.ohmcp-trash/` before mutating.
-v0.1 ships **no restore tool** — restoration is a manual operation
+v0.2 still ships **no restore tool** — restoration is a manual operation
 (copy the snapshot back to its original path). A scripted
-`restore_from_snapshot` is on the v0.2 roadmap.
-
-### Disk pressure from snapshots
-
-Snapshots are **not** automatically pruned. Long-running deployments
-with frequent destructive ops will see `<vault>/.ohmcp-trash/` grow.
-Treat it as your manual responsibility to prune (the directory is in
-the VaultPath forbidden-zone list, so no MCP tool will ever read or
-delete from it on your behalf).
+`restore_from_snapshot` is on the v0.3 roadmap.
 
 ### Multi-vault isolation
 

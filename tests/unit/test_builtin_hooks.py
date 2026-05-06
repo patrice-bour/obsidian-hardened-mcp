@@ -109,8 +109,8 @@ class TestReservedTagsHook:
         assert "source-vault" in (result.reason or "")
 
     def test_hierarchical_forbidden_tag(self, tmp_vault: Path) -> None:
-        hook = ReservedTagsHook(forbidden=["migration/pbr"])
-        bad = hook.validate(_ctx(tmp_vault, {"tags": ["migration/pbr"]}))
+        hook = ReservedTagsHook(forbidden=["migration/legacy"])
+        bad = hook.validate(_ctx(tmp_vault, {"tags": ["migration/legacy"]}))
         ok = hook.validate(_ctx(tmp_vault, {"tags": ["migration"]}))
         assert bad.decision == "reject"
         assert ok.decision == "accept"

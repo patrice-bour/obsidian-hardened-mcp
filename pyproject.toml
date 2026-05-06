@@ -1,6 +1,6 @@
 [project]
 name = "obsidian-hardened-mcp"
-version = "0.2.0"
+version = "0.2.1"
 description = "Secure MCP server for Obsidian vaults — full file modification, atomic frontmatter ops, hardened path sandbox"
 readme = "README.md"
 authors = [

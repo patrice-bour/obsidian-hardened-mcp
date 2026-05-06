@@ -7,8 +7,8 @@ land on the latest minor only.
 
 | Version | Supported |
 |---|---|
-| 0.1.x | ✅ |
-| < 0.1 | ❌ |
+| 0.2.x | ✅ |
+| < 0.2 | ❌ |
 
 ## Reporting a vulnerability
 
@@ -68,7 +68,7 @@ The following are documented operational assumptions, not bugs:
   reads the returned token from its own context, and fires phase 2
   with that token — the registry sees both calls as legitimate. The
   recovery path is the snapshot trash + audit log; the real prevention
-  layer is tracked as a v0.2 followup
+  layer is tracked as a v0.3 followup
   ([M6-11](docs/v0.1-followups.md#m6-11--2-phase-hmac-does-not-stop-a-coherently-hallucinating-llm),
   out-of-band confirmation via MCP `Context.elicit()`).
 
