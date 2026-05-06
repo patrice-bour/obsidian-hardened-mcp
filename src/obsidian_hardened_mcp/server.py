@@ -7,12 +7,14 @@ the server implements. The server runs over stdio.
 
 from __future__ import annotations
 
+import contextlib
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from obsidian_hardened_mcp.config import AppConfig
+from obsidian_hardened_mcp.config import AppConfig, TrashPolicy
 from obsidian_hardened_mcp.domain.results import ToolResult
+from obsidian_hardened_mcp.fs.pruner import prune_trash
 from obsidian_hardened_mcp.rest.client import RestClient
 from obsidian_hardened_mcp.rest.detector import RestAvailabilityDetector
 from obsidian_hardened_mcp.security.audit_logger import AuditLogger
@@ -60,7 +62,10 @@ from obsidian_hardened_mcp.tools.write import (
 from obsidian_hardened_mcp.tools.write import create_note as _create_note_impl
 from obsidian_hardened_mcp.tools.write import patch_note as _patch_note_impl
 from obsidian_hardened_mcp.tools.write import update_note as _update_note_impl
-from obsidian_hardened_mcp.validation.config_loader import load_validation_config
+from obsidian_hardened_mcp.validation.config_loader import (
+    load_trash_policy,
+    load_validation_config,
+)
 from obsidian_hardened_mcp.validation.hooks import HookRegistry
 
 
@@ -70,6 +75,7 @@ def create_server(
     hooks: HookRegistry | None = None,
     registry: ConfirmRegistry | None = None,
     rest_detector: RestAvailabilityDetector | None = None,
+    trash_policy: TrashPolicy | None = None,
 ) -> FastMCP:
     """Build a FastMCP server bound to the given configuration.
 
@@ -88,11 +94,45 @@ def create_server(
     omitted, we build one automatically when `config.rest_token` is set.
     Tests inject a fake detector (and indirectly a fake client) to
     avoid hitting a real Obsidian instance.
+
+    `trash_policy` controls auto-cleanup of `.ohmcp-trash/`. When
+    omitted, the server reads the ``trash:`` block from
+    `<vault_root>/.obsidian-hardened-mcp.yaml` (falling back to
+    `config.trash_policy`, itself the `TrashPolicy()` default). Tests
+    that bypass YAML loading by injecting `hooks` will fall through to
+    `config.trash_policy` here as well.
     """
     app = FastMCP(name="obsidian-hardened-mcp")
     audit = AuditLogger(audit_dir=config.audit_dir)
     if hooks is None:
         hooks = load_validation_config(config.vault_root)
+        if trash_policy is None:
+            trash_policy = load_trash_policy(config.vault_root)
+    if trash_policy is None:
+        trash_policy = config.trash_policy
+
+    # Startup prune: one synchronous sweep of `.ohmcp-trash/` so a
+    # long-accumulated backlog gets cleaned at boot. No-op when the
+    # trash dir doesn't exist or no candidates qualify. Suppress any
+    # exception so a misbehaving prune (rare: I/O during teardown,
+    # exotic FS) never blocks server startup.
+    with contextlib.suppress(Exception):  # pragma: no cover - defensive
+        prune_trash(config.vault_root, trash_policy, audit, trigger="startup")
+
+    def _maybe_post_op_prune(result: ToolResult) -> None:
+        """Run a defensive trash sweep after a successful destructive op.
+
+        Only runs on phase-2 success (``ok=True``, ``dry_run=False``);
+        phase-1 returns and dry-run probes leave nothing new to clean.
+        Failures here never propagate — the prune is best-effort and
+        the destructive op already succeeded by the time we get called.
+        """
+        if not result.ok or result.dry_run:
+            return
+        with contextlib.suppress(Exception):  # pragma: no cover - defensive
+            prune_trash(
+                config.vault_root, trash_policy, audit, trigger="post_op"
+            )
 
     # Lazy registry construction: the secret is only loaded/bootstrapped
     # on the first destructive tool call. Mutable list as a closure cell.
@@ -298,7 +338,7 @@ def create_server(
         confirm_token: str | None = None,
         dry_run: bool = False,
     ) -> ToolResult:
-        return _delete_note_impl(
+        result = _delete_note_impl(
             config,
             audit,
             _ensure_registry(),
@@ -306,6 +346,8 @@ def create_server(
             confirm_token=confirm_token,
             dry_run=dry_run,
         )
+        _maybe_post_op_prune(result)
+        return result
 
     @app.tool(
         description=(
@@ -322,7 +364,7 @@ def create_server(
         update_backlinks: bool = False,
         dry_run: bool = False,
     ) -> ToolResult:
-        return _rename_note_impl(
+        result = _rename_note_impl(
             config,
             audit,
             _ensure_registry(),
@@ -332,6 +374,8 @@ def create_server(
             update_backlinks=update_backlinks,
             dry_run=dry_run,
         )
+        _maybe_post_op_prune(result)
+        return result
 
     @app.tool(
         description=(
@@ -348,7 +392,7 @@ def create_server(
         update_backlinks: bool = False,
         dry_run: bool = False,
     ) -> ToolResult:
-        return _move_note_impl(
+        result = _move_note_impl(
             config,
             audit,
             _ensure_registry(),
@@ -358,6 +402,8 @@ def create_server(
             update_backlinks=update_backlinks,
             dry_run=dry_run,
         )
+        _maybe_post_op_prune(result)
+        return result
 
     @app.tool(
         description=(

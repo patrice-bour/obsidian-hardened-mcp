@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Auto-cleanup of `.ohmcp-trash/`** with a configurable retention
+  policy. Snapshots accumulated by destructive ops (`delete_note`,
+  `rename_note`, `move_note`) now get pruned automatically at server
+  startup and after each successful destructive call. Three layered
+  constraints: `retention_days` (default 30), `keep_at_least_per_path`
+  (default 1, protects recovery for every distinct source path even
+  past retention), `keep_at_least_global` (default 5, hard floor), and
+  an optional `max_total_mb` size cap. Configure via the `trash:`
+  block in `<vault>/.obsidian-hardened-mcp.yaml`. Every prune emits
+  an audit entry (`tool=trash_pruner`).
+
 ### Documentation
 - **README revamp for non-developers.** Restructured around a 5-minute
   Quick Start, a "What you need" checklist, equal-footing config

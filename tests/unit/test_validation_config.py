@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from obsidian_hardened_mcp.config import TrashPolicy
 from obsidian_hardened_mcp.validation.builtin_hooks import (
     IsoDateHook,
     JsonSchemaHook,
@@ -14,6 +15,7 @@ from obsidian_hardened_mcp.validation.builtin_hooks import (
 )
 from obsidian_hardened_mcp.validation.config_loader import (
     ConfigError,
+    load_trash_policy,
     load_validation_config,
 )
 
@@ -173,3 +175,74 @@ class TestNoHooksSection:
         )
         registry = load_validation_config(tmp_vault)
         assert registry.hooks == ()
+
+
+class TestLoadTrashPolicy:
+    def test_no_config_file_yields_default_policy(self, tmp_vault: Path) -> None:
+        (tmp_vault / ".obsidian-hardened-mcp.yaml").unlink()
+        policy = load_trash_policy(tmp_vault)
+        assert policy == TrashPolicy()
+
+    def test_no_trash_block_yields_default_policy(self, tmp_vault: Path) -> None:
+        (tmp_vault / ".obsidian-hardened-mcp.yaml").write_text(
+            "hooks:\n  - iso_date\n"
+        )
+        policy = load_trash_policy(tmp_vault)
+        assert policy == TrashPolicy()
+
+    def test_full_trash_block_parsed(self, tmp_vault: Path) -> None:
+        (tmp_vault / ".obsidian-hardened-mcp.yaml").write_text(
+            "trash:\n"
+            "  retention_days: 60\n"
+            "  keep_at_least_per_path: 3\n"
+            "  keep_at_least_global: 10\n"
+            "  max_total_mb: 100\n"
+        )
+        policy = load_trash_policy(tmp_vault)
+        assert policy.retention_days == 60
+        assert policy.keep_at_least_per_path == 3
+        assert policy.keep_at_least_global == 10
+        assert policy.max_total_mb == 100
+
+    def test_partial_trash_block_uses_defaults_for_missing_keys(
+        self, tmp_vault: Path
+    ) -> None:
+        (tmp_vault / ".obsidian-hardened-mcp.yaml").write_text(
+            "trash:\n  retention_days: 7\n"
+        )
+        policy = load_trash_policy(tmp_vault)
+        assert policy.retention_days == 7
+        # Other fields fall back to TrashPolicy() defaults
+        assert policy.keep_at_least_per_path == 1
+        assert policy.keep_at_least_global == 5
+        assert policy.max_total_mb is None
+
+    def test_null_retention_disables_time_pruning(
+        self, tmp_vault: Path
+    ) -> None:
+        (tmp_vault / ".obsidian-hardened-mcp.yaml").write_text(
+            "trash:\n  retention_days: null\n"
+        )
+        policy = load_trash_policy(tmp_vault)
+        assert policy.retention_days is None
+
+    def test_unknown_key_rejected(self, tmp_vault: Path) -> None:
+        (tmp_vault / ".obsidian-hardened-mcp.yaml").write_text(
+            "trash:\n  retention_days: 30\n  bogus_key: 42\n"
+        )
+        with pytest.raises(ConfigError, match="bogus_key"):
+            load_trash_policy(tmp_vault)
+
+    def test_negative_retention_rejected(self, tmp_vault: Path) -> None:
+        (tmp_vault / ".obsidian-hardened-mcp.yaml").write_text(
+            "trash:\n  retention_days: -5\n"
+        )
+        with pytest.raises(ConfigError):
+            load_trash_policy(tmp_vault)
+
+    def test_non_mapping_trash_rejected(self, tmp_vault: Path) -> None:
+        (tmp_vault / ".obsidian-hardened-mcp.yaml").write_text(
+            "trash:\n  - 1\n  - 2\n"
+        )
+        with pytest.raises(ConfigError, match="trash"):
+            load_trash_policy(tmp_vault)

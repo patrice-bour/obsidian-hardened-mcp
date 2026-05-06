@@ -100,6 +100,39 @@ Example schema (`_schemas/offre-emploi.json`):
 }
 ```
 
+## `trash:` block — auto-cleanup of `.ohmcp-trash/`
+
+Snapshots accumulate one per destructive op (`delete_note`,
+`rename_note`, `move_note`). Without a policy they grow forever; with
+one, the server prunes stale snapshots at startup and after each
+successful destructive call.
+
+```yaml
+trash:
+  retention_days: 30          # null = no time-based pruning
+  keep_at_least_per_path: 1   # always keep ≥ N most-recent per source path
+  keep_at_least_global: 5     # never let total drop below this
+  max_total_mb: null          # null = no size cap; otherwise int MB
+```
+
+Defaults (when the block is absent or partially specified):
+
+| Field | Default | Meaning |
+|---|---|---|
+| `retention_days` | `30` | Snapshots older than this are eligible for pruning. `null` disables time-based pruning. |
+| `keep_at_least_per_path` | `1` | For every distinct source path that ever ended up in trash, retain at least N most-recent snapshots regardless of age. Protects recovery: even if you deleted one cherished note 60 days ago and 50 trivial ones since, the cherished one stays. |
+| `keep_at_least_global` | `5` | Never let the total snapshot count drop below this. Coarse second filter. |
+| `max_total_mb` | `null` | Optional cap on total trash size. When set, oldest non-floor-protected snapshots are pruned until total ≤ cap. The per-path floor still wins over the cap. |
+
+Validation: `retention_days` must be `≥ 0` or `null`;
+`keep_at_least_*` must be `≥ 0`; `max_total_mb` must be `> 0` or
+`null`. Unknown keys in the `trash:` block raise `ConfigError` at
+boot.
+
+Every prune emits an `AuditEvent` (`tool=trash_pruner`,
+`op_kind=destructive`, `outcome=success|failure`) so deletions are
+traceable through the same audit log as the original destructive op.
+
 ## Loading semantics
 
 - The file is **read once** at server startup. Restart the server to
@@ -109,7 +142,9 @@ Example schema (`_schemas/offre-emploi.json`):
   Schema) raise `ConfigError` and abort startup — fail loud, not at
   first write.
 - An empty config (or a config with no `hooks:` section) returns an
-  empty registry — equivalent to "no validation".
+  empty registry — equivalent to "no validation". A config with no
+  `trash:` section uses the default trash policy (30-day retention,
+  ≥1 per path, ≥5 global).
 
 ## Operational notes
 

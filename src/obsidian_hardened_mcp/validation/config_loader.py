@@ -40,6 +40,7 @@ import jsonschema
 from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 
+from obsidian_hardened_mcp.config import TrashPolicy
 from obsidian_hardened_mcp.frontmatter.yaml_safety import enforce_default_tags_only
 from obsidian_hardened_mcp.validation.builtin_hooks import (
     IsoDateHook,
@@ -72,10 +73,71 @@ def load_validation_config(vault_root: Path) -> HookRegistry:
     Raises `ConfigError` on any malformed input — never returns a half-built
     registry.
     """
+    raw = _load_raw_yaml(vault_root)
+    if raw is None:
+        return HookRegistry([])
+
+    hook_specs = raw.get("hooks") or []
+    if not isinstance(hook_specs, list):
+        raise ConfigError("`hooks` must be a list")
+
+    hooks: list[ValidationHook] = []
+    for spec in hook_specs:
+        hooks.append(_build_hook(spec, vault_root=vault_root.resolve(strict=True)))
+    return HookRegistry(hooks)
+
+
+def load_trash_policy(vault_root: Path) -> TrashPolicy:
+    """Load the ``trash:`` block from the vault YAML config.
+
+    Returns the default `TrashPolicy` when the config file is absent
+    or has no ``trash:`` block. Raises `ConfigError` on a malformed
+    block (unknown keys, wrong types, negative values).
+    """
+    raw = _load_raw_yaml(vault_root)
+    if raw is None:
+        return TrashPolicy()
+
+    block = raw.get("trash")
+    if block is None:
+        return TrashPolicy()
+    if not isinstance(block, dict):
+        raise ConfigError(
+            f"`trash` must be a mapping, got {type(block).__name__}"
+        )
+
+    plain = {str(k): _plain(v) for k, v in block.items()}
+
+    accepted = {
+        "retention_days",
+        "keep_at_least_per_path",
+        "keep_at_least_global",
+        "max_total_mb",
+    }
+    extra = set(plain) - accepted
+    if extra:
+        raise ConfigError(
+            f"`trash` block has unknown keys {sorted(extra)}; accepted: "
+            f"{sorted(accepted)}"
+        )
+
+    try:
+        return TrashPolicy(**plain)
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(f"invalid `trash` block: {exc}") from exc
+
+
+def _load_raw_yaml(vault_root: Path) -> dict[str, Any] | None:
+    """Read and parse the vault YAML config; return None if absent.
+
+    Handles the common path: file exists, YAML parses, top level is a
+    mapping, custom tags rejected. Caller can then look up specific
+    blocks (``hooks``, ``trash``).
+    """
     vault_root = vault_root.resolve(strict=True)
     config_path = vault_root / CONFIG_FILE_NAME
     if not config_path.exists():
-        return HookRegistry([])
+        return None
 
     try:
         yaml = YAML(typ="rt")
@@ -90,21 +152,13 @@ def load_validation_config(vault_root: Path) -> HookRegistry:
     enforce_default_tags_only(raw, error_class=ConfigError)
 
     if raw is None:
-        return HookRegistry([])
+        return None
     if not isinstance(raw, dict):
         raise ConfigError(
             f"top level of {CONFIG_FILE_NAME} must be a mapping, got "
             f"{type(raw).__name__}"
         )
-
-    hook_specs = raw.get("hooks") or []
-    if not isinstance(hook_specs, list):
-        raise ConfigError("`hooks` must be a list")
-
-    hooks: list[ValidationHook] = []
-    for spec in hook_specs:
-        hooks.append(_build_hook(spec, vault_root=vault_root))
-    return HookRegistry(hooks)
+    return raw
 
 
 def _build_hook(spec: object, *, vault_root: Path) -> ValidationHook:

@@ -21,6 +21,60 @@ DEFAULT_MAX_BATCH = 500
 DEFAULT_REST_URL = "https://127.0.0.1:27124"
 
 
+class TrashPolicy(BaseModel):
+    """Auto-cleanup policy for `<vault>/.ohmcp-trash/`.
+
+    Defaults aim at "I want recovery for at least a month and at least
+    one snapshot per distinct note I've ever destroyed, but I don't
+    want my disk to fill silently". Override via the vault YAML
+    config (``trash:`` block) — see `docs/config-reference.md`.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    retention_days: int | None = 30
+    """Snapshots older than this many days are eligible for pruning.
+    Set to ``None`` to disable time-based pruning entirely (in which
+    case only ``max_total_mb`` can drive deletions, if set)."""
+
+    keep_at_least_per_path: int = 1
+    """For every distinct source path that ended up in trash, retain
+    at least this many of the most-recent snapshots regardless of
+    age. Protects the recovery path against losing the only snapshot
+    of a note you destroyed long ago."""
+
+    keep_at_least_global: int = 5
+    """Never let the total snapshot count drop below this. Coarse
+    second filter; protects against an over-eager retention setting
+    wiping the whole trash."""
+
+    max_total_mb: int | None = None
+    """Optional cap on total trash size. When set, the oldest
+    non-floor-protected snapshots are pruned until the total is at or
+    below the cap. ``None`` means no size cap."""
+
+    @field_validator("retention_days")
+    @classmethod
+    def _retention_non_negative(cls, value: int | None) -> int | None:
+        if value is not None and value < 0:
+            raise ValueError("retention_days must be >= 0 or null")
+        return value
+
+    @field_validator("keep_at_least_per_path", "keep_at_least_global")
+    @classmethod
+    def _keep_at_least_non_negative(cls, value: int) -> int:
+        if value < 0:
+            raise ValueError("keep_at_least values must be >= 0")
+        return value
+
+    @field_validator("max_total_mb")
+    @classmethod
+    def _max_total_positive(cls, value: int | None) -> int | None:
+        if value is not None and value <= 0:
+            raise ValueError("max_total_mb must be > 0 or null")
+        return value
+
+
 class AppConfig(BaseModel):
     """Runtime configuration."""
 
@@ -34,6 +88,9 @@ class AppConfig(BaseModel):
     max_batch: int = DEFAULT_MAX_BATCH
     rest_url: str = DEFAULT_REST_URL
     rest_token: str | None = None
+    trash_policy: TrashPolicy = Field(default_factory=TrashPolicy)
+    """Auto-cleanup of `.ohmcp-trash/`. Default applies if no
+    ``trash:`` block is present in the vault YAML."""
 
     @field_validator("vault_root")
     @classmethod
