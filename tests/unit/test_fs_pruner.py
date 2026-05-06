@@ -15,6 +15,7 @@ import pytest
 from obsidian_hardened_mcp.config import TrashPolicy
 from obsidian_hardened_mcp.fs.pruner import prune_trash
 from obsidian_hardened_mcp.security.audit_logger import AuditLogger
+from obsidian_hardened_mcp.tools._base import params_hash as _params_hash
 
 # --------------------------------------------------------------------- helpers
 
@@ -348,18 +349,164 @@ class TestAuditEmission:
         assert result.snapshots_pruned == 2
 
         entries = _read_audit_lines(tmp_path)
-        assert len(entries) == 2
-        for entry in entries:
+        # 2 per-snapshot destructive entries + 1 meta summary.
+        per_snapshot = [e for e in entries if e["op_kind"] == "destructive"]
+        summaries = [e for e in entries if e["op_kind"] == "meta"]
+        assert len(per_snapshot) == 2
+        assert len(summaries) == 1
+
+        # All events share the same request_id (one logical sweep).
+        request_ids = {entry["request_id"] for entry in entries}
+        assert len(request_ids) == 1
+        assert all(isinstance(rid, str) and len(rid) == 16 for rid in request_ids)
+
+        # params_hash on per-snapshot events matches the canonical helper
+        # output for (trigger, primary_source, error).
+        expected_per_snapshot = {
+            _params_hash("startup", "notes/a.md", ""),
+            _params_hash("startup", "notes/b.md", ""),
+        }
+        got_per_snapshot = {entry["params_hash"] for entry in per_snapshot}
+        assert got_per_snapshot == expected_per_snapshot
+
+        for entry in per_snapshot:
             assert entry["tool"] == "trash_pruner"
-            assert entry["op_kind"] == "destructive"
             assert entry["outcome"] == "success"
-            # vault_path is the snapshot dir relative to vault root
             assert isinstance(entry["vault_path"], str)
             assert entry["vault_path"].startswith(".ohmcp-trash/")
-            # params_hash carries the trigger label and the source path
-            params_hash = entry["params_hash"]
-            assert isinstance(params_hash, str)
-            assert "startup|" in params_hash
+
+    def test_summary_event_carries_aggregate_counts(
+        self, tmp_vault: Path, tmp_path: Path
+    ) -> None:
+        now = datetime(2026, 5, 6, tzinfo=UTC)
+        trash = tmp_vault / ".ohmcp-trash"
+        for i, suffix in enumerate(("aaaaaaaa", "bbbbbbbb", "cccccccc")):
+            _make_snapshot(
+                trash,
+                ts=now - timedelta(days=60),
+                source_path=f"notes/n{i}.md",
+                suffix=suffix,
+            )
+
+        prune_trash(
+            tmp_vault,
+            TrashPolicy(
+                retention_days=30,
+                keep_at_least_per_path=0,
+                keep_at_least_global=0,
+            ),
+            _audit(tmp_path),
+            now=now,
+            trigger="post_op",
+        )
+
+        entries = _read_audit_lines(tmp_path)
+        summaries = [e for e in entries if e["op_kind"] == "meta"]
+        assert len(summaries) == 1
+        summary = summaries[0]
+        assert summary["tool"] == "trash_pruner"
+        assert summary["vault_path"] == ".ohmcp-trash/"
+        assert summary["outcome"] == "success"
+        assert summary["snapshot_id"] is None
+        # The summary's params_hash is the canonical-helper output
+        # over (summary, trigger, count, failed, bytes_pruned).
+        # We don't pin the byte count (test fixture body is small but
+        # not zero), but the hash must be a 16-char hex string and
+        # must NOT collide with any per-snapshot hash.
+        assert isinstance(summary["params_hash"], str)
+        assert len(summary["params_hash"]) == 16
+        per_snapshot_hashes = {
+            e["params_hash"] for e in entries if e["op_kind"] == "destructive"
+        }
+        assert summary["params_hash"] not in per_snapshot_hashes
+
+    def test_no_summary_when_nothing_to_prune(
+        self, tmp_vault: Path, tmp_path: Path
+    ) -> None:
+        # Recent snapshots only — none eligible. No summary expected.
+        now = datetime(2026, 5, 6, tzinfo=UTC)
+        trash = tmp_vault / ".ohmcp-trash"
+        _make_snapshot(
+            trash, ts=now, source_path="notes/a.md", suffix="aaaaaaaa"
+        )
+        prune_trash(
+            tmp_vault,
+            TrashPolicy(retention_days=30),
+            _audit(tmp_path),
+            now=now,
+        )
+        assert _read_audit_lines(tmp_path) == []
+
+    def test_duration_ms_is_measured(
+        self, tmp_vault: Path, tmp_path: Path
+    ) -> None:
+        # We can't assert a specific duration, but it must be a real int
+        # >= 0, not the previous hardcoded 0.
+        now = datetime(2026, 5, 6, tzinfo=UTC)
+        trash = tmp_vault / ".ohmcp-trash"
+        _make_snapshot(
+            trash, ts=now - timedelta(days=60), source_path="notes/a.md", suffix="aaaaaaaa"
+        )
+        prune_trash(
+            tmp_vault,
+            TrashPolicy(retention_days=30, keep_at_least_per_path=0, keep_at_least_global=0),
+            _audit(tmp_path),
+            now=now,
+        )
+        entries = _read_audit_lines(tmp_path)
+        for entry in entries:
+            assert isinstance(entry["duration_ms"], int)
+            assert entry["duration_ms"] >= 0
+
+
+# ------------------------------------------------------------------------- 7b.
+
+
+class TestGlobalFloorOverridesSizeCap:
+    """Regression test for the four-step constraint interaction.
+
+    Reproduces the case the v0.2.0 review (issue I7) flagged as
+    untested: retention + size-cap mark N snapshots for deletion,
+    then the global floor un-marks the K most recent of them.
+    """
+
+    def test_global_floor_saves_size_cap_candidates(
+        self, tmp_vault: Path, tmp_path: Path
+    ) -> None:
+        now = datetime(2026, 5, 6, tzinfo=UTC)
+        trash = tmp_vault / ".ohmcp-trash"
+        # 8 large snapshots, all OLD, all SAME source path.
+        # Per-path floor at 1 protects only the most recent.
+        # Retention (30 days) marks the other 7 for prune.
+        # Size cap (1 MB) would prune all 7 unprotected (each ~1 MB).
+        # But global floor at 4 demands 4 final. So:
+        #   pruned by retention/size: 7 candidates
+        #   global floor saves the 3 most recent of those 7
+        #   -> pruned = 4, kept = 4 (1 per-path-protected + 3 floor-saved)
+        body = "x" * (1024 * 1024)  # 1 MB
+        for i in range(8):
+            _make_snapshot(
+                trash,
+                ts=now - timedelta(days=60 + i),
+                source_path="notes/shared.md",
+                body=body,
+                suffix=f"{i:08x}",
+            )
+
+        result = prune_trash(
+            tmp_vault,
+            TrashPolicy(
+                retention_days=30,
+                keep_at_least_per_path=1,
+                keep_at_least_global=4,
+                max_total_mb=1,  # cap below total
+            ),
+            _audit(tmp_path),
+            now=now,
+        )
+        assert result.snapshots_examined == 8
+        assert result.snapshots_pruned == 4
+        assert sum(1 for _ in trash.iterdir()) == 4
 
 
 # ------------------------------------------------------------------------- 8.

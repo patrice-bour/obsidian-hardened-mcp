@@ -10,6 +10,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 (Nothing yet — next stop is the public flip on GitHub and the PyPI
 publish.)
 
+## [0.2.2] - 2026-05-06
+
+Restores the audit-invariant contract documented in `CLAUDE.md` for
+the v0.2.0 trash pruner. Behavioural change is observable only in
+the audit log; the pruner's user-facing semantics (what gets pruned,
+when) are unchanged.
+
+### Fixed
+- **`request_id` correlation** in `fs/pruner.prune_trash`: a single
+  call now generates ONE call-level `request_id` (via
+  `tools._base.new_request_id()`) and shares it across every event
+  emitted by that sweep. The previous implementation generated a
+  fresh `request_id` per pruned snapshot, breaking the per-call
+  correlation guarantee CLAUDE.md §7 promises.
+- **Real `duration_ms`** on per-snapshot prune events: each
+  `shutil.rmtree` is now wrapped in a `time.monotonic()` window. The
+  field was previously hardcoded to `0`, hiding pruner runtime from
+  the audit log.
+- **`params_hash` canonicalisation**: per-snapshot prune events now
+  hash via `tools._base.params_hash()` (canonical JSON, sha256-16)
+  instead of an f-string, matching the project-wide convention
+  documented in CLAUDE.md forbidden patterns §6.
+
+### Added
+- **Sweep summary event** (`op_kind="meta"`,
+  `vault_path=".ohmcp-trash/"`): one event per `prune_trash` call
+  when at least one snapshot was attempted. Carries the aggregate
+  counts (pruned, failed, bytes) via `params_hash` and the wall
+  time of the whole sweep via `duration_ms`. Matches the
+  `prune_trash` docstring promise that v0.2.0 had not honoured.
+- Unit tests for the four-step constraint interaction (retention +
+  size cap + global floor) — locks the most subtle pruner contract
+  with a regression test (review issue I7).
+- Unit tests for the audit-invariant fixes above (shared
+  `request_id`, real `duration_ms`, summary event presence /
+  absence, canonical `params_hash`).
+
 ## [0.2.1] - 2026-05-06
 
 Pre-public-flip patch closing the credibility gaps surfaced by the
