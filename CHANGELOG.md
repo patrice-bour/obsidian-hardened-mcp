@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Documentation
+- **README revamp for non-developers.** Restructured around a 5-minute
+  Quick Start, a "What you need" checklist, equal-footing config
+  examples for Claude Desktop / Claude Code / other MCP clients, OS-by-OS
+  config-file paths, a multi-vault snippet, a concrete trash-recovery
+  example, and a Troubleshooting section. Dev-facing metrics
+  (`533 passed`, `101/101 PASS`, `1 000-example hypothesis sweep`,
+  `100 % branch coverage`) and library-level jargon (`ruamel.yaml`,
+  `fsync + os.replace`, `JSONL with deterministic content hash`)
+  removed from the user-facing README — they live in `CONTRIBUTING.md`,
+  `docs/security-model.md`, and `docs/architecture.md` already.
 - **Honesty pass on the 2-phase HMAC threat model.** `README.md`,
   `docs/security-model.md`, and `SECURITY.md` now state explicitly
   which classes of destructive-op risk the mechanism prevents

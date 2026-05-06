@@ -1,101 +1,61 @@
 # obsidian-hardened-mcp
 
-A secure Model Context Protocol (MCP) server for [Obsidian](https://obsidian.md) vaults.
+A safe, audited bridge between any [Obsidian](https://obsidian.md) vault and any MCP-compatible AI assistant — Claude Desktop, Claude Code, and friends.
 
-> **Status:** v0.1.1. Local-first single-user use is production-ready; public release is community-preview.
+> **Status**: v0.1.2, community-preview. Solo, local-first use is production-ready.
 
-## Why another Obsidian MCP server?
+The headline difference vs. lighter Obsidian MCP servers: this one assumes the AI **will eventually make a mistake**, and is built so that mistake is recoverable. Every write is atomic, every destruction leaves a copy in trash, every action is logged, and every path is checked before it touches disk.
 
-Existing MCP servers for Obsidian are limited:
+## Quick start (5 minutes)
 
-- Most can only **append** content — not **modify** existing files
-- Frontmatter cannot be edited atomically (set/delete/merge a single field) after creation
-- Security models are inconsistent and often missing entirely
+You'll need:
 
-`obsidian-hardened-mcp` addresses these gaps with a hardened, security-first design:
+- **Python 3.11 or newer** ([install](https://www.python.org/downloads/) if missing)
+- **[`uv`](https://github.com/astral-sh/uv)** — one-line install: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- **An Obsidian vault** (any folder of `.md` files works)
+- **An MCP-compatible client** — Claude Desktop, Claude Code, ChatGPT Desktop (Enterprise+), or any client that speaks the [Model Context Protocol](https://modelcontextprotocol.io)
 
-- **Full file modification** with atomic writes (tmp + fsync + rename)
-- **Atomic frontmatter operations** — get / set / delete / merge by field, with round-trip preservation (comments, ordering, quote styles)
-- **Path sandbox** that resists traversal, symlink escape, and absolute-path injection (1 000-example hypothesis sweep)
-- **Two-phase HMAC confirmation** for destructive ops (delete / rename / move / `execute_command`) — destructive intent surfaces as two distinct tool calls (issue token → confirm with token), giving any oversight layer (you reading the conversation, the client's confirm UI) a chance to intercept. Cryptographically binds the confirmation to the exact target, so a token from one path can't be reused on another. Caveat: a coherently-hallucinating or prompt-injection-driven agent that walks both phases is still possible — see [Two-phase confirmation](#two-phase-confirmation) below for the precise threat model
-- **Pre-destruction snapshots** under `.ohmcp-trash/` for every destructive op
-- **JSONL audit log** with deterministic content hashes
-- **Pluggable validation hooks** driven by external YAML — no hardcoded vault conventions
-- **Optional REST integration** when the [Obsidian Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin is running
+Two steps to verify:
 
-## Installation
-
-The server requires Python ≥ 3.11. Install [`uv`](https://github.com/astral-sh/uv) first if you don't have it — it provisions Python and runs the bin entry point in an isolated environment.
-
-### End users — zero install with `uvx`
+### 1. Run the server once
 
 ```bash
 uvx --from git+https://github.com/patrice-bour/obsidian-hardened-mcp obsidian-hardened-mcp --vault /path/to/your/vault
 ```
 
-`uvx` clones the package, builds an isolated environment, and runs the
-bin. Subsequent runs hit the local cache. Nothing to install manually.
+`uvx` clones the package into an isolated environment, installs it, and runs the bin. The server speaks MCP over standard input/output — there's no port to open, no service to manage. Press `Ctrl+C` once you've confirmed it boots cleanly.
 
-For reproducible setups, pin to a release tag:
+For reproducible setups, pin to a release tag: `git+https://github.com/patrice-bour/obsidian-hardened-mcp@v0.1.2`.
 
-```bash
-uvx --from git+https://github.com/patrice-bour/obsidian-hardened-mcp@v0.1.1 obsidian-hardened-mcp --vault /path/to/your/vault
-```
+### 2. Wire it into your AI client
 
-> **Heads-up.** A PyPI publish is on the v0.2 short list. Once there,
-> the command shortens to `uvx obsidian-hardened-mcp --vault /path/to/your/vault`.
+Pick whichever you use:
 
-### Developers — clone + `uv sync`
+#### Claude Desktop
 
-```bash
-git clone https://github.com/patrice-bour/obsidian-hardened-mcp.git
-cd obsidian-hardened-mcp
-uv sync
-```
+Edit your config file:
 
-Run the in-process suite (≈ 5 s) and the end-to-end harness
-(≈ 30 s, real subprocess):
-
-```bash
-uv run pytest -q                            # 533 passed
-uv run python tests/e2e/run_e2e.py          # 101/101 PASS
-```
-
-## Quick start
-
-Point the server at your vault root:
-
-```bash
-uvx --from git+https://github.com/patrice-bour/obsidian-hardened-mcp obsidian-hardened-mcp --vault /path/to/your/vault
-```
-
-The server speaks stdio MCP. Add it to your client's configuration:
-
-### Claude Desktop
-
-`~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
-or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+- Linux: `~/.config/Claude/claude_desktop_config.json`
 
 ```json
 {
   "mcpServers": {
-    "obsidian-hardened-mcp": {
+    "obsidian": {
       "command": "uvx",
       "args": [
-        "--from",
-        "git+https://github.com/patrice-bour/obsidian-hardened-mcp",
-        "obsidian-hardened-mcp",
-        "--vault",
-        "/path/to/your/vault"
+        "--from", "git+https://github.com/patrice-bour/obsidian-hardened-mcp",
+        "obsidian-hardened-mcp", "--vault", "/path/to/your/vault"
       ]
     }
   }
 }
 ```
 
-### Claude Code
+Restart Claude Desktop. The server appears in the tools panel.
 
-`~/.claude.json` (project-scoped) or via `claude mcp add`:
+#### Claude Code
 
 ```bash
 claude mcp add obsidian-hardened-mcp \
@@ -103,10 +63,13 @@ claude mcp add obsidian-hardened-mcp \
      obsidian-hardened-mcp --vault /path/to/your/vault
 ```
 
+#### Other MCP clients
+
+The server is a generic stdio MCP subprocess. Wire it the same way you'd wire any other MCP server: `command: "uvx"`, `args: [<the same args as above>]`. See your client's MCP documentation for the exact config-file format.
+
 ### Multiple vaults
 
-Register one entry per vault with distinct names — the server itself is
-single-vault by design (the `--vault` flag is required at boot):
+Register one entry per vault, with distinct names. The server is single-vault by design — `--vault` is required at boot, so the boundary is enforced server-side, not by convention.
 
 ```json
 {
@@ -125,20 +88,48 @@ single-vault by design (the `--vault` flag is required at boot):
 }
 ```
 
+### Try it
+
+Once your client sees the server, ask your AI in plain language: *"List the notes in my vault."* If you get a list back, you're set.
+
+## Why hardened?
+
+A handful of Obsidian MCP servers exist already. Most can read your vault and *append* text to notes. None of them, as far as we've seen, treat the vault as a precious thing that AI assistants are likely to mishandle.
+
+This server is built around four design choices:
+
+- **Modifications are atomic.** When the AI rewrites a note, the change either fully completes or doesn't happen at all. No halfway state where a network glitch or a crash leaves you with a corrupted file. Same for frontmatter edits — `set tag`, `delete field`, `merge object` operations preserve the rest of the YAML byte-for-byte (including comments, key order, and quote styles).
+- **Destructive operations are reversible.** Before the server deletes, renames, or moves a note, it copies the original under `.ohmcp-trash/<timestamp>/<path>` inside your vault. Recovery is a `cp` away. (Older trash entries auto-prune on a configurable schedule; see [Configuration](#configuration).)
+- **Every write is logged.** A `~/.obsidian-hardened-mcp/audit/<date>.jsonl` file accumulates one entry per write with a content-addressable hash, so you can reconstruct exactly what the AI did and when.
+- **Paths are checked before they touch disk.** Every file path the AI proposes flows through a sandbox that rejects absolute paths, parent-directory escapes, symbolic links pointing outside the vault, system folders (`.obsidian/`, `.git/`), null bytes, and oversize segments. The sandbox is tested against 1,000 randomly-generated malicious paths.
+
+## What it can do
+
+The server exposes 18 tools to your AI client, grouped by capability:
+
+- **Read.** Fetch the full text of a note, list notes under a folder, parse the frontmatter as a structured object, search by literal query across body and metadata, resolve `[[wikilinks]]` to file paths.
+- **Write.** Create a new note (refuses to clobber an existing one), rewrite a note's content, append text, or do a literal find-and-replace with an explicit count guard.
+- **Edit frontmatter atomically.** Set, delete, or merge a single YAML field without touching the rest of the file. Comments, ordering, and quote styles are preserved exactly.
+- **Delete, rename, move — safely.** Two-step protocol with cryptographic confirmation tokens (see [Two-phase confirmation](#two-phase-confirmation) below). A snapshot lands in `.ohmcp-trash/` before the change. Optional best-effort wikilink rewriting keeps `[[Old Name]]` references current.
+- **Validate writes against your conventions.** Optionally drop a `<vault>/.obsidian-hardened-mcp.yaml` to declare validation hooks: every write must pass them or it's rejected. Built-ins: `iso_date`, `reserved_tags`, `json_schema`. See [docs/config-reference.md](./docs/config-reference.md).
+- **Trigger Obsidian commands** (optional). When the [Obsidian Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin is running and you set `OBSIDIAN_REST_TOKEN`, the server can invoke any Obsidian command.
+
+For the precise tool surface (names, parameters, return shapes), see [docs/architecture.md](./docs/architecture.md) § "Tools".
+
 ## Configuration
 
 ### Environment variables
 
 | Variable | Purpose |
 |---|---|
-| `OBSIDIAN_VAULT_ROOT` | Default vault root when `--vault` isn't passed. |
+| `OBSIDIAN_VAULT_ROOT` | Default vault root if `--vault` isn't passed at boot. |
 | `OBSIDIAN_REST_URL` | Override the Local REST API endpoint. **Must be loopback** (`127.0.0.1`, `localhost`, `[::1]`). Default `https://127.0.0.1:27124`. |
-| `OBSIDIAN_REST_TOKEN` | Bearer token for the Local REST API plugin. When set, `execute_command` becomes available. **Don't paste it inline in shells that persist history** (zsh `SHARE_HISTORY`, bash default `HISTFILE`) — the token grants write access to your live vault. Prefer `direnv` with a gitignored `.envrc`, `read -rs OBSIDIAN_REST_TOKEN && export OBSIDIAN_REST_TOKEN`, or prefix with `HISTFILE=/dev/null` (zsh). See also the [security note in `tests/e2e/README.md`](tests/e2e/README.md#optional-opt-in-rest-api-with-token-s9). |
-| `OBSIDIAN_AUDIT_DIR` | Override the audit log directory. Default `~/.obsidian-hardened-mcp/audit/`. Useful for CI runners that publish test artefacts (avoids `$HOME` leakage). |
+| `OBSIDIAN_REST_TOKEN` | Bearer token for the Local REST API plugin. When set, `execute_command` becomes available. **Don't paste it inline in shells that persist history** — see the [security note](tests/e2e/README.md#optional-opt-in-rest-api-with-token-s9). |
+| `OBSIDIAN_AUDIT_DIR` | Override the audit log directory. Default `~/.obsidian-hardened-mcp/audit/`. |
 
-### Vault-level config (`<vault>/.obsidian-hardened-mcp.yaml`)
+### Vault-level config
 
-Validation hooks load from a YAML file at the vault root. Example:
+Drop a `<vault>/.obsidian-hardened-mcp.yaml` at the vault root to enable validation hooks. The YAML reader is locked down to safe types only; custom tags are rejected.
 
 ```yaml
 hooks:
@@ -156,130 +147,95 @@ hooks:
             date: { type: string, format: date }
 ```
 
-See [`docs/config-reference.md`](./docs/config-reference.md) for the full schema and built-in hooks.
+See [docs/config-reference.md](./docs/config-reference.md) for the full schema and all built-in hooks.
 
-### Auxiliary directories (off-vault)
+### Auxiliary directories
 
 | Path | Contents | Mode |
 |---|---|---|
-| `~/.obsidian-hardened-mcp/audit/YYYY-MM-DD.jsonl` | Append-only JSONL audit log of every write/destructive op. | `0644` |
-| `~/.obsidian-hardened-mcp/secret` | HMAC secret for 2-phase confirmation tokens (auto-generated on first boot). | `0600` |
-| `<vault>/.ohmcp-trash/<UTC-ts>/` | Snapshots taken before every destructive op. Manual prune. | inherited |
+| `~/.obsidian-hardened-mcp/audit/YYYY-MM-DD.jsonl` | Append-only audit log of every write. | `0644` |
+| `~/.obsidian-hardened-mcp/secret` | HMAC secret for confirmation tokens (auto-generated on first boot). | `0600` |
+| `<vault>/.ohmcp-trash/<UTC-ts>/` | Snapshots from destructive ops. Auto-prune configurable. | inherited |
 
-## Tools exposed
+## Local-only posture
 
-| Kind | Tool | Purpose |
-|---|---|---|
-| read | `read_note` | Full text content of a note. |
-| read | `list_notes` | Markdown files under a folder, with limit. |
-| read | `get_frontmatter` | Parsed YAML frontmatter + body preview. |
-| read | `search_notes` | Literal query across body / frontmatter / both. |
-| read | `resolve_wikilink` | Resolve `[[Target]]` to a vault-relative path. |
-| write | `create_note` | New note (atomic; refuses to clobber). |
-| write | `update_note` | Replace full content (atomic). |
-| write | `append_to_note` | Append text (atomic). |
-| write | `patch_note` | Literal find-replace with explicit `count`. |
-| write | `set_frontmatter_field` | Set a single field (round-trip safe). |
-| write | `delete_frontmatter_field` | Delete a single field. |
-| write | `merge_frontmatter` | Shallow / deep merge of a patch dict. |
-| destructive | `delete_note` | Two-phase: phase 1 token + preview, phase 2 snapshot + unlink. |
-| destructive | `rename_note` | Two-phase rename within the same folder, optional best-effort wikilink rewrite. |
-| destructive | `move_note` | Two-phase move to another folder, optional wikilink rewrite. |
-| destructive | `execute_command` | Two-phase Obsidian command via the Local REST API plugin. |
-| meta | `get_vault_info` | Vault metadata + `rest_available`. |
-| meta | `list_tools_capabilities` | Manifest of every tool registered on this server. |
+The server runs as a **child process of your AI client** and speaks MCP over standard input/output. It never opens a network port, never accepts a connection, never advertises itself anywhere. Your vault stays on your machine.
 
-`get_vault_info` and `list_tools_capabilities` let MCP clients adapt their UI
-to what the server actually offers.
+The optional REST integration talks to the third-party [Obsidian Local REST API plugin](https://github.com/coddingtonbear/obsidian-local-rest-api). The plugin can be configured by the user to listen on `127.0.0.1` (default) or `0.0.0.0` (all interfaces). **Our REST client refuses to talk to anything other than a loopback URL** regardless of how the plugin is configured — even if you set `OBSIDIAN_REST_URL=https://your-public-ip:27124`, the server rejects the configuration at boot.
 
-### Two-phase confirmation
+If you want to reach this server from another machine, you'd have to wire your own tunnel. We deliberately don't make that easy.
 
-Every destructive tool follows the same protocol:
+## Threat model — summary
 
-1. **Phase 1** — call without `confirm_token`. The tool returns
-   `confirm_token` (single-use, 90 s TTL, HMAC-bound to the full
-   payload) plus a preview. **Disk untouched.**
-2. **Phase 2** — call again with the same arguments AND
-   `confirm_token=<from-phase-1>`. The tool consumes the token,
-   snapshots the original state under `.ohmcp-trash/`, and applies the
-   change atomically.
+We defend against:
 
-#### What this prevents
+- **Path tampering** by tool input — traversal, symlink escape, absolute paths, oversize segments, null bytes, forbidden zones (`.obsidian/`, `.git/`).
+- **Single-shot destructive mishaps** via cryptographic confirmation tokens (see [below](#two-phase-confirmation)).
+- **Frontmatter exfiltration** through unsafe YAML constructs (Python tags, custom tags).
+- **Torn writes** on crash or signal — file content is either old or new, never partial.
 
-- **Single-shot mishaps**: one hallucinated tool call cannot mutate the
-  vault. Without the server-held secret, the model cannot fabricate a
-  valid token, so phase 2 fails outright.
-- **Token forge**: the secret lives at `~/.obsidian-hardened-mcp/secret`
-  with mode `0o600`; the loader refuses to start if the mode is wider.
-- **Cross-target reuse**: a token issued for `delete_note(A)` is bound
-  to A's payload hash and is rejected if reused on `delete_note(B)`.
-- **Replay**: tokens are single-use (the registry consumes them on
-  phase 2) and TTL-bound (90 s). A captured token cannot be replayed
-  later or twice.
+We do **not** defend against:
 
-#### What this does NOT prevent
+- A coherently-hallucinating LLM that walks both phases of the destructive protocol legitimately. The recovery path is the snapshot trash + audit log; the real fix (out-of-band confirmation via the MCP `Context.elicit()` capability) is on the v0.2 roadmap.
+- Code running under your user account. An attacker with shell access can already do anything the server can.
+- Concurrent writers. The server is single-writer by design — two clients pointed at the same vault can corrupt each other.
 
-- **A coherently-hallucinating LLM** that fires phase 1, reads the
-  returned token from its own context, and fires phase 2 with that
-  token. Both calls are legitimate as far as the registry is
-  concerned. Same applies to a prompt-injection-driven agent.
-- **Code running under your user account** that can read the secret
-  file directly and forge tokens at will. This is documented as
-  out-of-scope (see [`docs/security-model.md`](./docs/security-model.md)).
+For the full threat-by-threat matrix, see [docs/security-model.md](./docs/security-model.md).
 
-#### Defences in depth
+## Two-phase confirmation
 
-- **Surface in the conversation**: phase 1 and phase 2 are two
-  distinct turns; you (or any oversight layer) can intercept between
-  them.
-- **Snapshot trash**: even if both phases fire, a copy of the original
-  state lands under `.ohmcp-trash/<UTC-ts>-<hash>/<path>` before the
-  destructive op. Recovery is a `cp` away.
-- **Audit log**: every destructive op emits a JSONL entry; detection
-  is post-fact but reliable.
-- **Client-side confirmation**: Claude Desktop and Claude Code render
-  a confirm UI for tool calls — the human in the loop is your last
-  defence against a hallucinated chain.
-- **v0.2 followup** ([M6-11](./docs/v0.1-followups.md#m6-11--2-phase-hmac-does-not-stop-a-coherently-hallucinating-llm)):
-  use the MCP `Context.elicit()` capability to route the second-factor
-  confirmation through the client UI instead of the LLM context. This
-  is the real fix; we didn't ship it in v0.1 because it requires
-  per-client integration testing.
+Every destructive tool (`delete_note`, `rename_note`, `move_note`, `execute_command`) follows the same protocol:
 
-## Security posture
+1. **Phase 1**: the AI calls the tool *without* a `confirm_token`. The server returns a single-use, 90-second-TTL token bound by HMAC to the exact operation parameters, plus a preview of what would happen. **Disk untouched.**
+2. **Phase 2**: the AI calls the tool again with the same arguments AND the token. The server verifies the token, snapshots the file under `.ohmcp-trash/`, then applies the change atomically.
 
-Read [`docs/security-model.md`](./docs/security-model.md) for the full
-threat model. The headline guarantees:
+What this prevents (in a nutshell): single-shot accidents, token forgery without the secret, applying a token meant for one note to a different note, replays after expiry. What it does *not* prevent: an LLM that fires phase 1, reads the returned token from its own context, and fires phase 2 cleanly. For that scenario, you fall back on the snapshot trash, the audit log, and your client's confirm UI.
 
-- **Path sandbox** at every tool boundary (`VaultPath.from_user`):
-  rejects absolute paths, traversal, symlink escape, forbidden zones
-  (`.obsidian/`, `.git/`, `.trash/`, `.ohmcp-trash/`, the config file),
-  null bytes, oversize segments. Held to 100 % branch coverage and
-  proven by a 1 000-example hypothesis sweep.
-- **Atomic writes** — tmp-in-same-dir + fsync + `os.replace` + dir-fsync.
-  Crash-safe; never leaves a torn file.
-- **YAML safety** — `ruamel.yaml` round-trip mode; non-default tags
-  rejected on read AND on write. Closes the unsafe-tag exfiltration
-  loop (no `!!python/object/apply` etc.).
-- **2-phase HMAC** — destructive ops + `execute_command` (REST). 90 s
-  TTL, single-use, payload-bound, in-memory. Loopback-only `rest_url`.
-- **Audit content hash** — every write emits a JSONL entry whose
-  `audit_id` is a SHA256 of `(tool, vault_path, op_kind, outcome,
-  params_hash, dry_run, snapshot_id)` — deterministic for replay/dedup.
-- **Pluggable validation hooks** — first reject short-circuits, hooks
-  see a deepcopy of context so they cannot mutate each other's view.
+For the full threat-by-threat matrix and the planned out-of-band fix, see [docs/security-model.md § LLM-driven destructive ops](./docs/security-model.md#llm-driven-destructive-ops).
 
-The model is **single-user, locally-trusted**: one human, one MCP
-client, one vault. Concurrent writers and hostile local users are
-explicitly out of scope; see `docs/security-model.md` § "Non-goals".
+## Example: recovering a deleted note
+
+You ask your AI to clean up old notes. It overdoes it. To recover:
+
+```bash
+# 1. Find the snapshot inside your vault
+ls /path/to/your/vault/.ohmcp-trash/
+# → 20260506T143022Z-a1b2c3d4/
+
+# 2. Inspect what's inside (the structure mirrors your vault)
+ls /path/to/your/vault/.ohmcp-trash/20260506T143022Z-a1b2c3d4/
+# → notes/projects/the-one-i-cared-about.md
+
+# 3. Move it back where it belongs
+mv /path/to/your/vault/.ohmcp-trash/20260506T143022Z-a1b2c3d4/notes/projects/the-one-i-cared-about.md \
+   /path/to/your/vault/notes/projects/
+
+# 4. Optional — cross-check the audit log to know exactly when and why it was deleted
+grep "the-one-i-cared-about" ~/.obsidian-hardened-mcp/audit/$(date -u +%Y-%m-%d).jsonl
+```
+
+The audit entry tells you which tool deleted it, with what arguments, and which snapshot it produced.
+
+## Troubleshooting
+
+**"My AI says it has no access to my vault"** — Verify (a) the path in the config matches your actual vault location, (b) you restarted the AI client after editing the config, and (c) the path is readable by the user the AI runs as. On macOS, MDM-managed vaults sometimes need a Full Disk Access grant for the AI client.
+
+**`payload_mismatch` on phase 2** — Phase 1 and phase 2 must pass *exactly* the same arguments (the HMAC binds to all of them). Forgetting `update_backlinks=True` on one of the two calls is a classic trip wire. Re-issue phase 1, copy the new token, and call phase 2 with identical args.
+
+**"Connection closed" right after launch** — If you've dropped a `<vault>/.obsidian-hardened-mcp.yaml` referencing a JSON Schema file (`schemas.<type>: _schemas/foo.json`), the server requires that schema file to actually exist at the vault root. Missing schema files cause the server to abort at boot.
+
+**`rest_unavailable` from `execute_command`** — Either `OBSIDIAN_REST_TOKEN` isn't set, or the Local REST API plugin isn't running in Obsidian. Open Obsidian, enable the plugin, copy its bearer token, export it (preferably via direnv or `read -rs` to keep it out of shell history), and restart your MCP client.
+
+**The audit log file is missing** — The server creates it lazily on the first write. If your session was read-only, no entry was emitted yet. Try a single write to confirm it appears.
 
 ## Project documentation
 
-- [`docs/architecture.md`](./docs/architecture.md) — module layout and tool flow.
-- [`docs/security-model.md`](./docs/security-model.md) — threat model + tested invariants.
-- [`docs/config-reference.md`](./docs/config-reference.md) — `.obsidian-hardened-mcp.yaml` schema.
-- [`docs/v0.1-followups.md`](./docs/v0.1-followups.md) — items deferred to v0.2 with rationale.
-- [`AGENTS.md`](./AGENTS.md) — agent-facing project conventions.
+- [docs/architecture.md](./docs/architecture.md) — module layout, tool flow, contracts.
+- [docs/security-model.md](./docs/security-model.md) — full threat model + tested invariants.
+- [docs/config-reference.md](./docs/config-reference.md) — `<vault>/.obsidian-hardened-mcp.yaml` schema and built-in hooks.
+- [docs/v0.1-followups.md](./docs/v0.1-followups.md) — items deferred to v0.2 with rationale.
+- [CONTRIBUTING.md](./CONTRIBUTING.md) — dev setup, test commands, contribution flow.
+- [SECURITY.md](./SECURITY.md) — vulnerability disclosure policy.
 
 ## License
 
