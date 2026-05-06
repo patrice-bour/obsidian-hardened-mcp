@@ -7,53 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+(Nothing yet — next stop is the public flip on GitHub and the PyPI
+publish.)
+
+## [0.2.0] - 2026-05-06
+
+Pre-public-flip baseline. Three docs PRs (HMAC honesty, README revamp
+for non-developers, repo metadata cohesion) plus one feature
+(configurable auto-cleanup of `.ohmcp-trash/`). The repo is now ready
+to flip from private to public; the only remaining gates are a final
+GitHub repo-metadata audit (Issues / Wiki / Discussions toggles) and
+the `gh repo edit --visibility public` itself.
+
 ### Added
+- **Auto-cleanup of `.ohmcp-trash/`** with a configurable retention
+  policy. Snapshots from destructive ops now get pruned automatically
+  at server startup and after each successful destructive call.
+  Configurable via the `trash:` block in
+  `<vault>/.obsidian-hardened-mcp.yaml` (`retention_days`,
+  `keep_at_least_per_path`, `keep_at_least_global`, `max_total_mb`).
+  Defaults: 30 days retention, ≥1 most-recent snapshot per distinct
+  source path (protects recovery), ≥5 global floor. Every prune
+  emits an audit entry (`tool=trash_pruner`).
 - `.gitattributes` with `* text=auto eol=lf` and a Python diff
   attribute. Prevents Windows contributors from silently introducing
   CRLF on commit.
-- **Auto-cleanup of `.ohmcp-trash/`** with a configurable retention
-  policy. Snapshots accumulated by destructive ops (`delete_note`,
-  `rename_note`, `move_note`) now get pruned automatically at server
-  startup and after each successful destructive call. Three layered
-  constraints: `retention_days` (default 30), `keep_at_least_per_path`
-  (default 1, protects recovery for every distinct source path even
-  past retention), `keep_at_least_global` (default 5, hard floor), and
-  an optional `max_total_mb` size cap. Configure via the `trash:`
-  block in `<vault>/.obsidian-hardened-mcp.yaml`. Every prune emits
-  an audit entry (`tool=trash_pruner`).
 
-### Documentation
-- `docs/security-model.md` § "Network adversaries" updated post the
-  Lot-B HMAC honesty pass: removed the stale "(future M7)" tag (M7
-  shipped in v0.1.0), and aligned the framing on the third-party
-  Obsidian Local REST API plugin (which the user can configure on
-  `0.0.0.0` but our client refuses to talk to via non-loopback) so
-  README, SECURITY.md, and security-model are consistent.
-- **README revamp for non-developers.** Restructured around a 5-minute
-  Quick Start, a "What you need" checklist, equal-footing config
-  examples for Claude Desktop / Claude Code / other MCP clients, OS-by-OS
-  config-file paths, a multi-vault snippet, a concrete trash-recovery
-  example, and a Troubleshooting section. Dev-facing metrics
-  (`533 passed`, `101/101 PASS`, `1 000-example hypothesis sweep`,
+### Changed
+- README rewritten for a non-developer audience: 5-minute Quick Start,
+  prerequisites checklist upfront, equal-footing config examples for
+  Claude Desktop / Claude Code / other MCP clients, OS-by-OS config
+  paths, multi-vault snippet, concrete trash-recovery walkthrough,
+  Troubleshooting section. Dev-facing metrics (`533 passed`,
+  `101/101 PASS`, `1 000-example hypothesis sweep`,
   `100 % branch coverage`) and library-level jargon (`ruamel.yaml`,
   `fsync + os.replace`, `JSONL with deterministic content hash`)
   removed from the user-facing README — they live in `CONTRIBUTING.md`,
-  `docs/security-model.md`, and `docs/architecture.md` already.
+  `docs/security-model.md`, and `docs/architecture.md`.
+- `docs/security-model.md` § "Network adversaries" updated post the
+  Lot-B HMAC honesty pass: removed the stale "(future M7)" tag (M7
+  shipped in v0.1.0) and aligned the framing on the third-party
+  Obsidian Local REST API plugin (which the user can configure on
+  `0.0.0.0` but our client refuses to talk to via non-loopback) so
+  README, SECURITY.md, and security-model are now consistent.
+
+### Documentation
 - **Honesty pass on the 2-phase HMAC threat model.** `README.md`,
   `docs/security-model.md`, and `SECURITY.md` now state explicitly
   which classes of destructive-op risk the mechanism prevents
-  (single-shot mishaps, token forge, cross-target reuse, replay) and
-  which it does NOT prevent (a coherently-hallucinating LLM that walks
-  phase 1 then phase 2 in sequence; a prompt-injection-driven agent).
-  The defence-in-depth story is now spelled out: HMAC binding +
-  snapshot trash + audit log + client-side confirmation. The real
-  out-of-band fix via MCP `Context.elicit()` is tracked as
+  (single-shot mishaps, token forge, cross-target reuse, replay)
+  and which it does NOT prevent (a coherently-hallucinating LLM
+  that walks phase 1 then phase 2 in sequence; a prompt-injection-
+  driven agent). The defence-in-depth story is now spelled out:
+  HMAC binding + snapshot trash + audit log + client-side
+  confirmation. The real out-of-band fix via MCP `Context.elicit()`
+  is tracked as
   [M6-11](docs/v0.1-followups.md#m6-11--2-phase-hmac-does-not-stop-a-coherently-hallucinating-llm)
-  for v0.2.
+  for v0.3.
 - `SECURITY.md`: clarified that the loopback-only enforcement is on
-  *our* REST client; the third-party Obsidian Local REST API plugin
-  can be configured to bind `0.0.0.0`, but our server still refuses
-  to talk to it via a non-loopback URL.
+  *our* REST client (the third-party Obsidian Local REST API plugin
+  can be configured to bind `0.0.0.0` but our server still refuses
+  to talk to it via a non-loopback URL).
 
 ## [0.1.2] - 2026-05-05
 
@@ -432,7 +446,8 @@ strict mypy clean.
   cataloguing every entry as `done` / `v0.2` / `wontfix` per the
   "implemented or explicitly closed" rule.
 
-[Unreleased]: https://github.com/patrice-bour/obsidian-hardened-mcp/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/patrice-bour/obsidian-hardened-mcp/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/patrice-bour/obsidian-hardened-mcp/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/patrice-bour/obsidian-hardened-mcp/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/patrice-bour/obsidian-hardened-mcp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/patrice-bour/obsidian-hardened-mcp/releases/tag/v0.1.0

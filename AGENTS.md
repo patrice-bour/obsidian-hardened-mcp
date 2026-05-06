@@ -51,12 +51,49 @@ The approved v0.1 plan lives at `~/.claude/plans/les-serveurs-mcp-existants-tran
 
 ## Where to resume (for a fresh session)
 
-**Last merged on `main`**: `chore(release): v0.1.2` — public-flip prep
-(SECURITY / CONTRIBUTING / CoC / issue + PR templates, SPDX headers,
-security-model preamble for outsiders, README install rewritten
-around `uvx --from git+...`), plus the final naming pass `full →
-hardened`. **v0.1.2 tagged.** v0.1.0 (`f24827b`) and v0.1.1 tags
-preserved on the renamed repo.
+**TL;DR for a Claude Code session resuming a long-running thread**:
+the project is at **v0.2.0**, ready to flip from private to public on
+GitHub. The reference plan for the pre-public-flip work lives at
+`/Users/pbr/.claude/plans/avant-de-publier-sur-zippy-simon.md`. Read
+that file, then come back here for the milestones / sanity check.
+The user (Patrice) is preparing to flip; ask which step to pick up
+before doing anything visible (push, gh repo edit, PyPI publish).
+
+**Last merged on `main`**: `chore(release): v0.2.0` — pre-public-flip
+baseline. Contains the HMAC honesty pass (doc-only), the README
+revamp for non-developers, the auto-cleanup of `.ohmcp-trash/` with
+configurable retention policy, and a few extras (`.gitattributes`,
+docs coherence post Lot-B). **v0.2.0 tagged.** v0.1.0 (`f24827b`),
+v0.1.1, v0.1.2 tags preserved.
+
+**State of the public-flip plan** (per
+`/Users/pbr/.claude/plans/avant-de-publier-sur-zippy-simon.md`):
+
+- ✅ PR1 — Lot B (HMAC honesty doc) — commit `d86a608`
+- ✅ PR2 — Lot A (README revamp) — commit `cf6bc50`
+- ✅ PR3 — Lot C (trash auto-cleanup) — commit `2a6ae2b`
+- ✅ Pre-flip extras #1 (`.gitattributes`), #2 (git log audit, clean),
+  #4 (docs coherence) — commit `f2c8731`
+- ⏳ Pre-flip extra #3 — verify GitHub repo metadata
+  (Issues ON / Wiki OFF / Discussions OFF). User deferred this.
+- ⏳ The actual flip itself:
+  ```bash
+  gh repo edit patrice-bour/obsidian-hardened-mcp --visibility public --accept-visibility-change-consequences
+  gh api repos/patrice-bour/obsidian-hardened-mcp/branches/main/protection -X PUT --input - <<'JSON'
+  { "required_status_checks": null, "enforce_admins": false,
+    "required_pull_request_reviews": { "required_approving_review_count": 0,
+      "require_code_owner_reviews": false, "dismiss_stale_reviews": false },
+    "restrictions": null, "required_linear_history": true,
+    "allow_force_pushes": false, "allow_deletions": false }
+  JSON
+  ```
+- ⏳ Post-flip: PyPI publish (the longer-running 1→4 plan from the
+  earlier conversation). User has no PyPI account yet — they'll
+  create one + 2FA + token, then we wire `uv publish` (token-based
+  one-shot first; Trusted Publishers via GitHub Actions later).
+- ⏳ Optional v0.3 / mcpvault-parity gaps: `read_multiple_notes`
+  (batch read) and `manage_tags` (dedicated tag tool, sugar over
+  `merge_frontmatter`).
 
 **Milestones progress** (commits in `git log`):
 
@@ -77,32 +114,41 @@ preserved on the renamed repo.
 | 🎉 | **v0.1.0 tagged** | tag `v0.1.0` on `f24827b` | — |
 | 🎉 | **v0.1.1 tagged** — E2E harness + repo rename `power → full` + code-review pass | tag `v0.1.1` | 533 + 101 E2E |
 | 🎉 | **v0.1.2 tagged** — public-flip prep (SECURITY/CONTRIBUTING/CoC/templates/SPDX/uvx docs) + repo rename `full → hardened` | tag `v0.1.2` | 533 + 101 E2E |
+| 🎉 | **v0.2.0 tagged** — HMAC honesty + README revamp + trash auto-cleanup + pre-flip extras | tag `v0.2.0` | 558 + 101 E2E |
 
-**Next task**: v0.2 — pick up the v0.2 backlog in
-`docs/v0.1-followups.md` (36 entries). The master plan covered v0.1;
-v0.2 priorities (informally): ripgrep-backed `search_notes` with TTL
-index cache (M5-01 + M5-02), `path_routing` built-in hook (M4-01),
-`execute_command` allow-list (M7-04), TLS CA bundle (M7-03), and the
-`search_notes` REST routing that v0.1 deferred (M7-01). Decide a
-proper v0.2 plan + brief before opening the next worktree.
+**Next task** (in this exact order):
 
-**Sanity check** to confirm a clean v0.1.2 base:
+1. Verify GitHub repo metadata (Issues ON / Wiki OFF / Discussions OFF /
+   Projects OFF). Pre-flip extra #3 from
+   `/Users/pbr/.claude/plans/avant-de-publier-sur-zippy-simon.md`.
+2. Flip GitHub repo from private to public + activate branch
+   protection on `main` (commands in the `Where to resume` block
+   above).
+3. PyPI publish (the user must first create a PyPI account + 2FA +
+   generate a token; then `UV_PUBLISH_TOKEN=… uv build && uv publish`
+   one-shot for now, Trusted Publishers via GitHub Actions later).
+4. Optional v0.3 / mcpvault-parity: `read_multiple_notes` (batch
+   read), `manage_tags` (dedicated tag tool, sugar over
+   `merge_frontmatter`).
+
+**v0.3 backlog** (carried over from v0.1-followups.md): ripgrep-backed
+`search_notes` with TTL index cache (M5-01 + M5-02), `path_routing`
+built-in hook (M4-01), `execute_command` allow-list (M7-04), TLS CA
+bundle (M7-03), `search_notes` REST routing (M7-01), and **M6-11 —
+out-of-band confirmation via MCP `Context.elicit()`** (the real fix
+for the HMAC coherent-hallucination gap surfaced in v0.2.0).
+
+**Sanity check** to confirm a clean v0.2.0 base:
 
 ```bash
 cd <repo-root>
-uv run pytest -q                                    # expect 533 passed
+uv run pytest -q                                    # expect 558 passed
 uv run python tests/e2e/run_e2e.py                  # expect 101/101 PASS
 uv run ruff check src tests                         # expect "All checks passed"
 uv run mypy src                                     # expect "no issues found"
-git tag -l                                          # expect 'v0.1.0', 'v0.1.1', 'v0.1.2'
+git tag -l                                          # expect 'v0.1.0', 'v0.1.1', 'v0.1.2', 'v0.2.0'
 ```
 
-**v0.2 backlog** (M8 audit, full table in `docs/v0.1-followups.md` § v0.1.0 disposition): 4 done, 36 v0.2, 2 wontfix. Top targets when v0.2 opens:
-
-- M5-01 + M5-02 — ripgrep-backed `search_notes` with TTL index cache.
-- M4-01 — `path_routing` built-in hook (last of the three planned).
-- M7-04 — `execute_command` allow-list (defense in depth).
-- M7-03 — TLS CA bundle option (relax loopback constraint).
-- M7-01 / M7-02 — REST routing for `search_notes` / `resolve_wikilink`.
-- M6-04 — lazy registry init thread safety.
-- M4-13 / M4-14 — config hot-reload + clean `ConfigError` exit.
+**Detailed backlog** lives in `docs/v0.1-followups.md` (36 v0.2/v0.3
+entries from the M8 audit, plus the new M6-11 from the HMAC honesty
+pass).
