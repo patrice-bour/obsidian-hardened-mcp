@@ -1,0 +1,6 @@
+# Line-ending normalization. Anything text-like is normalized to LF
+# in-tree; checkouts on Windows get whatever core.autocrlf says.
+* text=auto eol=lf
+
+# Python diff hunks gain function-context.
+*.py text diff=python

@@ -292,8 +292,24 @@ be loosened on rewrite. **Don't store secrets in vault notes.**
 
 ### Network adversaries
 
-The MCP transport is stdio. The optional Local REST API integration
-(future M7) talks to `127.0.0.1` only. There is no network listener.
+The MCP transport is stdio — the server is a child process of the
+client, communicates via standard input/output, and never binds a
+network port. There is no listener to attack.
+
+The optional Local REST API integration (shipped in M7) is the only
+network-adjacent surface, and it is hardened on three axes:
+
+1. The server's REST client refuses any non-loopback `OBSIDIAN_REST_URL`
+   at boot. The hostname must be in `{127.0.0.1, localhost, ::1}`. The
+   third-party Obsidian Local REST API plugin can itself be configured
+   by the user to bind `0.0.0.0` (all interfaces), but **our client
+   will not talk to that endpoint via a public IP** even if you ask it
+   to — `_rest_url_must_be_loopback` rejects the config.
+2. The httpx client runs with `verify=False` because the plugin uses
+   a self-signed cert for `127.0.0.1`. That posture is only safe
+   on loopback (M7.5).
+3. The bearer token is masked in `repr()` and never logged in error
+   messages or audit events.
 
 ### iCloud offload races
 

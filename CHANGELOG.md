@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `.gitattributes` with `* text=auto eol=lf` and a Python diff
+  attribute. Prevents Windows contributors from silently introducing
+  CRLF on commit.
 - **Auto-cleanup of `.ohmcp-trash/`** with a configurable retention
   policy. Snapshots accumulated by destructive ops (`delete_note`,
   `rename_note`, `move_note`) now get pruned automatically at server
@@ -20,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   an audit entry (`tool=trash_pruner`).
 
 ### Documentation
+- `docs/security-model.md` § "Network adversaries" updated post the
+  Lot-B HMAC honesty pass: removed the stale "(future M7)" tag (M7
+  shipped in v0.1.0), and aligned the framing on the third-party
+  Obsidian Local REST API plugin (which the user can configure on
+  `0.0.0.0` but our client refuses to talk to via non-loopback) so
+  README, SECURITY.md, and security-model are consistent.
 - **README revamp for non-developers.** Restructured around a 5-minute
   Quick Start, a "What you need" checklist, equal-footing config
   examples for Claude Desktop / Claude Code / other MCP clients, OS-by-OS
