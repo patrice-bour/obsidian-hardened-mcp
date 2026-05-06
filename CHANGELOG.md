@@ -7,8 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-(Nothing yet — v0.2 will pick up the deferred items in
-`docs/v0.1-followups.md`.)
+### Documentation
+- **Honesty pass on the 2-phase HMAC threat model.** `README.md`,
+  `docs/security-model.md`, and `SECURITY.md` now state explicitly
+  which classes of destructive-op risk the mechanism prevents
+  (single-shot mishaps, token forge, cross-target reuse, replay) and
+  which it does NOT prevent (a coherently-hallucinating LLM that walks
+  phase 1 then phase 2 in sequence; a prompt-injection-driven agent).
+  The defence-in-depth story is now spelled out: HMAC binding +
+  snapshot trash + audit log + client-side confirmation. The real
+  out-of-band fix via MCP `Context.elicit()` is tracked as
+  [M6-11](docs/v0.1-followups.md#m6-11--2-phase-hmac-does-not-stop-a-coherently-hallucinating-llm)
+  for v0.2.
+- `SECURITY.md`: clarified that the loopback-only enforcement is on
+  *our* REST client; the third-party Obsidian Local REST API plugin
+  can be configured to bind `0.0.0.0`, but our server still refuses
+  to talk to it via a non-loopback URL.
 
 ## [0.1.2] - 2026-05-05
 

@@ -56,9 +56,21 @@ The following are documented operational assumptions, not bugs:
 - Hostile local users: an attacker with code execution under the same
   POSIX user as the server can already do anything the server can.
 - Network exposure: the server speaks stdio MCP and never binds a
-  port. The optional Local REST API integration is loopback-only.
+  port. The optional Local REST API integration is loopback-only —
+  the server's REST client refuses any non-loopback `OBSIDIAN_REST_URL`
+  even if the third-party Obsidian Local REST API plugin is itself
+  configured to bind on `0.0.0.0`.
 - Vault contents trust: the server treats the vault as authoritative
   text owned by the user. Hooks and validators are advisory.
+- Coherent LLM hallucination chains: the 2-phase HMAC mechanism
+  prevents single-shot mishaps, token forge, cross-target reuse, and
+  replay. It does **not** prevent an LLM that hallucinates phase 1,
+  reads the returned token from its own context, and fires phase 2
+  with that token — the registry sees both calls as legitimate. The
+  recovery path is the snapshot trash + audit log; the real prevention
+  layer is tracked as a v0.2 followup
+  ([M6-11](docs/v0.1-followups.md#m6-11--2-phase-hmac-does-not-stop-a-coherently-hallucinating-llm),
+  out-of-band confirmation via MCP `Context.elicit()`).
 
 For the full operational threat model, see
 [`docs/security-model.md`](docs/security-model.md).

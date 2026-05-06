@@ -17,7 +17,7 @@ Existing MCP servers for Obsidian are limited:
 - **Full file modification** with atomic writes (tmp + fsync + rename)
 - **Atomic frontmatter operations** — get / set / delete / merge by field, with round-trip preservation (comments, ordering, quote styles)
 - **Path sandbox** that resists traversal, symlink escape, and absolute-path injection (1 000-example hypothesis sweep)
-- **Two-phase HMAC confirmation** for destructive ops (delete / rename / move / `execute_command`) — a single hallucinated tool call can never mutate the vault on the first try
+- **Two-phase HMAC confirmation** for destructive ops (delete / rename / move / `execute_command`) — destructive intent surfaces as two distinct tool calls (issue token → confirm with token), giving any oversight layer (you reading the conversation, the client's confirm UI) a chance to intercept. Cryptographically binds the confirmation to the exact target, so a token from one path can't be reused on another. Caveat: a coherently-hallucinating or prompt-injection-driven agent that walks both phases is still possible — see [Two-phase confirmation](#two-phase-confirmation) below for the precise threat model
 - **Pre-destruction snapshots** under `.ohmcp-trash/` for every destructive op
 - **JSONL audit log** with deterministic content hashes
 - **Pluggable validation hooks** driven by external YAML — no hardcoded vault conventions
@@ -204,8 +204,47 @@ Every destructive tool follows the same protocol:
    snapshots the original state under `.ohmcp-trash/`, and applies the
    change atomically.
 
-A single hallucinated call cannot mutate the vault on the first try because
-the LLM has no way to forge a token without the secret.
+#### What this prevents
+
+- **Single-shot mishaps**: one hallucinated tool call cannot mutate the
+  vault. Without the server-held secret, the model cannot fabricate a
+  valid token, so phase 2 fails outright.
+- **Token forge**: the secret lives at `~/.obsidian-hardened-mcp/secret`
+  with mode `0o600`; the loader refuses to start if the mode is wider.
+- **Cross-target reuse**: a token issued for `delete_note(A)` is bound
+  to A's payload hash and is rejected if reused on `delete_note(B)`.
+- **Replay**: tokens are single-use (the registry consumes them on
+  phase 2) and TTL-bound (90 s). A captured token cannot be replayed
+  later or twice.
+
+#### What this does NOT prevent
+
+- **A coherently-hallucinating LLM** that fires phase 1, reads the
+  returned token from its own context, and fires phase 2 with that
+  token. Both calls are legitimate as far as the registry is
+  concerned. Same applies to a prompt-injection-driven agent.
+- **Code running under your user account** that can read the secret
+  file directly and forge tokens at will. This is documented as
+  out-of-scope (see [`docs/security-model.md`](./docs/security-model.md)).
+
+#### Defences in depth
+
+- **Surface in the conversation**: phase 1 and phase 2 are two
+  distinct turns; you (or any oversight layer) can intercept between
+  them.
+- **Snapshot trash**: even if both phases fire, a copy of the original
+  state lands under `.ohmcp-trash/<UTC-ts>-<hash>/<path>` before the
+  destructive op. Recovery is a `cp` away.
+- **Audit log**: every destructive op emits a JSONL entry; detection
+  is post-fact but reliable.
+- **Client-side confirmation**: Claude Desktop and Claude Code render
+  a confirm UI for tool calls — the human in the loop is your last
+  defence against a hallucinated chain.
+- **v0.2 followup** ([M6-11](./docs/v0.1-followups.md#m6-11--2-phase-hmac-does-not-stop-a-coherently-hallucinating-llm)):
+  use the MCP `Context.elicit()` capability to route the second-factor
+  confirmation through the client UI instead of the LLM context. This
+  is the real fix; we didn't ship it in v0.1 because it requires
+  per-client integration testing.
 
 ## Security posture
 

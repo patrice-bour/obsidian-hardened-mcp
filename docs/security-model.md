@@ -81,9 +81,10 @@ target either at its old content or its new content, never in between.
 ### LLM-driven destructive ops
 
 Destructive tools (`delete_note`, `rename_note`, `move_note`,
-`execute_command`) require a **two-phase HMAC confirmation**. A single
-hallucinated tool call cannot mutate the vault — or trigger an
-Obsidian command — on the first try.
+`execute_command`) require a **two-phase HMAC confirmation**. The
+mechanism is a defence-in-depth layer with a precise scope — this
+section spells out what it does and does not prevent, because the
+distinction matters.
 
 - **Phase 1** (`confirm_token=None`): the tool computes a preview, issues
   a single-use `OperationToken` HMAC-signed against the secret + payload,
@@ -107,10 +108,62 @@ In-memory storage is **by design**: a server restart invalidates all
 phase-1 tokens. The 90 s TTL makes that acceptable; phase-1 issuances
 older than 90 s would have expired anyway.
 
+#### Threat-by-threat matrix
+
+| Threat | Status | Mechanism |
+|---|---|---|
+| Single-shot hallucinated tool call mutates the vault | **prevented** | Phase 2 requires a valid HMAC. Without the secret, the model cannot forge one; phase 1 alone never touches disk. |
+| Token forge by a remote attacker | **prevented** | HMAC over the secret + payload + expiry + nonce. The secret never leaves the server. |
+| Cross-target token reuse (apply token from delete A to delete B) | **prevented** | `payload_hash` in the HMAC binds the token to the exact operation parameters. Phase 2 with mismatched payload fails. |
+| Token replay / reuse | **prevented** | Single-use (consumed on phase 2). 90 s TTL. In-memory store cleared on restart. |
+| Coherently-hallucinating LLM that fires phase 1 → reads token from its own context → fires phase 2 with that token | **NOT prevented** | The two calls are legitimate from the registry's point of view. The HMAC mechanism cannot tell a coherent hallucination from an intentional destructive op. |
+| Prompt-injection-driven agent that walks the LLM through both phases | **NOT prevented** | Same as above — the protocol completes successfully. |
+| Local code execution under the same POSIX user reading the secret file directly | **NOT prevented** | Out of scope. An attacker with code execution privileges can already do anything the server can. |
+
+#### Defence-in-depth layers
+
+The 2-phase HMAC is one layer among several. The full destruction-safety
+story for v0.1 is:
+
+1. **HMAC binding** (this section): single-shot prevention, forge
+   prevention, cross-target prevention, replay prevention.
+2. **Snapshot trash** (next section): every successful phase 2 first
+   copies the original under `<vault>/.ohmcp-trash/<UTC-ts>-<hash>/` so
+   recovery is always a `cp` away — even if a coherent hallucination
+   walks both phases.
+3. **Audit log**: a JSONL entry with deterministic content hash lands
+   on disk for every destructive op, before and after. Post-incident
+   detection is reliable.
+4. **Client-side confirmation**: Claude Desktop and Claude Code render
+   a confirm UI before tool calls. The human in the loop is the last
+   line of defence against a hallucinated chain.
+
+#### Real out-of-band confirmation (v0.2 followup)
+
+The honest answer to "what stops a coherently-hallucinating LLM from
+walking both phases?" is **nothing in the HMAC mechanism alone** — by
+construction, the mechanism cannot distinguish a coherent hallucination
+from intent. Closing this gap requires moving the second factor *out of
+the LLM's context*. The MCP spec already provides this via
+`Context.elicit()`: servers can request structured input from the user,
+rendered by the client UI (Claude Desktop, Claude Code), at any point
+in the request lifecycle. An LLM cannot fabricate the elicitation
+response because it routes through the client, not the model.
+
+This is tracked as
+[M6-11](v0.1-followups.md#m6-11--2-phase-hmac-does-not-stop-a-coherently-hallucinating-llm)
+for v0.2. The plan is to wrap phase-2 entry points in a thin layer that
+calls `ctx.elicit("Confirm <op> on <target>?")` before consuming the
+HMAC token, with graceful soft-fail for clients that don't implement
+elicitation (an explicit `elicitation_unsupported` error code, so
+automation paths can opt in knowingly rather than silently bypassing
+the layer).
+
 Snapshots accumulate under `<vault>/.ohmcp-trash/`. They are NEVER
 re-exposed by read tools (the directory is in the VaultPath
 forbidden-zone list). Manual cleanup convention: prune
-`.ohmcp-trash/` yourself when disk usage matters.
+`.ohmcp-trash/` yourself when disk usage matters. *(Auto-cleanup with
+configurable retention is in flight as a separate v0.1.x followup.)*
 
 `update_backlinks=True` (rename/move) is best-effort: only exact
 wikilink targets `[[oldname]]` / `[[oldname.md]]` are rewritten,
