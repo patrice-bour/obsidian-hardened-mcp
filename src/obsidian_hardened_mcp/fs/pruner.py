@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import re
 import shutil
-import uuid
+import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -39,6 +39,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from obsidian_hardened_mcp.domain.audit import AuditEvent
+from obsidian_hardened_mcp.tools._base import new_request_id, params_hash
 
 if TYPE_CHECKING:
     from obsidian_hardened_mcp.config import TrashPolicy
@@ -103,7 +104,9 @@ def prune_trash(
     audit:
         Audit logger. The pruner emits one event per pruned (or
         attempted-prune-but-failed) snapshot, plus one summary event
-        at the end if anything happened.
+        at the end if anything happened. All events share a single
+        ``request_id`` so a downstream consumer can correlate them
+        as one logical sweep.
     now:
         Override the "current" time (tests). Defaults to UTC now.
     trigger:
@@ -112,10 +115,12 @@ def prune_trash(
         happened.
     """
     trash_root = vault_root / _TRASH_DIRNAME
-    if not trash_root.exists() or not trash_root.is_dir():
+    if not trash_root.is_dir():
         return PruneResult()
 
     now = now if now is not None else datetime.now(tz=UTC)
+    request_id = new_request_id()
+    sweep_started = time.monotonic()
 
     snapshots: list[_SnapshotInfo] = []
     skipped: list[str] = []
@@ -197,19 +202,24 @@ def prune_trash(
     pruned: list[_SnapshotInfo] = []
     failed_count = 0
     for snap in candidates:
+        op_started = time.monotonic()
         try:
             shutil.rmtree(snap.dir)
         except OSError as exc:  # pragma: no cover - defensive (ENOSPC, EROFS…)
             failed_count += 1
+            duration_ms = int((time.monotonic() - op_started) * 1000)
             _emit_prune_audit(
                 audit,
                 vault_root=vault_root,
                 snap=snap,
                 outcome="failure",
                 trigger=trigger,
+                request_id=request_id,
+                duration_ms=duration_ms,
                 error=str(exc),
             )
             continue
+        duration_ms = int((time.monotonic() - op_started) * 1000)
         pruned.append(snap)
         _emit_prune_audit(
             audit,
@@ -217,7 +227,21 @@ def prune_trash(
             snap=snap,
             outcome="success",
             trigger=trigger,
+            request_id=request_id,
+            duration_ms=duration_ms,
             error=None,
+        )
+
+    # 6) Summary event for the whole sweep (only if anything happened).
+    if pruned or failed_count:
+        _emit_prune_summary(
+            audit,
+            request_id=request_id,
+            trigger=trigger,
+            sweep_started=sweep_started,
+            pruned_count=len(pruned),
+            failed_count=failed_count,
+            bytes_pruned=sum(s.total_bytes for s in pruned),
         )
 
     return PruneResult(
@@ -287,26 +311,70 @@ def _emit_prune_audit(
     snap: _SnapshotInfo,
     outcome: str,
     trigger: str,
+    request_id: str,
+    duration_ms: int,
     error: str | None,
 ) -> None:
     """One audit entry per pruned (or attempted-prune-failed) snapshot.
 
     `vault_path` is the snapshot directory's path RELATIVE to the vault —
     that's what the pruner physically destroyed, not the original source
-    note. The original source can be cross-referenced via
-    `params_hash` (which carries the original primary path).
+    note. The original source is folded into `params_hash` alongside the
+    trigger and any error. `request_id` is the call-level id shared by
+    every event from this sweep.
     """
     rel_dir = snap.dir.relative_to(vault_root).as_posix()
     event = AuditEvent(
         ts=datetime.now(tz=UTC),
-        request_id=f"prune-{uuid.uuid4().hex[:12]}",
+        request_id=request_id,
         tool="trash_pruner",
         vault_path=rel_dir,
         op_kind="destructive",
         outcome=outcome,  # type: ignore[arg-type]
-        duration_ms=0,
+        duration_ms=duration_ms,
         snapshot_id=snap.snapshot_id,
-        params_hash=f"{trigger}|{snap.primary_source}|err={error or ''}",
+        params_hash=params_hash(trigger, snap.primary_source, error or ""),
+        dry_run=False,
+    )
+    audit.log(event)
+
+
+def _emit_prune_summary(
+    audit: AuditLogger,
+    *,
+    request_id: str,
+    trigger: str,
+    sweep_started: float,
+    pruned_count: int,
+    failed_count: int,
+    bytes_pruned: int,
+) -> None:
+    """One summary event per sweep, emitted only if at least one prune
+    was attempted. Uses ``op_kind="meta"`` so a downstream filter on
+    destructive entries doesn't double-count snapshot-level events.
+
+    The summary's ``vault_path`` is the trash root itself (no specific
+    snapshot); ``snapshot_id`` is null. The aggregate counts live in
+    ``params_hash`` and the wall time of the whole sweep is reported
+    in ``duration_ms``.
+    """
+    duration_ms = int((time.monotonic() - sweep_started) * 1000)
+    event = AuditEvent(
+        ts=datetime.now(tz=UTC),
+        request_id=request_id,
+        tool="trash_pruner",
+        vault_path=f"{_TRASH_DIRNAME}/",
+        op_kind="meta",
+        outcome="success" if failed_count == 0 else "failure",
+        duration_ms=duration_ms,
+        snapshot_id=None,
+        params_hash=params_hash(
+            "summary",
+            trigger,
+            pruned_count,
+            failed_count,
+            bytes_pruned,
+        ),
         dry_run=False,
     )
     audit.log(event)
