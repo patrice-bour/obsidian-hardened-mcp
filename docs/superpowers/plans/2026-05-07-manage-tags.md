@@ -1006,7 +1006,7 @@ Also include the plan file with all 6 of Task 6's checkboxes ticked.
 **Files:**
 - Modify: `tests/unit/test_tools_frontmatter.py`
 
-- [ ] **Step 1: Add the cross-cutting tests**
+- [x] **Step 1: Add the cross-cutting tests**
 
 Add to `TestManageTags`:
 
@@ -1067,14 +1067,15 @@ Add to `TestManageTags`:
         from obsidian_hardened_mcp.validation.hooks import (
             HookContext,
             HookRegistry,
-            HookViolationError,
+            HookResult,
         )
 
         class _RejectAlways:
             name = "reject-always"
+            phase = "pre_write"
 
-            def __call__(self, ctx: HookContext) -> None:
-                raise HookViolationError("rejected by test hook")
+            def validate(self, ctx: HookContext) -> HookResult:
+                return HookResult.reject("rejected by test hook")
 
         hooks = HookRegistry([_RejectAlways()])
         result = manage_tags(
@@ -1085,17 +1086,17 @@ Add to `TestManageTags`:
         assert result.error.code is ErrorCode.VALIDATION_FAILED
 ```
 
-- [ ] **Step 2: Run new tests**
+- [x] **Step 2: Run new tests**
 
 Run: `uv run pytest tests/unit/test_tools_frontmatter.py::TestManageTags -k "round_trip or dry_run or hook" -v`
 Expected: 3 PASS (these exercise behaviour already implemented in Task 4).
 
-- [ ] **Step 3: Full suite**
+- [x] **Step 3: Full suite**
 
 Run: `uv run pytest -q`
-Expected: **612 passed** (609 + 3 new). Total `TestManageTags` = 20 tests as planned.
+Expected: **612 passed** (609 + 3 new). Total `TestManageTags` = 23 tests as implemented.
 
-- [ ] **Step 4: Lint + mypy**
+- [x] **Step 4: Lint + mypy**
 
 Run:
 ```bash
@@ -1105,10 +1106,10 @@ uv run mypy src
 
 Expected: clean.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
-git add tests/unit/test_tools_frontmatter.py
+git add tests/unit/test_tools_frontmatter.py docs/superpowers/plans/2026-05-07-manage-tags.md
 git commit -m "test(frontmatter): cross-cutting coverage for manage_tags
 
 Round-trip preservation (other fields + comments survive a tag edit),

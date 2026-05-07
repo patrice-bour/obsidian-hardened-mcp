@@ -363,6 +363,76 @@ class TestManageTags:
         assert result.data["removed"] == []
         assert path.stat().st_mtime_ns == mtime_before
 
+    def test_round_trip_preserves_other_fields(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        original = (
+            "---\n"
+            "title: My Note\n"
+            "# important\n"
+            "date: 2026-05-04\n"
+            "tags:\n"
+            "  - old\n"
+            "---\n"
+            "body content\n"
+        )
+        path = tmp_vault / "01_Notes" / "rich.md"
+        path.write_text(original)
+
+        result = manage_tags(
+            config, audit, "01_Notes/rich.md", "add", ["new"]
+        )
+        assert result.ok
+
+        after = path.read_text()
+        assert "title: My Note" in after
+        assert "# important" in after
+        assert "date: 2026-05-04" in after
+        assert "body content" in after
+        assert "old" in after and "new" in after
+
+    def test_dry_run_no_disk_write(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        path = tmp_vault / "01_Notes" / "tagged.md"
+        original = "---\ntags:\n  - a\n---\nbody\n"
+        path.write_text(original)
+        result = manage_tags(
+            config, audit, "01_Notes/tagged.md", "add", ["b"], dry_run=True
+        )
+        assert result.ok
+        assert result.dry_run is True
+        assert path.read_text() == original
+
+    def test_hook_violation_rejected(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+        from obsidian_hardened_mcp.validation.hooks import (
+            HookContext,
+            HookRegistry,
+            HookResult,
+        )
+
+        class _RejectAlways:
+            name = "reject-always"
+            phase = "pre_write"
+
+            def validate(self, ctx: HookContext) -> HookResult:
+                return HookResult.reject("rejected by test hook")
+
+        hooks = HookRegistry([_RejectAlways()])
+        result = manage_tags(
+            config, audit, "01_Notes/sample.md", "add", ["wip"], hooks=hooks
+        )
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.VALIDATION_FAILED
+
 
 @pytest.fixture
 def config(tmp_vault: Path) -> AppConfig:
