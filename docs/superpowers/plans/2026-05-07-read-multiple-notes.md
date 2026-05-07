@@ -714,7 +714,7 @@ across random valid input shapes."
 - Modify: `src/obsidian_hardened_mcp/server.py`
 - Modify: `tests/e2e/scenarios/s1_read.py`
 
-- [ ] **Step 1: Wire the tool into the MCP server**
+- [x] **Step 1: Wire the tool into the MCP server**
 
 In `src/obsidian_hardened_mcp/server.py`, update the import line:
 
@@ -738,12 +738,12 @@ Then add the registration block right after the existing `list_notes` registrati
         return _read_multiple_notes_impl(config, paths)
 ```
 
-- [ ] **Step 2: Inspect the E2E scenario file**
+- [x] **Step 2: Inspect the E2E scenario file**
 
 Run: `head -60 tests/e2e/scenarios/s1_read.py`
 Expected: Read the existing structure to mimic it (likely uses an `E2EHarness`-style helper to dispatch tool calls and assert).
 
-- [ ] **Step 3: Add E2E scenarios**
+- [x] **Step 3: Add E2E scenarios**
 
 Add (or append, depending on the existing structure of `s1_read.py`) two new scenario functions:
 
@@ -773,17 +773,18 @@ async def s1e_read_multiple_notes_partial(harness) -> None:
 
 Wire these into the scenario list / runner the same way `s1a`, `s1b`, `s1c` are wired (look at the bottom of the existing file or `run_e2e.py` to see the registration pattern).
 
-- [ ] **Step 4: Run the unit suite to confirm registration didn't break anything**
+- [x] **Step 4: Run the unit suite to confirm registration didn't break anything**
 
 Run: `uv run pytest -q`
-Expected: still 578 PASS.
+Expected: still 582 PASS (actual: 582 PASS).
 
-- [ ] **Step 5: Run the E2E suite**
+- [x] **Step 5: Run the E2E suite**
 
 Run: `uv run python tests/e2e/run_e2e.py`
 Expected: 101 + 2 = 103 PASS (or 101 PASS + the 2 new ones tied to existing groupings depending on how scenarios.py registers — check the output).
+Actual: 109/109 PASS (S1 grew from 20→28 steps; S0 fixed via meta.py).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/obsidian_hardened_mcp/server.py tests/e2e/scenarios/s1_read.py
