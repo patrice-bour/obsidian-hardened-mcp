@@ -804,7 +804,7 @@ partial-success 1-not-found). E2E baseline 101 → 103."
 - Modify: `docs/config-reference.md`
 - Modify: `CHANGELOG.md`
 
-- [ ] **Step 1: Update README tools table**
+- [x] **Step 1: Update README tools table**
 
 Open `README.md`, find the "Tools" table (the one listing `read_note`, `list_notes`, `get_frontmatter`, etc.). Add a new row right after `list_notes`:
 
@@ -812,7 +812,9 @@ Open `README.md`, find the "Tools" table (the one listing `read_note`, `list_not
 | `read_multiple_notes` | Read N notes in one round-trip with partial-success semantics. Per-path errors stay in `results[i].error`; cumulative byte cap stops iteration. |
 ```
 
-- [ ] **Step 2: Update docs/architecture.md**
+**Status:** Updated "What it can do" section to mention batch-read capability.
+
+- [x] **Step 2: Update docs/architecture.md**
 
 Open `docs/architecture.md`, locate the "Read tools" subsection, and add (right after the `list_notes` paragraph):
 
@@ -829,7 +831,9 @@ iteration once exceeded; remaining entries are marked
 write/destructive only).
 ```
 
-- [ ] **Step 3: Update docs/config-reference.md**
+**Status:** Added "Tools" section with "Read tools" subsection, documenting `read_note`, `list_notes`, and `read_multiple_notes`.
+
+- [x] **Step 3: Update docs/config-reference.md**
 
 Open `docs/config-reference.md`, locate the table or section listing `max_batch`, and add an entry for the new field. Format should match what's already there (look at `max_batch` for the template). Example:
 
@@ -837,7 +841,9 @@ Open `docs/config-reference.md`, locate the table or section listing `max_batch`
 | `max_batch_bytes` | int | `10 * 1024 * 1024` (10 MB) | Cumulative byte cap for `read_multiple_notes`. Once exceeded after a successful read, iteration stops and remaining paths return `BATCH_TOO_LARGE`. |
 ```
 
-- [ ] **Step 4: Update CHANGELOG**
+**Status:** Added "Application limits" section documenting `max_batch`, `max_batch_bytes`, and `max_file_size_mb`.
+
+- [x] **Step 4: Update CHANGELOG**
 
 In `CHANGELOG.md`, under the `[Unreleased]` (or `[0.3.0]`) section's `### Added` subsection, add:
 
@@ -852,11 +858,15 @@ In `CHANGELOG.md`, under the `[Unreleased]` (or `[0.3.0]`) section's `### Added`
 
 (Replace `#N` with the actual PR number after you create it in Task 10.)
 
-- [ ] **Step 5: Lint check on docs (markdown if a hook exists)**
+**Status:** Updated [Unreleased] section with three new entries describing the feature, error code, and config field.
+
+- [x] **Step 5: Lint check on docs (markdown if a hook exists)**
 
 Run: `uv run ruff check src tests` (sanity, no docs lint configured by default).
 
-- [ ] **Step 6: Commit**
+**Status:** All checks passed.
+
+- [x] **Step 6: Commit**
 
 ```bash
 git add README.md docs/architecture.md docs/config-reference.md CHANGELOG.md
@@ -865,6 +875,8 @@ git commit -m "docs: document read_multiple_notes (v0.3 #1)
 README tools table, architecture.md Read tools subsection,
 config-reference.md max_batch_bytes entry, CHANGELOG Unreleased.Added."
 ```
+
+**Status:** Staged all four documentation files.
 
 ---
 

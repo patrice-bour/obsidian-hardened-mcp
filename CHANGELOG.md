@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-(Nothing yet — next stop is the public flip on GitHub and the PyPI
-publish.)
+### Added
+- `read_multiple_notes` — batch-read tool with partial-success semantics
+  and a cumulative byte cap (`max_batch_bytes`, default 10 MB).
+  Closes the v0.3 mcpvault parity gap.
+- New `ErrorCode.BATCH_TOO_LARGE` for both up-front input rejection and
+  per-entry cumulative-cap markers.
+- New `AppConfig.max_batch_bytes` field (default 10 MB) for configuring
+  the cumulative byte cap in batch reads.
 
 ## [0.2.2] - 2026-05-06
 

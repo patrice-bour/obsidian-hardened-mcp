@@ -160,6 +160,19 @@ traceable through the same audit log as the original destructive op.
   it must read the file itself — but that is outside the scope of the
   v0.1 Protocol.
 
+## Application limits
+
+The server enforces soft limits on batch operations and file sizes:
+
+| Field | Default | Meaning |
+|---|---|---|
+| `max_batch` | `100` | Maximum number of paths in a single `read_multiple_notes` call. Requests with more paths are rejected at the top level. |
+| `max_batch_bytes` | `10 * 1024 * 1024` (10 MB) | Cumulative byte cap for `read_multiple_notes`. Once exceeded after a successful read, iteration stops and remaining paths return `BATCH_TOO_LARGE`. |
+| `max_file_size_mb` | `10` | Maximum size (in MB) of a single note file. Reads larger than this fail with `FILE_TOO_LARGE`. |
+
+These are set at server startup via `AppConfig` and are not currently
+overridable per-vault via `<vault>/.obsidian-hardened-mcp.yaml`.
+
 ## Custom hooks (v0.2+)
 
 The `ValidationHook` Protocol is public; user-defined classes can be
