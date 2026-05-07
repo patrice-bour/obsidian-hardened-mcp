@@ -45,6 +45,31 @@ src/obsidian_hardened_mcp/
 6. **Validation hooks run in declared order** (M4+) before any write reaches
    disk; one `reject` aborts the entire operation.
 
+## Tools
+
+### Read tools
+
+#### `read_note`
+
+Fetch the full text of a single note by path. Returns the raw body;
+frontmatter is accessible via `get_frontmatter`.
+
+#### `list_notes`
+
+Enumerate all notes under a folder (or the vault root). Returns metadata
+(size, modified time) but not full contents.
+
+#### `read_multiple_notes`
+
+Batch-read primitive. Iterates the input `paths` in order, catching
+per-path failures (path escape, not-found, file-too-large, etc.) into
+`results[i].error` rather than aborting the call. Top-level rejection
+applies to empty inputs and to `len(paths) > config.max_batch`. A
+cumulative byte cap (`config.max_batch_bytes`, default 10 MB) stops
+iteration once exceeded; remaining entries are marked
+`BATCH_TOO_LARGE`. No audit emission (per CLAUDE.md invariant #4 —
+write/destructive only).
+
 ## Tool result shape
 
 Every tool returns `ToolResult`:

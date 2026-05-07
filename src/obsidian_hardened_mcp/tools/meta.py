@@ -58,6 +58,11 @@ def list_tools_capabilities(config: AppConfig) -> ToolResult:
         {"name": "read_note", "kind": "read", "description": "Read a note's text content."},
         {"name": "list_notes", "kind": "read", "description": "List markdown notes."},
         {
+            "name": "read_multiple_notes",
+            "kind": "read",
+            "description": "Read multiple notes in one batch with partial-success semantics.",
+        },
+        {
             "name": "get_frontmatter",
             "kind": "read",
             "description": "Parse a note's YAML frontmatter (round-trip aware).",

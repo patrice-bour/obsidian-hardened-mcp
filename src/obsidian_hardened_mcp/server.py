@@ -51,6 +51,7 @@ from obsidian_hardened_mcp.tools.meta import (
     list_tools_capabilities as _list_tools_capabilities_impl,
 )
 from obsidian_hardened_mcp.tools.read import list_notes as _list_notes_impl
+from obsidian_hardened_mcp.tools.read import read_multiple_notes as _read_multiple_notes_impl
 from obsidian_hardened_mcp.tools.read import read_note as _read_note_impl
 from obsidian_hardened_mcp.tools.search import search_notes as _search_notes_impl
 from obsidian_hardened_mcp.tools.wikilink import (
@@ -172,6 +173,16 @@ def create_server(
     @app.tool(description="List markdown notes in the vault, optionally filtered by folder.")
     def list_notes(folder: str | None = None, limit: int = 200) -> ToolResult:
         return _list_notes_impl(config, folder=folder, limit=limit)
+
+    @app.tool(
+        description=(
+            "Read multiple notes in one batch with partial-success "
+            "semantics. Per-path errors live in results[i].error; "
+            "cumulative byte cap stops iteration."
+        )
+    )
+    def read_multiple_notes(paths: list[str]) -> ToolResult:
+        return _read_multiple_notes_impl(config, paths)
 
     @app.tool(
         description=(

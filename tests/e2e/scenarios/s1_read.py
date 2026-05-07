@@ -127,6 +127,54 @@ async def run(h: E2EHarness) -> ScenarioReport:
             f"got resolved={resolved!r} ambiguous={field_value(rw, 'ambiguous')!r}",
         )
 
+    # read_multiple_notes — happy path: 3 valid notes in input order
+    paths_happy = ["notes/alpha.md", "index.md", "journal/2026-05-04.md"]
+    rmn_happy = await h.call("read_multiple_notes", paths=paths_happy)
+    ok, why = expect_ok(rmn_happy, where="read_multiple_notes happy")
+    rep.add("read_multiple_notes happy ok", ok, why)
+    if ok:
+        data_happy = rmn_happy.data or {}
+        results_happy = data_happy.get("results") or []
+        rep.add(
+            "batch returns 3 results in order",
+            [r.get("path") for r in results_happy] == paths_happy,
+            f"got paths={[r.get('path') for r in results_happy]!r}",
+        )
+        rep.add(
+            "all 3 results have content",
+            all("content" in r for r in results_happy),
+            f"results={[list(r.keys()) for r in results_happy]!r}",
+        )
+        rep.add(
+            "stopped_early is False",
+            data_happy.get("stopped_early") is False,
+            f"stopped_early={data_happy.get('stopped_early')!r}",
+        )
+
+    # read_multiple_notes — partial success: 1 missing path returns error at index 1
+    paths_partial = ["notes/alpha.md", "notes/missing.md", "index.md"]
+    rmn_partial = await h.call("read_multiple_notes", paths=paths_partial)
+    ok, why = expect_ok(rmn_partial, where="read_multiple_notes partial")
+    rep.add("read_multiple_notes partial ok", ok, why)
+    if ok:
+        results_partial = (rmn_partial.data or {}).get("results") or []
+        rep.add(
+            "partial: index 0 has content",
+            "content" in (results_partial[0] if results_partial else {}),
+            f"keys[0]={list(results_partial[0].keys()) if results_partial else '[]'}",
+        )
+        err_entry = results_partial[1] if len(results_partial) > 1 else {}
+        rep.add(
+            "partial: index 1 has not_found error",
+            (err_entry.get("error") or {}).get("code") == "not_found",
+            f"error={err_entry.get('error')!r}",
+        )
+        rep.add(
+            "partial: index 2 has content",
+            "content" in (results_partial[2] if len(results_partial) > 2 else {}),
+            f"keys[2]={list(results_partial[2].keys()) if len(results_partial) > 2 else '[]'}",
+        )
+
     return rep
 
 

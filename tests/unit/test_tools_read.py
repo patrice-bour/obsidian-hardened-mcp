@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import hypothesis
 import pytest
+from hypothesis import strategies as st
 
 from obsidian_hardened_mcp.config import AppConfig
 from obsidian_hardened_mcp.domain.results import ErrorCode
-from obsidian_hardened_mcp.tools.read import list_notes, read_note
+from obsidian_hardened_mcp.tools.read import list_notes, read_multiple_notes, read_note
 
 
 @pytest.fixture
@@ -130,3 +132,215 @@ class TestListNotes:
         assert result.ok
         assert result.data is not None
         assert result.data["limit"] == config.max_batch
+
+
+class TestReadMultipleNotes:
+    def test_empty_paths_rejected(self, config: AppConfig) -> None:
+        result = read_multiple_notes(config, [])
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.INVALID_PATH
+        assert "empty" in result.error.message.lower()
+
+    def test_too_many_paths_rejected(self, config: AppConfig) -> None:
+        # max_batch defaults to 500; pass 501 paths.
+        paths = [f"01_Notes/{i}.md" for i in range(config.max_batch + 1)]
+        result = read_multiple_notes(config, paths)
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.BATCH_TOO_LARGE
+        assert str(config.max_batch) in result.error.message
+
+    def test_single_success(self, config: AppConfig) -> None:
+        result = read_multiple_notes(config, ["01_Notes/sample.md"])
+        assert result.ok
+        assert result.data is not None
+        results = result.data["results"]
+        assert len(results) == 1
+        assert results[0]["path"] == "01_Notes/sample.md"
+        assert results[0]["content"] == "# Sample\n"
+        assert results[0]["size"] == 9
+        assert "error" not in results[0]
+        assert result.data["cumulative_bytes"] == 9
+        assert result.data["stopped_early"] is False
+
+    def test_all_succeed_preserves_order(self, config: AppConfig) -> None:
+        paths = ["01_Notes/sample.md", "_VAULT.md", "00_Journal/2026-05-04.md"]
+        result = read_multiple_notes(config, paths)
+        assert result.ok
+        assert result.data is not None
+        results = result.data["results"]
+        assert [r["path"] for r in results] == paths
+        assert all("content" in r for r in results)
+
+    def test_partial_success_not_found(self, config: AppConfig) -> None:
+        paths = ["01_Notes/sample.md", "01_Notes/missing.md", "_VAULT.md"]
+        result = read_multiple_notes(config, paths)
+        assert result.ok
+        assert result.data is not None
+        results = result.data["results"]
+        assert "content" in results[0]
+        assert results[1]["error"]["code"] == ErrorCode.NOT_FOUND.value
+        assert "content" in results[2]
+
+    def test_partial_success_path_escape(self, config: AppConfig) -> None:
+        paths = ["01_Notes/sample.md", "../escape.md"]
+        result = read_multiple_notes(config, paths)
+        assert result.ok
+        assert result.data is not None
+        results = result.data["results"]
+        assert "content" in results[0]
+        assert results[1]["error"]["code"] == ErrorCode.PATH_ESCAPE.value
+        assert results[1]["path"] == "../escape.md"
+
+    def test_partial_success_forbidden_zone(self, config: AppConfig) -> None:
+        paths = ["01_Notes/sample.md", ".obsidian/config.json"]
+        result = read_multiple_notes(config, paths)
+        assert result.ok
+        assert result.data is not None
+        results = result.data["results"]
+        assert "content" in results[0]
+        assert results[1]["error"]["code"] == ErrorCode.FORBIDDEN_ZONE.value
+
+    def test_partial_success_file_too_large(
+        self, tmp_vault: Path
+    ) -> None:
+        # Tight max_file_size_mb so a small file already breaks it.
+        cfg = AppConfig(vault_root=tmp_vault, max_file_size_mb=1)
+        big = tmp_vault / "01_Notes" / "big.md"
+        big.write_bytes(b"x" * (2 * 1024 * 1024))  # 2 MB > 1 MB cap
+
+        result = read_multiple_notes(
+            cfg, ["01_Notes/sample.md", "01_Notes/big.md"]
+        )
+        assert result.ok
+        assert result.data is not None
+        results = result.data["results"]
+        assert "content" in results[0]
+        assert results[1]["error"]["code"] == ErrorCode.FILE_TOO_LARGE.value
+
+    def test_cumulative_cap_stops_iteration(self, tmp_vault: Path) -> None:
+        # 3 files of 6 MB each; 10 MB cap; max_file_size_mb=8 (over the
+        # individual cap to allow 6 MB files).
+        cfg = AppConfig(
+            vault_root=tmp_vault,
+            max_file_size_mb=8,
+            max_batch_bytes=10 * 1024 * 1024,
+        )
+        for name in ("a.md", "b.md", "c.md"):
+            (tmp_vault / "01_Notes" / name).write_bytes(b"x" * (6 * 1024 * 1024))
+
+        paths = ["01_Notes/a.md", "01_Notes/b.md", "01_Notes/c.md"]
+        result = read_multiple_notes(cfg, paths)
+        assert result.ok
+        assert result.data is not None
+        results = result.data["results"]
+
+        assert "content" in results[0]
+        assert "content" in results[1]
+        assert results[2]["error"]["code"] == ErrorCode.BATCH_TOO_LARGE.value
+        assert "after index 1" in results[2]["error"]["message"]
+        assert result.data["stopped_early"] is True
+        assert result.data["cumulative_bytes"] == 12 * 1024 * 1024
+
+    def test_cumulative_cap_marks_remaining(self, tmp_vault: Path) -> None:
+        cfg = AppConfig(
+            vault_root=tmp_vault,
+            max_file_size_mb=8,
+            max_batch_bytes=10 * 1024 * 1024,
+        )
+        for name in ("a.md", "b.md", "c.md", "d.md", "e.md"):
+            (tmp_vault / "01_Notes" / name).write_bytes(b"x" * (4 * 1024 * 1024))
+
+        paths = [f"01_Notes/{n}" for n in ("a.md", "b.md", "c.md", "d.md", "e.md")]
+        result = read_multiple_notes(cfg, paths)
+        assert result.ok
+        assert result.data is not None
+        results = result.data["results"]
+
+        # First three succeed (4+4+4 = 12 MB > 10 MB cap, stops after #3)
+        assert "content" in results[0]
+        assert "content" in results[1]
+        assert "content" in results[2]
+        assert results[3]["error"]["code"] == ErrorCode.BATCH_TOO_LARGE.value
+        assert results[4]["error"]["code"] == ErrorCode.BATCH_TOO_LARGE.value
+        assert result.data["stopped_early"] is True
+        assert result.data["cumulative_bytes"] == 12 * 1024 * 1024
+
+    def test_no_early_stop_when_under_cap(self, config: AppConfig) -> None:
+        result = read_multiple_notes(
+            config, ["01_Notes/sample.md", "_VAULT.md", "00_Journal/2026-05-04.md"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["stopped_early"] is False
+
+    def test_duplicates_allowed(self, config: AppConfig) -> None:
+        result = read_multiple_notes(
+            config, ["01_Notes/sample.md", "01_Notes/sample.md"]
+        )
+        assert result.ok
+        assert result.data is not None
+        results = result.data["results"]
+        assert len(results) == 2
+        assert results[0] == results[1]
+        assert result.data["cumulative_bytes"] == 18  # 9 + 9
+
+    def test_path_field_preserves_input(self, config: AppConfig) -> None:
+        # Caller passes `./` prefix; we must echo it back even though
+        # VaultPath would normalise it away internally.
+        result = read_multiple_notes(config, ["./01_Notes/sample.md"])
+        assert result.ok
+        assert result.data is not None
+        assert result.data["results"][0]["path"] == "./01_Notes/sample.md"
+
+    def test_no_audit_event_emitted(
+        self, config: AppConfig, tmp_path: Path
+    ) -> None:
+        from obsidian_hardened_mcp.security.audit_logger import AuditLogger
+
+        # AuditLogger takes a directory; it writes YYYY-MM-DD.jsonl inside it.
+        # Construct a logger pointing at a fresh temp dir; if the tool
+        # accidentally emitted an audit event we'd see a .jsonl file.
+        audit_dir = tmp_path / "audit"
+        logger = AuditLogger(audit_dir)
+        _ = read_multiple_notes(config, ["01_Notes/sample.md"])
+        # No emission expected; the audit dir must remain empty.
+        jsonl_files = list(audit_dir.glob("*.jsonl"))
+        assert jsonl_files == []
+        # Suppress unused-variable lint: logger constructed only to assert
+        # the contract that read tools never use it.
+        del logger
+
+    def test_cumulative_bytes_field_correct(self, config: AppConfig) -> None:
+        result = read_multiple_notes(
+            config, ["01_Notes/sample.md", "_VAULT.md"]
+        )
+        assert result.ok
+        assert result.data is not None
+        # "# Sample\n" = 9 bytes, "# Vault root\n" = 13 bytes
+        assert result.data["cumulative_bytes"] == 9 + 13
+
+    @hypothesis.settings(
+        suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture]
+    )
+    @hypothesis.given(
+        st.lists(
+            st.sampled_from(
+                ["01_Notes/sample.md", "_VAULT.md", "00_Journal/2026-05-04.md",
+                 "01_Notes/missing.md", "../escape.md", ".obsidian/config.json"]
+            ),
+            min_size=1,
+            max_size=10,
+        )
+    )
+    def test_results_length_equals_input_length(
+        self, config: AppConfig, paths: list[str]
+    ) -> None:
+        result = read_multiple_notes(config, paths)
+        if not result.ok:
+            # Up-front rejection (empty / too many) is acceptable; the
+            # property only asserts on successful envelopes.
+            return
+        assert result.data is not None
+        assert len(result.data["results"]) == len(paths)

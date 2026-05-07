@@ -39,6 +39,22 @@ class TestSizeLimitsValidation:
         cfg = AppConfig(vault_root=tmp_vault, max_file_size_mb=5)
         assert cfg.max_file_size_bytes == 5 * 1024 * 1024
 
+    def test_zero_max_batch_bytes_is_rejected(self, tmp_vault: Path) -> None:
+        with pytest.raises(ValidationError):
+            AppConfig(vault_root=tmp_vault, max_batch_bytes=0)
+
+    def test_negative_max_batch_bytes_is_rejected(self, tmp_vault: Path) -> None:
+        with pytest.raises(ValidationError):
+            AppConfig(vault_root=tmp_vault, max_batch_bytes=-1)
+
+    def test_max_batch_bytes_default_is_10mb(self, tmp_vault: Path) -> None:
+        cfg = AppConfig(vault_root=tmp_vault)
+        assert cfg.max_batch_bytes == 10 * 1024 * 1024
+
+    def test_max_batch_bytes_custom(self, tmp_vault: Path) -> None:
+        cfg = AppConfig(vault_root=tmp_vault, max_batch_bytes=5 * 1024 * 1024)
+        assert cfg.max_batch_bytes == 5 * 1024 * 1024
+
 
 class TestFromEnv:
     def test_env_vars_propagate(
