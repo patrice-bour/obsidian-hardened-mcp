@@ -497,7 +497,7 @@ Also include the plan file with all 6 of Task 3's checkboxes ticked.
 - Modify: `src/obsidian_hardened_mcp/tools/frontmatter.py`
 - Modify: `tests/unit/test_tools_frontmatter.py`
 
-- [ ] **Step 1: Write failing tests for `add`**
+- [x] **Step 1: Write failing tests for `add`**
 
 Add to `TestManageTags` (in `test_tools_frontmatter.py`):
 
@@ -583,12 +583,12 @@ Add to `TestManageTags` (in `test_tools_frontmatter.py`):
         assert path.stat().st_mtime_ns == mtime_before
 ```
 
-- [ ] **Step 2: Run new tests to verify they fail**
+- [x] **Step 2: Run new tests to verify they fail**
 
 Run: `uv run pytest tests/unit/test_tools_frontmatter.py::TestManageTags -k "add" -v`
 Expected: 5 FAIL — current skeleton raises `NotImplementedError`.
 
-- [ ] **Step 3: Implement add op**
+- [x] **Step 3: Implement add op**
 
 Replace the `raise NotImplementedError(f"op={op!r} not yet implemented")` line at the end of `manage_tags` with the full mutate-write cycle:
 
@@ -733,12 +733,12 @@ Replace the `raise NotImplementedError(f"op={op!r} not yet implemented")` line a
     )
 ```
 
-- [ ] **Step 4: Run add tests**
+- [x] **Step 4: Run add tests**
 
 Run: `uv run pytest tests/unit/test_tools_frontmatter.py::TestManageTags -k "add" -v`
 Expected: 5 PASS.
 
-- [ ] **Step 5: Lint + mypy + full suite**
+- [x] **Step 5: Lint + mypy + full suite**
 
 Run:
 ```bash
@@ -749,7 +749,7 @@ uv run pytest -q
 
 Expected: clean. **602 passed** (597 + 5 new).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/obsidian_hardened_mcp/tools/frontmatter.py tests/unit/test_tools_frontmatter.py

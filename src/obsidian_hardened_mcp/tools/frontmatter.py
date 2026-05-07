@@ -213,12 +213,12 @@ def manage_tags(
         normalized: list[str] = []
     else:
         try:
-            normalized = _dedupe_in_order(_normalize_tag(t) for t in tags)  # noqa: F841
+            normalized = _dedupe_in_order(_normalize_tag(t) for t in tags)
         except _InvalidTagError as exc:
             return ToolResult.failure(ErrorCode.INVALID_TAG, str(exc))
 
-    started = time.monotonic()  # noqa: F841
-    request_id = new_request_id()  # noqa: F841
+    started = time.monotonic()
+    request_id = new_request_id()
 
     try:
         vp = VaultPath.from_user(path, config.vault_root)
@@ -246,7 +246,144 @@ def manage_tags(
             }
         )
 
-    raise NotImplementedError(f"op={op!r} not yet implemented")
+    # Compute the new tag list per op.
+    if op == "add":
+        new_tags = list(existing_tags)
+        for t in normalized:
+            if t not in new_tags:
+                new_tags.append(t)
+    elif op == "remove":
+        raise NotImplementedError("op='remove' lands in Task 5")
+    elif op == "replace":
+        raise NotImplementedError("op='replace' lands in Task 6")
+    else:  # pragma: no cover - exhaustive Literal
+        return ToolResult.failure(  # type: ignore[unreachable]
+            ErrorCode.INVALID_TAG, f"unknown op {op!r}"
+        )
+
+    added = [t for t in new_tags if t not in existing_tags]
+    removed = [t for t in existing_tags if t not in new_tags]
+    params_hash_value = params_hash(path, op, normalized)
+
+    # Skip disk write on no-op (mtime stability).
+    if new_tags == existing_tags:
+        audit_id = emit_audit(
+            audit,
+            request_id=request_id,
+            tool="manage_tags",
+            op_kind="write",
+            vault_path=str(vp.relative),
+            outcome="success",
+            started=started,
+            params_hash=params_hash_value,
+            dry_run=dry_run,
+        )
+        return ToolResult(
+            ok=True,
+            data={
+                "path": str(vp.relative),
+                "request_id": request_id,
+                "op": op,
+                "tags": new_tags,
+                "added": added,
+                "removed": removed,
+            },
+            dry_run=dry_run,
+            audit_id=audit_id,
+        )
+
+    # Build new frontmatter.
+    new_fm = (
+        copy.deepcopy(parsed.frontmatter)
+        if parsed.frontmatter is not None
+        else CommentedMap()
+    )
+    if not new_tags:
+        if "tags" in new_fm:
+            del new_fm["tags"]
+    else:
+        new_fm["tags"] = new_tags
+
+    new_parsed = ParsedNote(
+        frontmatter=(new_fm if new_fm else None),
+        body=parsed.body,
+    )
+    new_content = render_note(new_parsed)
+
+    # Hooks run on the post-write state.
+    if hooks is not None:
+        try:
+            run_validation_hooks(
+                hooks,
+                HookContext(
+                    path=vp,
+                    new_frontmatter=(
+                        None if not new_fm else to_plain_dict(dict(new_fm))
+                    ),
+                    new_body=parsed.body,
+                    operation="manage_tags",
+                ),
+            )
+        except Exception as exc:
+            return map_exception(exc)
+
+    if dry_run:
+        audit_id = emit_audit(
+            audit,
+            request_id=request_id,
+            tool="manage_tags",
+            op_kind="write",
+            vault_path=str(vp.relative),
+            outcome="success",
+            started=started,
+            params_hash=params_hash_value,
+            dry_run=True,
+        )
+        return ToolResult(
+            ok=True,
+            data={
+                "path": str(vp.relative),
+                "request_id": request_id,
+                "op": op,
+                "tags": new_tags,
+                "added": added,
+                "removed": removed,
+                "new_content": new_content,
+            },
+            dry_run=True,
+            audit_id=audit_id,
+        )
+
+    from obsidian_hardened_mcp.fs.writer import atomic_write_text
+
+    try:
+        atomic_write_text(vp, new_content)
+    except Exception as exc:
+        return map_exception(exc)
+
+    audit_id = emit_audit(
+        audit,
+        request_id=request_id,
+        tool="manage_tags",
+        op_kind="write",
+        vault_path=str(vp.relative),
+        outcome="success",
+        started=started,
+        params_hash=params_hash_value,
+        dry_run=False,
+    )
+    return ToolResult(
+        ok=True,
+        data={
+            "path": str(vp.relative),
+            "request_id": request_id,
+            "op": op,
+            "tags": new_tags,
+            "added": added,
+            "removed": removed,
+        },
+        audit_id=audit_id,
+    )
 
 
 # ---------------------------------------------------------------------------

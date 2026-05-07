@@ -163,6 +163,82 @@ class TestManageTags:
         assert result.error is not None
         assert result.error.code is ErrorCode.MALFORMED_FRONTMATTER
 
+    def test_add_to_empty_creates_tags_key(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        result = manage_tags(
+            config, audit, "01_Notes/sample.md", "add", ["wip"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == ["wip"]
+        assert result.data["added"] == ["wip"]
+        assert result.data["removed"] == []
+        assert result.data["op"] == "add"
+
+    def test_add_dedupe_silent(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        (tmp_vault / "01_Notes" / "tagged.md").write_text(
+            "---\ntags:\n  - a\n---\nbody\n"
+        )
+        result = manage_tags(
+            config, audit, "01_Notes/tagged.md", "add", ["a", "b"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == ["a", "b"]
+        assert result.data["added"] == ["b"]
+        assert result.data["removed"] == []
+
+    def test_add_preserves_existing_order_then_new(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        (tmp_vault / "01_Notes" / "tagged.md").write_text(
+            "---\ntags:\n  - z\n  - a\n---\nbody\n"
+        )
+        result = manage_tags(
+            config, audit, "01_Notes/tagged.md", "add", ["m", "b"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == ["z", "a", "m", "b"]
+
+    def test_add_hash_prefix_stripped(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        result = manage_tags(
+            config, audit, "01_Notes/sample.md", "add", ["#wip"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == ["wip"]
+
+    def test_add_no_change_when_all_already_present(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        path = tmp_vault / "01_Notes" / "tagged.md"
+        path.write_text("---\ntags:\n  - a\n  - b\n---\nbody\n")
+        mtime_before = path.stat().st_mtime_ns
+        result = manage_tags(
+            config, audit, "01_Notes/tagged.md", "add", ["a", "b"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == ["a", "b"]
+        assert result.data["added"] == []
+        assert path.stat().st_mtime_ns == mtime_before
+
 
 @pytest.fixture
 def config(tmp_vault: Path) -> AppConfig:
