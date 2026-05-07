@@ -70,6 +70,48 @@ iteration once exceeded; remaining entries are marked
 `BATCH_TOO_LARGE`. No audit emission (per CLAUDE.md invariant #4 —
 write/destructive only).
 
+### Frontmatter operations
+
+#### `get_frontmatter`
+
+Parse and return the YAML frontmatter of a note as a structured object,
+preserving the original file's YAML formatting (comments, key order,
+quote styles). Rejects unsafe YAML constructs (custom tags, Python
+objects). The frontmatter block is optional; returns `{}` if absent.
+
+#### `set_frontmatter_field`
+
+Atomically set or update a single YAML field in a note's frontmatter.
+The rest of the file (including formatting, comments, and other keys)
+is preserved exactly. If the frontmatter block does not exist, one is
+created. Emits an audit event on success.
+
+#### `delete_frontmatter_field`
+
+Atomically remove a single YAML field from a note's frontmatter. If the
+field does not exist, this is a silent no-op. If the frontmatter block
+becomes empty after deletion, the entire block is removed from the file.
+Emits an audit event on success.
+
+#### `merge_frontmatter_field`
+
+Atomically merge a value (typically a dict or list) into a single YAML
+field. If the field does not exist, it is created. For objects, keys are
+merged with shallow union semantics; for lists, values are concatenated.
+Other types (scalars) are replaced. Emits an audit event on success.
+
+#### `manage_tags`
+
+Dedicated tag primitive for the `tags:` frontmatter field. Supports
+four ops: `add` (idempotent), `remove` (silent no-op for absent tags),
+`replace` (wholesale set, `[]` clears), and `list` (read-only, no
+audit). Input tags are normalised: leading `#` stripped, whitespace
+trimmed, validated against `^[A-Za-z0-9_./-]+$`, no leading/trailing
+`/`. When the resulting list is empty (after `remove` or
+`replace=[]`), the `tags:` key is removed from the frontmatter
+entirely. Reuses `_mutate_frontmatter`'s parse/render/atomic-write
+machinery for round-trip preservation.
+
 ## Tool result shape
 
 Every tool returns `ToolResult`:

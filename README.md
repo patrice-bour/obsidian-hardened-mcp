@@ -105,11 +105,11 @@ This server is built around four design choices:
 
 ## What it can do
 
-The server exposes 19 tools to your AI client, grouped by capability:
+The server exposes 20 tools to your AI client, grouped by capability:
 
 - **Read.** Fetch the full text of a note, list notes under a folder, read multiple notes in one call with partial-success semantics, parse the frontmatter as a structured object, search by literal query across body and metadata, resolve `[[wikilinks]]` to file paths.
 - **Write.** Create a new note (refuses to clobber an existing one), rewrite a note's content, append text, or do a literal find-and-replace with an explicit count guard.
-- **Edit frontmatter atomically.** Set, delete, or merge a single YAML field without touching the rest of the file. Comments, ordering, and quote styles are preserved exactly.
+- **Edit frontmatter atomically.** Set, delete, or merge a single YAML field without touching the rest of the file. Comments, ordering, and quote styles are preserved exactly. Dedicated tag management tool (`manage_tags`) handles add/remove/replace/list operations with idempotent semantics and `#`-prefix tolerance.
 - **Delete, rename, move — safely.** Two-step protocol with cryptographic confirmation tokens (see [Two-phase confirmation](#two-phase-confirmation) below). A snapshot lands in `.ohmcp-trash/` before the change. Optional best-effort wikilink rewriting keeps `[[Old Name]]` references current.
 - **Validate writes against your conventions.** Optionally drop a `<vault>/.obsidian-hardened-mcp.yaml` to declare validation hooks: every write must pass them or it's rejected. Built-ins: `iso_date`, `reserved_tags`, `json_schema`. See [docs/config-reference.md](./docs/config-reference.md).
 - **Trigger Obsidian commands** (optional). When the [Obsidian Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin is running and you set `OBSIDIAN_REST_TOKEN`, the server can invoke any Obsidian command.

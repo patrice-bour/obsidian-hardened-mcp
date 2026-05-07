@@ -1275,7 +1275,7 @@ Also include the plan file with all 6 of Task 8's checkboxes ticked.
 - Modify: `docs/architecture.md`
 - Modify: `CHANGELOG.md`
 
-- [ ] **Step 1: README — bump tool count + add tool description**
+- [x] **Step 1: README — bump tool count + add tool description**
 
 Open `README.md`. The line that says "**19 tools**" (in the section titled something like "What it can do") needs to become "**20 tools**".
 
@@ -1287,7 +1287,7 @@ If there's a tools listing or capability summary nearby, add a short line for `m
 
 If the README only has prose (no table), insert a sentence in the most natural paragraph.
 
-- [ ] **Step 2: docs/architecture.md — add tag-ops subsection**
+- [x] **Step 2: docs/architecture.md — add tag-ops subsection**
 
 Open `docs/architecture.md`. Find the "Tools" section and the "Frontmatter operations" or similar subsection. Append:
 
@@ -1307,7 +1307,7 @@ machinery for round-trip preservation.
 
 If the existing section uses a different heading style (e.g., `####` instead of `###`), adapt.
 
-- [ ] **Step 3: CHANGELOG**
+- [x] **Step 3: CHANGELOG**
 
 In `CHANGELOG.md`, under `[Unreleased]` `### Added`, append:
 
@@ -1321,12 +1321,12 @@ In `CHANGELOG.md`, under `[Unreleased]` `### Added`, append:
 
 If `[Unreleased]` does not exist (it should, from v0.3 #1), check that `[0.3.0]` exists or create one.
 
-- [ ] **Step 4: Sanity**
+- [x] **Step 4: Sanity**
 
 Run: `uv run pytest -q`
 Expected: 612 PASS still (docs don't affect tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add README.md docs/architecture.md CHANGELOG.md
