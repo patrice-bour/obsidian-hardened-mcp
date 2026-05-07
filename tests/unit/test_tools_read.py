@@ -8,7 +8,7 @@ import pytest
 
 from obsidian_hardened_mcp.config import AppConfig
 from obsidian_hardened_mcp.domain.results import ErrorCode
-from obsidian_hardened_mcp.tools.read import list_notes, read_note
+from obsidian_hardened_mcp.tools.read import list_notes, read_multiple_notes, read_note
 
 
 @pytest.fixture
@@ -134,8 +134,6 @@ class TestListNotes:
 
 class TestReadMultipleNotes:
     def test_empty_paths_rejected(self, config: AppConfig) -> None:
-        from obsidian_hardened_mcp.tools.read import read_multiple_notes
-
         result = read_multiple_notes(config, [])
         assert not result.ok
         assert result.error is not None
@@ -143,8 +141,6 @@ class TestReadMultipleNotes:
         assert "empty" in result.error.message.lower()
 
     def test_too_many_paths_rejected(self, config: AppConfig) -> None:
-        from obsidian_hardened_mcp.tools.read import read_multiple_notes
-
         # max_batch defaults to 500; pass 501 paths.
         paths = [f"01_Notes/{i}.md" for i in range(config.max_batch + 1)]
         result = read_multiple_notes(config, paths)
