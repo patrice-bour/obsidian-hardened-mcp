@@ -130,3 +130,25 @@ class TestListNotes:
         assert result.ok
         assert result.data is not None
         assert result.data["limit"] == config.max_batch
+
+
+class TestReadMultipleNotes:
+    def test_empty_paths_rejected(self, config: AppConfig) -> None:
+        from obsidian_hardened_mcp.tools.read import read_multiple_notes
+
+        result = read_multiple_notes(config, [])
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.INVALID_PATH
+        assert "empty" in result.error.message.lower()
+
+    def test_too_many_paths_rejected(self, config: AppConfig) -> None:
+        from obsidian_hardened_mcp.tools.read import read_multiple_notes
+
+        # max_batch defaults to 500; pass 501 paths.
+        paths = [f"01_Notes/{i}.md" for i in range(config.max_batch + 1)]
+        result = read_multiple_notes(config, paths)
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.BATCH_TOO_LARGE
+        assert str(config.max_batch) in result.error.message

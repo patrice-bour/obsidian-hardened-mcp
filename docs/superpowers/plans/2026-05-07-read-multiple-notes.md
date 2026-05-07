@@ -165,7 +165,7 @@ exhaustion."
 - Modify: `src/obsidian_hardened_mcp/tools/read.py`
 - Modify: `tests/unit/test_tools_read.py`
 
-- [ ] **Step 1: Write the failing input-validation tests**
+- [x] **Step 1: Write the failing input-validation tests**
 
 At the bottom of `tests/unit/test_tools_read.py`, add:
 
@@ -192,12 +192,12 @@ class TestReadMultipleNotes:
         assert str(config.max_batch) in result.error.message
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `uv run pytest tests/unit/test_tools_read.py::TestReadMultipleNotes -v`
 Expected: 2 FAIL with `ImportError: cannot import name 'read_multiple_notes'`.
 
-- [ ] **Step 3: Add the tool skeleton**
+- [x] **Step 3: Add the tool skeleton**
 
 In `src/obsidian_hardened_mcp/tools/read.py`, append after `list_notes`:
 
@@ -227,12 +227,12 @@ def read_multiple_notes(config: AppConfig, paths: list[str]) -> ToolResult:
     )
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run pytest tests/unit/test_tools_read.py::TestReadMultipleNotes -v`
 Expected: 2 PASS.
 
-- [ ] **Step 5: Lint, type-check, full-suite sanity**
+- [x] **Step 5: Lint, type-check, full-suite sanity**
 
 Run:
 ```bash
@@ -243,7 +243,7 @@ uv run pytest -q
 
 Expected: all clean, 564 PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/obsidian_hardened_mcp/tools/read.py tests/unit/test_tools_read.py
