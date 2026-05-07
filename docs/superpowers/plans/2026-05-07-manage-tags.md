@@ -218,7 +218,7 @@ Also include the plan file with all 7 of Task 2's checkboxes ticked.
 
 The skeleton handles input validation (op + tags shape), reads the existing tags, and dispatches `op="list"` immediately. Other ops raise NotImplementedError for now.
 
-- [ ] **Step 1: Write failing skeleton tests**
+- [x] **Step 1: Write failing skeleton tests**
 
 Add to `tests/unit/test_tools_frontmatter.py` after `TestNormalizeTag`:
 
@@ -332,12 +332,12 @@ Add the imports needed at the top of the test file if not already there:
 from obsidian_hardened_mcp.security.audit_logger import AuditLogger
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `uv run pytest tests/unit/test_tools_frontmatter.py::TestManageTags -v`
 Expected: 8 FAIL with `ImportError: cannot import name 'manage_tags'`.
 
-- [ ] **Step 3: Implement skeleton + list op**
+- [x] **Step 3: Implement skeleton + list op**
 
 In `src/obsidian_hardened_mcp/tools/frontmatter.py`, near the existing top-level `@tool_call`-decorated functions, add (after `merge_frontmatter` is a good slot):
 
@@ -456,12 +456,12 @@ def _extract_existing_tags(fm: CommentedMap | None) -> list[str]:
     return list(raw)
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `uv run pytest tests/unit/test_tools_frontmatter.py::TestManageTags -v`
 Expected: 8 PASS.
 
-- [ ] **Step 5: Lint + mypy + full suite**
+- [x] **Step 5: Lint + mypy + full suite**
 
 Run:
 ```bash
@@ -472,7 +472,7 @@ uv run pytest -q
 
 Expected: clean. **597 passed** (589 + 8 new).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/obsidian_hardened_mcp/tools/frontmatter.py tests/unit/test_tools_frontmatter.py

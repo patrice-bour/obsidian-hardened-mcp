@@ -8,6 +8,7 @@ import pytest
 
 from obsidian_hardened_mcp.config import AppConfig
 from obsidian_hardened_mcp.domain.results import ErrorCode
+from obsidian_hardened_mcp.security.audit_logger import AuditLogger
 from obsidian_hardened_mcp.tools.frontmatter import get_frontmatter
 
 
@@ -62,6 +63,105 @@ class TestNormalizeTag:
         for bad in ("/wip", "wip/", "/wip/"):
             with pytest.raises(_InvalidTagError):
                 _normalize_tag(bad)
+
+
+class TestManageTags:
+    @pytest.fixture
+    def config(self, tmp_vault: Path) -> AppConfig:
+        return AppConfig(vault_root=tmp_vault)
+
+    @pytest.fixture
+    def audit(self, tmp_path: Path) -> AuditLogger:
+        return AuditLogger(tmp_path / "audit")
+
+    def test_add_with_empty_tags_rejected(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        result = manage_tags(config, audit, "01_Notes/sample.md", "add", [])
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.INVALID_TAG
+
+    def test_add_with_none_tags_rejected(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        result = manage_tags(config, audit, "01_Notes/sample.md", "add", None)
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.INVALID_TAG
+
+    def test_remove_with_empty_tags_rejected(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        result = manage_tags(config, audit, "01_Notes/sample.md", "remove", [])
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.INVALID_TAG
+
+    def test_invalid_tag_chars_rejected(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        result = manage_tags(
+            config, audit, "01_Notes/sample.md", "add", ["a b"]
+        )
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.INVALID_TAG
+
+    def test_list_empty_when_no_tags_key(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        result = manage_tags(config, audit, "01_Notes/sample.md", "list")
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == []
+        assert result.data["path"] == "01_Notes/sample.md"
+
+    def test_list_returns_existing_tags(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        (tmp_vault / "01_Notes" / "tagged.md").write_text(
+            "---\ntags:\n  - wip\n  - draft\n---\nbody\n"
+        )
+        result = manage_tags(config, audit, "01_Notes/tagged.md", "list")
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == ["wip", "draft"]
+
+    def test_list_emits_no_audit(
+        self, config: AppConfig, tmp_path: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        audit_dir = tmp_path / "audit"
+        logger = AuditLogger(audit_dir)
+        _ = manage_tags(config, logger, "01_Notes/sample.md", "list")
+        assert (not audit_dir.exists()) or not list(audit_dir.glob("*.jsonl"))
+
+    def test_list_rejects_non_list_tags(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        (tmp_vault / "01_Notes" / "csv.md").write_text(
+            "---\ntags: a, b, c\n---\nbody\n"
+        )
+        result = manage_tags(config, audit, "01_Notes/csv.md", "list")
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.MALFORMED_FRONTMATTER
 
 
 @pytest.fixture

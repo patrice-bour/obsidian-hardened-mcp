@@ -23,7 +23,7 @@ import copy
 import datetime as dt
 import re
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import Any, Literal
 
 from ruamel.yaml.comments import CommentedMap
@@ -176,6 +176,77 @@ def merge_frontmatter(
         hooks=hooks,
         mutator=lambda fm: _merge(fm, patch, mode),
     )
+
+
+TagOp = Literal["add", "remove", "replace", "list"]
+
+
+@tool_call
+def manage_tags(
+    config: AppConfig,
+    audit: AuditLogger,
+    path: str,
+    op: TagOp,
+    tags: list[str] | None = None,
+    *,
+    hooks: HookRegistry | None = None,
+    dry_run: bool = False,
+) -> ToolResult:
+    """Add, remove, replace, or list tags in a note's YAML frontmatter.
+
+    `op="add"`: idempotent — duplicates dropped silently.
+    `op="remove"`: silent no-op for tags that aren't present; if the
+      result is empty, the `tags:` key is removed from the frontmatter.
+    `op="replace"`: wholesale set; pass `tags=[]` to clear.
+    `op="list"`: read-only, no audit emission.
+
+    Input tags are normalised: leading '#' stripped, whitespace trimmed,
+    validated against `^[A-Za-z0-9_./-]+$` with no leading/trailing '/'.
+    """
+    if op in ("add", "remove") and (tags is None or not tags):
+        return ToolResult.failure(
+            ErrorCode.INVALID_TAG,
+            f"op={op!r} requires non-empty tags",
+        )
+
+    if tags is None:
+        normalized: list[str] = []
+    else:
+        try:
+            normalized = _dedupe_in_order(_normalize_tag(t) for t in tags)  # noqa: F841
+        except _InvalidTagError as exc:
+            return ToolResult.failure(ErrorCode.INVALID_TAG, str(exc))
+
+    started = time.monotonic()  # noqa: F841
+    request_id = new_request_id()  # noqa: F841
+
+    try:
+        vp = VaultPath.from_user(path, config.vault_root)
+    except Exception as exc:
+        return map_exception(exc)
+    if not vp.absolute.exists():
+        return ToolResult.failure(
+            ErrorCode.NOT_FOUND, f"file not found: {vp.relative}"
+        )
+
+    try:
+        existing_text = read_text(vp, max_size_bytes=config.max_file_size_bytes)
+        parsed = parse_note(existing_text)
+        existing_tags = _extract_existing_tags(parsed.frontmatter)
+    except _MalformedTagsFieldError as exc:
+        return ToolResult.failure(ErrorCode.MALFORMED_FRONTMATTER, str(exc))
+    except Exception as exc:
+        return map_exception(exc)
+
+    if op == "list":
+        return ToolResult.success(
+            data={
+                "path": str(vp.relative),
+                "tags": list(existing_tags),
+            }
+        )
+
+    raise NotImplementedError(f"op={op!r} not yet implemented")
 
 
 # ---------------------------------------------------------------------------
@@ -348,6 +419,42 @@ def _delete_field(fm: CommentedMap | None, key: str) -> CommentedMap:
         raise _FieldNotFoundError(f"field {key!r} not found")
     del fm[key]
     return fm
+
+
+def _dedupe_in_order(items: Iterable[str]) -> list[str]:
+    """Iterate over `items`, returning a new list with duplicates removed,
+    preserving first-occurrence order."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in items:
+        if item not in seen:
+            seen.add(item)
+            out.append(item)
+    return out
+
+
+class _MalformedTagsFieldError(ValueError):
+    """Raised when an existing 'tags:' field is not a list of strings."""
+
+
+def _extract_existing_tags(fm: CommentedMap | None) -> list[str]:
+    """Return existing tags as a `list[str]`, or `[]` if absent.
+
+    Raises `_MalformedTagsFieldError` if `tags:` exists but is not a list
+    of strings.
+    """
+    if fm is None or "tags" not in fm:
+        return []
+    raw = fm["tags"]
+    if not isinstance(raw, list):
+        raise _MalformedTagsFieldError(
+            "existing 'tags:' field is not a list of strings"
+        )
+    if not all(isinstance(t, str) for t in raw):
+        raise _MalformedTagsFieldError(
+            "existing 'tags:' field is not a list of strings"
+        )
+    return list(raw)
 
 
 def _merge(
