@@ -14,7 +14,7 @@ from obsidian_hardened_mcp.domain.results import ErrorCode, ToolResult
 from obsidian_hardened_mcp.domain.vault_path import VaultPath
 from obsidian_hardened_mcp.fs.listing import iter_markdown
 from obsidian_hardened_mcp.fs.reader import read_text
-from obsidian_hardened_mcp.tools._base import tool_call
+from obsidian_hardened_mcp.tools._base import map_exception, tool_call
 
 
 @tool_call
@@ -86,7 +86,55 @@ def read_multiple_notes(config: AppConfig, paths: list[str]) -> ToolResult:
             f"{len(paths)} paths exceeds max_batch={config.max_batch}",
         )
 
-    # Iteration body lands in Task 4.
+    results: list[dict[str, Any]] = []
+    cumulative_bytes = 0
+    stopped_early = False
+    cap_hit_at: int | None = None
+
+    for i, raw_path in enumerate(paths):
+        if cap_hit_at is not None:
+            results.append(
+                {
+                    "path": raw_path,
+                    "error": {
+                        "code": ErrorCode.BATCH_TOO_LARGE.value,
+                        "message": (
+                            f"cumulative size cap reached after index {cap_hit_at}"
+                        ),
+                    },
+                }
+            )
+            continue
+
+        try:
+            vp = VaultPath.from_user(raw_path, config.vault_root)
+            content = read_text(vp, max_size_bytes=config.max_file_size_bytes)
+        except Exception as exc:
+            err = map_exception(exc)
+            assert err.error is not None
+            results.append(
+                {
+                    "path": raw_path,
+                    "error": {
+                        "code": err.error.code.value,
+                        "message": err.error.message,
+                    },
+                }
+            )
+            continue
+
+        size = len(content.encode("utf-8"))
+        results.append({"path": raw_path, "content": content, "size": size})
+        cumulative_bytes += size
+
+        if cumulative_bytes > config.max_batch_bytes:
+            cap_hit_at = i
+            stopped_early = True
+
     return ToolResult.success(
-        data={"results": [], "cumulative_bytes": 0, "stopped_early": False}
+        data={
+            "results": results,
+            "cumulative_bytes": cumulative_bytes,
+            "stopped_early": stopped_early,
+        }
     )

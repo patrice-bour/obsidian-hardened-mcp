@@ -262,7 +262,7 @@ next commit."
 - Modify: `src/obsidian_hardened_mcp/tools/read.py`
 - Modify: `tests/unit/test_tools_read.py`
 
-- [ ] **Step 1: Write the failing happy-path tests**
+- [x] **Step 1: Write the failing happy-path tests**
 
 Add to `TestReadMultipleNotes`:
 
@@ -294,12 +294,12 @@ Add to `TestReadMultipleNotes`:
         assert all("content" in r for r in results)
 ```
 
-- [ ] **Step 2: Run the new tests to verify they fail**
+- [x] **Step 2: Run the new tests to verify they fail**
 
 Run: `uv run pytest tests/unit/test_tools_read.py::TestReadMultipleNotes -v`
 Expected: 2 new tests FAIL (assertion errors — current skeleton returns empty `results`).
 
-- [ ] **Step 3: Implement the iteration body**
+- [x] **Step 3: Implement the iteration body**
 
 Replace the `return ToolResult.success(...)` line in `read_multiple_notes` (added in Task 3) with the full iteration:
 
@@ -364,12 +364,12 @@ Make sure `map_exception` is imported at the top of the file by adjusting the im
 from obsidian_hardened_mcp.tools._base import map_exception, tool_call
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run pytest tests/unit/test_tools_read.py::TestReadMultipleNotes -v`
 Expected: 4 PASS.
 
-- [ ] **Step 5: Lint and type-check**
+- [x] **Step 5: Lint and type-check**
 
 Run:
 ```bash
@@ -379,7 +379,7 @@ uv run mypy src
 
 Expected: clean.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/obsidian_hardened_mcp/tools/read.py tests/unit/test_tools_read.py

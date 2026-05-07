@@ -148,3 +148,25 @@ class TestReadMultipleNotes:
         assert result.error is not None
         assert result.error.code is ErrorCode.BATCH_TOO_LARGE
         assert str(config.max_batch) in result.error.message
+
+    def test_single_success(self, config: AppConfig) -> None:
+        result = read_multiple_notes(config, ["01_Notes/sample.md"])
+        assert result.ok
+        assert result.data is not None
+        results = result.data["results"]
+        assert len(results) == 1
+        assert results[0]["path"] == "01_Notes/sample.md"
+        assert results[0]["content"] == "# Sample\n"
+        assert results[0]["size"] == 9
+        assert "error" not in results[0]
+        assert result.data["cumulative_bytes"] == 9
+        assert result.data["stopped_early"] is False
+
+    def test_all_succeed_preserves_order(self, config: AppConfig) -> None:
+        paths = ["01_Notes/sample.md", "_VAULT.md", "00_Journal/2026-05-04.md"]
+        result = read_multiple_notes(config, paths)
+        assert result.ok
+        assert result.data is not None
+        results = result.data["results"]
+        assert [r["path"] for r in results] == paths
+        assert all("content" in r for r in results)
