@@ -114,6 +114,14 @@ def list_tools_capabilities(config: AppConfig) -> ToolResult:
             "kind": "write",
             "description": "Shallow or deep merge of a patch dict into the frontmatter.",
         },
+        {
+            "name": "manage_tags",
+            "kind": "write",
+            "description": (
+                "Add, remove, replace, or list tags in a note's frontmatter. "
+                "Idempotent semantics; cleanup-on-empty; '#'-prefix tolerance."
+            ),
+        },
         # Destructive (2-phase HMAC confirm)
         {
             "name": "delete_note",

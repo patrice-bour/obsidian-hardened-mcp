@@ -1128,7 +1128,7 @@ Also include the plan file with all 5 of Task 7's checkboxes ticked.
 - Modify: `src/obsidian_hardened_mcp/tools/meta.py`
 - Modify: `tests/e2e/scenarios/s3_frontmatter.py`
 
-- [ ] **Step 1: Wire the tool into the MCP server**
+- [x] **Step 1: Wire the tool into the MCP server**
 
 In `src/obsidian_hardened_mcp/server.py`, update the existing imports from `tools.frontmatter` to include `manage_tags`:
 
@@ -1182,11 +1182,11 @@ Then add the registration block right after the `merge_frontmatter` block:
 
 The `# type: ignore[arg-type]` is because MCP can't easily narrow `str` to `Literal["add","remove","replace","list"]`; the inner function will reject unknown ops via the existing fallthrough.
 
-- [ ] **Step 2: Update `meta.py` capabilities manifest**
+- [x] **Step 2: Update `meta.py` capabilities manifest**
 
 In `src/obsidian_hardened_mcp/tools/meta.py`, find the list of known tools (similar to what was added for `read_multiple_notes` in v0.3 #1) and add an entry for `manage_tags`. The exact dict shape depends on the file; mirror what was added for `read_multiple_notes` in commit `5a3cfc0`. Read the file first to see the format.
 
-- [ ] **Step 3: Sanity-check unit + S0 smoke**
+- [x] **Step 3: Sanity-check unit + S0 smoke**
 
 Run: `uv run pytest -q`
 Expected: 612 PASS still.
@@ -1194,7 +1194,7 @@ Expected: 612 PASS still.
 Run: `uv run python tests/e2e/run_e2e.py`
 Expected: All scenarios PASS, with S0 (smoke / capabilities) green. If S0 fails because `manage_tags` is missing from the capabilities manifest, fix `meta.py` and re-run.
 
-- [ ] **Step 4: Add E2E scenarios to `s3_frontmatter.py`**
+- [x] **Step 4: Add E2E scenarios to `s3_frontmatter.py`**
 
 Read `tests/e2e/scenarios/s3_frontmatter.py` first to understand the existing `rep.add(...)` style. Then append two new test groups (or as many `rep.add` calls as needed, matching existing per-scenario style):
 
@@ -1249,12 +1249,12 @@ Read `tests/e2e/scenarios/s3_frontmatter.py` first to understand the existing `r
 
 Note: adapt the path (`"notes/test.md"`) to whatever the seed vault provides — read `tests/e2e/seed_vault.py` to confirm.
 
-- [ ] **Step 5: Run E2E**
+- [x] **Step 5: Run E2E**
 
 Run: `uv run python tests/e2e/run_e2e.py`
 Expected: 109 + 6 = **115 PASS** (or more depending on how the existing scenario file groups; just verify all green).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/obsidian_hardened_mcp/server.py src/obsidian_hardened_mcp/tools/meta.py tests/e2e/scenarios/s3_frontmatter.py

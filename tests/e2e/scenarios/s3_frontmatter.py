@@ -108,6 +108,53 @@ async def run(h: E2EHarness) -> ScenarioReport:
         f"nested.beta lost: {nested_block!r}",
     )
 
+    # --- manage_tags happy path ---
+    # Use org/acme.md which has no pre-existing 'tags:' field.
+    mt_path = "org/acme.md"
+
+    add_result = await h.call(
+        "manage_tags", path=mt_path, op="add", tags=["wip"]
+    )
+    rep.add(
+        "manage_tags add returns ok",
+        add_result.ok is True,
+        f"got {add_result}",
+    )
+    rep.add(
+        "manage_tags add returns expected tags",
+        (add_result.data or {}).get("tags") == ["wip"],
+        f"got tags={(add_result.data or {}).get('tags')!r}",
+    )
+
+    list_result = await h.call(
+        "manage_tags", path=mt_path, op="list"
+    )
+    rep.add(
+        "manage_tags list returns ok",
+        list_result.ok is True,
+        f"got {list_result}",
+    )
+    rep.add(
+        "manage_tags list reflects prior add",
+        (list_result.data or {}).get("tags") == ["wip"],
+        f"got tags={(list_result.data or {}).get('tags')!r}",
+    )
+
+    # --- manage_tags remove drops the 'tags:' key when empty ---
+    remove_result = await h.call(
+        "manage_tags", path=mt_path, op="remove", tags=["wip"]
+    )
+    rep.add(
+        "manage_tags remove returns ok",
+        remove_result.ok is True,
+        f"got {remove_result}",
+    )
+    rep.add(
+        "manage_tags remove leaves empty tags",
+        (remove_result.data or {}).get("tags") == [],
+        f"got tags={(remove_result.data or {}).get('tags')!r}",
+    )
+
     # No manual restore: run_e2e re-seeds the vault at the start of every
     # full run, so leaving frontmatter-rich.md in its post-S3 state is
     # safe. Restoring from a pre-S3 read would risk writing back a
