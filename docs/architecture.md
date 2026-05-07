@@ -109,8 +109,8 @@ audit). Input tags are normalised: leading `#` stripped, whitespace
 trimmed, validated against `^[A-Za-z0-9_./-]+$`, no leading/trailing
 `/`. When the resulting list is empty (after `remove` or
 `replace=[]`), the `tags:` key is removed from the frontmatter
-entirely. Reuses `_mutate_frontmatter`'s parse/render/atomic-write
-machinery for round-trip preservation.
+entirely. Reuses the `parse_note` / `render_note` / `atomic_write_text` primitives
+directly (the same building blocks `_mutate_frontmatter` uses) for round-trip preservation.
 
 ## Tool result shape
 
