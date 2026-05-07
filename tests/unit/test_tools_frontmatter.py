@@ -239,6 +239,74 @@ class TestManageTags:
         assert result.data["added"] == []
         assert path.stat().st_mtime_ns == mtime_before
 
+    def test_remove_existing_tag(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        (tmp_vault / "01_Notes" / "tagged.md").write_text(
+            "---\ntags:\n  - a\n  - b\n  - c\n---\nbody\n"
+        )
+        result = manage_tags(
+            config, audit, "01_Notes/tagged.md", "remove", ["b"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == ["a", "c"]
+        assert result.data["removed"] == ["b"]
+        assert result.data["added"] == []
+
+    def test_remove_absent_tag_silent_noop(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        path = tmp_vault / "01_Notes" / "tagged.md"
+        path.write_text("---\ntags:\n  - a\n---\nbody\n")
+        mtime_before = path.stat().st_mtime_ns
+        result = manage_tags(
+            config, audit, "01_Notes/tagged.md", "remove", ["does-not-exist"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == ["a"]
+        assert result.data["removed"] == []
+        assert path.stat().st_mtime_ns == mtime_before
+
+    def test_remove_all_drops_tags_key(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.frontmatter import parse_note
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        (tmp_vault / "01_Notes" / "tagged.md").write_text(
+            "---\ntags:\n  - a\n  - b\n---\nbody\n"
+        )
+        result = manage_tags(
+            config, audit, "01_Notes/tagged.md", "remove", ["a", "b"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == []
+        assert result.data["removed"] == ["a", "b"]
+
+        text = (tmp_vault / "01_Notes" / "tagged.md").read_text()
+        parsed = parse_note(text)
+        assert parsed.frontmatter is None or "tags" not in parsed.frontmatter
+
+    def test_remove_with_no_tags_key_noop(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        result = manage_tags(
+            config, audit, "01_Notes/sample.md", "remove", ["wip"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == []
+        assert result.data["removed"] == []
+
 
 @pytest.fixture
 def config(tmp_vault: Path) -> AppConfig:

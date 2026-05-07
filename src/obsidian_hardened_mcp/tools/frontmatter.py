@@ -253,7 +253,7 @@ def manage_tags(
             if t not in new_tags:
                 new_tags.append(t)
     elif op == "remove":
-        raise NotImplementedError("op='remove' lands in Task 5")
+        new_tags = [t for t in existing_tags if t not in normalized]
     elif op == "replace":
         raise NotImplementedError("op='replace' lands in Task 6")
     else:  # pragma: no cover - exhaustive Literal
