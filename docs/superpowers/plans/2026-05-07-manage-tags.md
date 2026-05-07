@@ -774,7 +774,7 @@ Also include the plan file with all 6 of Task 4's checkboxes ticked.
 - Modify: `src/obsidian_hardened_mcp/tools/frontmatter.py`
 - Modify: `tests/unit/test_tools_frontmatter.py`
 
-- [ ] **Step 1: Write failing tests for `remove`**
+- [x] **Step 1: Write failing tests for `remove`**
 
 Add to `TestManageTags`:
 
@@ -851,12 +851,12 @@ Add to `TestManageTags`:
         assert result.data["removed"] == []
 ```
 
-- [ ] **Step 2: Run new tests to verify they fail**
+- [x] **Step 2: Run new tests to verify they fail**
 
 Run: `uv run pytest tests/unit/test_tools_frontmatter.py::TestManageTags -k "remove" -v`
 Expected: 4 FAIL — `op='remove'` raises `NotImplementedError`.
 
-- [ ] **Step 3: Implement remove op**
+- [x] **Step 3: Implement remove op**
 
 Find the `elif op == "remove":` branch in `manage_tags` and replace its `raise NotImplementedError(...)` with:
 
@@ -867,17 +867,17 @@ Find the `elif op == "remove":` branch in `manage_tags` and replace its `raise N
 
 The rest of the function (skip-on-no-op check, frontmatter rebuild including the `if not new_tags: del fm["tags"]` branch, hooks, dry_run, write, audit) is already in place from Task 4.
 
-- [ ] **Step 4: Run remove tests**
+- [x] **Step 4: Run remove tests**
 
 Run: `uv run pytest tests/unit/test_tools_frontmatter.py::TestManageTags -k "remove" -v`
 Expected: 4 PASS.
 
-- [ ] **Step 5: Full suite**
+- [x] **Step 5: Full suite**
 
 Run: `uv run pytest -q`
 Expected: **606 passed** (602 + 4 new).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/obsidian_hardened_mcp/tools/frontmatter.py tests/unit/test_tools_frontmatter.py
