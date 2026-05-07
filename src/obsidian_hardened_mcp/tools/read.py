@@ -77,6 +77,9 @@ def read_multiple_notes(config: AppConfig, paths: list[str]) -> ToolResult:
     rather than aborting the call. If cumulative read bytes exceed
     `config.max_batch_bytes`, iteration stops; remaining paths are marked
     `BATCH_TOO_LARGE`.
+
+    Note: `cumulative_bytes` in the response sums only the bytes of
+    *successfully* read entries; per-path errors do not contribute to it.
     """
     if not paths:
         return ToolResult.failure(ErrorCode.INVALID_PATH, "paths cannot be empty")

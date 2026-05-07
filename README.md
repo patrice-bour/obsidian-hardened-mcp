@@ -105,7 +105,7 @@ This server is built around four design choices:
 
 ## What it can do
 
-The server exposes 18 tools to your AI client, grouped by capability:
+The server exposes 19 tools to your AI client, grouped by capability:
 
 - **Read.** Fetch the full text of a note, list notes under a folder, read multiple notes in one call with partial-success semantics, parse the frontmatter as a structured object, search by literal query across body and metadata, resolve `[[wikilinks]]` to file paths.
 - **Write.** Create a new note (refuses to clobber an existing one), rewrite a note's content, append text, or do a literal find-and-replace with an explicit count guard.

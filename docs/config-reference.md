@@ -166,7 +166,7 @@ The server enforces soft limits on batch operations and file sizes:
 
 | Field | Default | Meaning |
 |---|---|---|
-| `max_batch` | `100` | Maximum number of paths in a single `read_multiple_notes` call. Requests with more paths are rejected at the top level. |
+| `max_batch` | `500` | Maximum number of paths in a single `read_multiple_notes` call. Requests with more paths are rejected at the top level. |
 | `max_batch_bytes` | `10 * 1024 * 1024` (10 MB) | Cumulative byte cap for `read_multiple_notes`. Once exceeded after a successful read, iteration stops and remaining paths return `BATCH_TOO_LARGE`. |
 | `max_file_size_mb` | `10` | Maximum size (in MB) of a single note file. Reads larger than this fail with `FILE_TOO_LARGE`. |
 
