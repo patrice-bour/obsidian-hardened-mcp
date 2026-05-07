@@ -574,7 +574,7 @@ total reflects the entry that crossed the line."
 **Files:**
 - Modify: `tests/unit/test_tools_read.py`
 
-- [ ] **Step 1: Write the remaining unit tests**
+- [x] **Step 1: Write the remaining unit tests**
 
 Add to `TestReadMultipleNotes`:
 
@@ -636,12 +636,14 @@ Add to `TestReadMultipleNotes`:
         assert result.data["cumulative_bytes"] == 9 + 13
 ```
 
-- [ ] **Step 2: Run the new tests to verify they pass**
+Note: `test_no_audit_event_emitted` was adapted to use `AuditLogger`'s actual directory-based API (it takes a dir, not a file path). The `@hypothesis.settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])` decorator was added to the property test.
+
+- [x] **Step 2: Run the new tests to verify they pass**
 
 Run: `uv run pytest tests/unit/test_tools_read.py::TestReadMultipleNotes -v`
 Expected: 15 PASS.
 
-- [ ] **Step 3: Add the hypothesis property test**
+- [x] **Step 3: Add the hypothesis property test**
 
 Append at the end of `TestReadMultipleNotes`:
 
@@ -677,12 +679,12 @@ import hypothesis
 from hypothesis import strategies as st
 ```
 
-- [ ] **Step 4: Run the property test**
+- [x] **Step 4: Run the property test**
 
 Run: `uv run pytest tests/unit/test_tools_read.py::TestReadMultipleNotes::test_results_length_equals_input_length -v`
 Expected: PASS (default hypothesis runs ~100 examples).
 
-- [ ] **Step 5: Lint, type-check, full-suite check**
+- [x] **Step 5: Lint, type-check, full-suite check**
 
 Run:
 ```bash
@@ -693,7 +695,7 @@ uv run pytest -q
 
 Expected: 558 + 4 + 16 = 578 PASS, clean lint, clean mypy.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add tests/unit/test_tools_read.py

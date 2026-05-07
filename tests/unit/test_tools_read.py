@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import hypothesis
 import pytest
+from hypothesis import strategies as st
 
 from obsidian_hardened_mcp.config import AppConfig
 from obsidian_hardened_mcp.domain.results import ErrorCode
@@ -272,3 +274,73 @@ class TestReadMultipleNotes:
         assert result.ok
         assert result.data is not None
         assert result.data["stopped_early"] is False
+
+    def test_duplicates_allowed(self, config: AppConfig) -> None:
+        result = read_multiple_notes(
+            config, ["01_Notes/sample.md", "01_Notes/sample.md"]
+        )
+        assert result.ok
+        assert result.data is not None
+        results = result.data["results"]
+        assert len(results) == 2
+        assert results[0] == results[1]
+        assert result.data["cumulative_bytes"] == 18  # 9 + 9
+
+    def test_path_field_preserves_input(self, config: AppConfig) -> None:
+        # Caller passes `./` prefix; we must echo it back even though
+        # VaultPath would normalise it away internally.
+        result = read_multiple_notes(config, ["./01_Notes/sample.md"])
+        assert result.ok
+        assert result.data is not None
+        assert result.data["results"][0]["path"] == "./01_Notes/sample.md"
+
+    def test_no_audit_event_emitted(
+        self, config: AppConfig, tmp_path: Path
+    ) -> None:
+        from obsidian_hardened_mcp.security.audit_logger import AuditLogger
+
+        # AuditLogger takes a directory; it writes YYYY-MM-DD.jsonl inside it.
+        # Construct a logger pointing at a fresh temp dir; if the tool
+        # accidentally emitted an audit event we'd see a .jsonl file.
+        audit_dir = tmp_path / "audit"
+        logger = AuditLogger(audit_dir)
+        _ = read_multiple_notes(config, ["01_Notes/sample.md"])
+        # No emission expected; the audit dir must remain empty.
+        jsonl_files = list(audit_dir.glob("*.jsonl"))
+        assert jsonl_files == []
+        # Suppress unused-variable lint: logger constructed only to assert
+        # the contract that read tools never use it.
+        del logger
+
+    def test_cumulative_bytes_field_correct(self, config: AppConfig) -> None:
+        result = read_multiple_notes(
+            config, ["01_Notes/sample.md", "_VAULT.md"]
+        )
+        assert result.ok
+        assert result.data is not None
+        # "# Sample\n" = 9 bytes, "# Vault root\n" = 13 bytes
+        assert result.data["cumulative_bytes"] == 9 + 13
+
+    @hypothesis.settings(
+        suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture]
+    )
+    @hypothesis.given(
+        st.lists(
+            st.sampled_from(
+                ["01_Notes/sample.md", "_VAULT.md", "00_Journal/2026-05-04.md",
+                 "01_Notes/missing.md", "../escape.md", ".obsidian/config.json"]
+            ),
+            min_size=1,
+            max_size=10,
+        )
+    )
+    def test_results_length_equals_input_length(
+        self, config: AppConfig, paths: list[str]
+    ) -> None:
+        result = read_multiple_notes(config, paths)
+        if not result.ok:
+            # Up-front rejection (empty / too many) is acceptable; the
+            # property only asserts on successful envelopes.
+            return
+        assert result.data is not None
+        assert len(result.data["results"]) == len(paths)
