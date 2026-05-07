@@ -69,7 +69,7 @@ Expected: `558 passed` (or whatever the current baseline is — same number as o
 - Modify: `src/obsidian_hardened_mcp/config.py`
 - Modify: `tests/unit/test_config.py`
 
-- [ ] **Step 1: Write the failing config test**
+- [x] **Step 1: Write the failing config test**
 
 Add to the `TestSizeLimitsValidation` class in `tests/unit/test_config.py`:
 
@@ -91,12 +91,12 @@ Add to the `TestSizeLimitsValidation` class in `tests/unit/test_config.py`:
         assert cfg.max_batch_bytes == 5 * 1024 * 1024
 ```
 
-- [ ] **Step 2: Run config tests to verify they fail**
+- [x] **Step 2: Run config tests to verify they fail**
 
 Run: `uv run pytest tests/unit/test_config.py -k max_batch_bytes -v`
 Expected: 4 tests FAIL with `AttributeError: 'AppConfig' object has no attribute 'max_batch_bytes'` or `ValidationError: extra fields not permitted`.
 
-- [ ] **Step 3: Add the config field and validator**
+- [x] **Step 3: Add the config field and validator**
 
 In `src/obsidian_hardened_mcp/config.py`, near the existing `max_batch` field (around line 88), add:
 
@@ -115,12 +115,12 @@ Then near the existing `_max_batch_positive` validator (around line 112), add:
         return value
 ```
 
-- [ ] **Step 4: Run config tests to verify they pass**
+- [x] **Step 4: Run config tests to verify they pass**
 
 Run: `uv run pytest tests/unit/test_config.py -k max_batch_bytes -v`
 Expected: 4 PASS.
 
-- [ ] **Step 5: Add `BATCH_TOO_LARGE` to ErrorCode**
+- [x] **Step 5: Add `BATCH_TOO_LARGE` to ErrorCode**
 
 In `src/obsidian_hardened_mcp/domain/results.py`, add the new value to `ErrorCode` (between `INVALID_PATH` and `PATH_ESCAPE` — alphabetical-ish; just keep existing order otherwise):
 
@@ -130,12 +130,12 @@ In `src/obsidian_hardened_mcp/domain/results.py`, add the new value to `ErrorCod
 
 Place it after `INVALID_PATH` to keep input-validation codes grouped.
 
-- [ ] **Step 6: Run all tests as a sanity check**
+- [x] **Step 6: Run all tests as a sanity check**
 
 Run: `uv run pytest -q`
 Expected: 558 + 4 = 562 PASS, 0 FAIL.
 
-- [ ] **Step 7: Lint and type-check**
+- [x] **Step 7: Lint and type-check**
 
 Run:
 ```bash
@@ -145,7 +145,7 @@ uv run mypy src
 
 Expected: clean.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/obsidian_hardened_mcp/domain/results.py src/obsidian_hardened_mcp/config.py tests/unit/test_config.py

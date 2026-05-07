@@ -18,6 +18,7 @@ DEFAULT_SECRET_FILE = Path.home() / ".obsidian-hardened-mcp" / "secret"
 DEFAULT_CONFIG_FILE_NAME = ".obsidian-hardened-mcp.yaml"
 DEFAULT_MAX_FILE_SIZE_MB = 10
 DEFAULT_MAX_BATCH = 500
+DEFAULT_MAX_BATCH_BYTES = 10 * 1024 * 1024
 DEFAULT_REST_URL = "https://127.0.0.1:27124"
 
 
@@ -86,6 +87,7 @@ class AppConfig(BaseModel):
     config_file_name: str = DEFAULT_CONFIG_FILE_NAME
     max_file_size_mb: int = DEFAULT_MAX_FILE_SIZE_MB
     max_batch: int = DEFAULT_MAX_BATCH
+    max_batch_bytes: int = DEFAULT_MAX_BATCH_BYTES
     rest_url: str = DEFAULT_REST_URL
     rest_token: str | None = None
     trash_policy: TrashPolicy = Field(default_factory=TrashPolicy)
@@ -114,6 +116,13 @@ class AppConfig(BaseModel):
     def _max_batch_positive(cls, value: int) -> int:
         if value <= 0:
             raise ValueError("max_batch must be positive")
+        return value
+
+    @field_validator("max_batch_bytes")
+    @classmethod
+    def _max_batch_bytes_positive(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("max_batch_bytes must be positive")
         return value
 
     @field_validator("rest_url")

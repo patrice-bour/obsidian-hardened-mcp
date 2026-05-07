@@ -18,6 +18,7 @@ class ErrorCode(StrEnum):
     """Stable, machine-readable error codes for MCP clients."""
 
     INVALID_PATH = "invalid_path"
+    BATCH_TOO_LARGE = "batch_too_large"
     PATH_ESCAPE = "path_escape"
     SYMLINK_ESCAPE = "symlink_escape"
     FORBIDDEN_ZONE = "forbidden_zone"
