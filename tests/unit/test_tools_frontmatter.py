@@ -64,6 +64,30 @@ class TestNormalizeTag:
             with pytest.raises(_InvalidTagError):
                 _normalize_tag(bad)
 
+    def test_rejects_too_long(self) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import (
+            _InvalidTagError,
+            _normalize_tag,
+        )
+
+        with pytest.raises(_InvalidTagError):
+            _normalize_tag("a" * 257)
+
+    def test_accepts_at_max_length(self) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import _normalize_tag
+
+        # 256 chars is the max; should pass.
+        assert _normalize_tag("a" * 256) == "a" * 256
+
+    def test_rejects_double_slash(self) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import (
+            _InvalidTagError,
+            _normalize_tag,
+        )
+
+        with pytest.raises(_InvalidTagError):
+            _normalize_tag("a//b")
+
 
 class TestManageTags:
     @pytest.fixture
@@ -426,6 +450,100 @@ class TestManageTags:
                 return HookResult.reject("rejected by test hook")
 
         hooks = HookRegistry([_RejectAlways()])
+        result = manage_tags(
+            config, audit, "01_Notes/sample.md", "add", ["wip"], hooks=hooks
+        )
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.VALIDATION_FAILED
+
+    def test_too_many_tags_rejected(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        # 513 unique tags > _MAX_TAG_COUNT=512
+        big = [f"tag{i}" for i in range(513)]
+        result = manage_tags(
+            config, audit, "01_Notes/sample.md", "add", big
+        )
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.INVALID_TAG
+
+    def test_path_escape_rejected(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        result = manage_tags(
+            config, audit, "../escape.md", "list"
+        )
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.PATH_ESCAPE
+
+    def test_replace_with_none_tags_treated_as_clear(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        """Document that replace(tags=None) is equivalent to replace([])."""
+        from obsidian_hardened_mcp.frontmatter import parse_note
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        (tmp_vault / "01_Notes" / "tagged.md").write_text(
+            "---\ntags:\n  - a\n---\nbody\n"
+        )
+        result = manage_tags(
+            config, audit, "01_Notes/tagged.md", "replace", None
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == []
+        assert result.data["removed"] == ["a"]
+
+        text = (tmp_vault / "01_Notes" / "tagged.md").read_text()
+        parsed = parse_note(text)
+        assert parsed.frontmatter is None or "tags" not in parsed.frontmatter
+
+    def test_unknown_op_rejected(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        """Sentinel for the unknown-op else branch — server boundary
+        passes op as str (with type: ignore), so unknown values can reach
+        manage_tags. Must return INVALID_TAG, not crash."""
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        # Cast to bypass mypy Literal narrowing
+        result = manage_tags(
+            config, audit, "01_Notes/sample.md", "LIST",  # type: ignore[arg-type]
+            None,
+        )
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.INVALID_TAG
+
+    def test_hook_generic_exception_propagates(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        """A hook that raises a generic exception must not crash manage_tags.
+        HookRegistry.run() converts any exception from validate() into a
+        HookReport rejection, which raise_for_rejection() turns into
+        HookViolationError, which map_exception maps to VALIDATION_FAILED."""
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+        from obsidian_hardened_mcp.validation.hooks import (
+            HookContext,
+            HookRegistry,
+            HookResult,
+        )
+
+        class _ErrorAlways:
+            name = "error-always"
+            phase = "pre_write"
+
+            def validate(self, ctx: HookContext) -> HookResult:
+                raise ValueError("boom")
+
+        hooks = HookRegistry([_ErrorAlways()])
         result = manage_tags(
             config, audit, "01_Notes/sample.md", "add", ["wip"], hooks=hooks
         )

@@ -27,7 +27,7 @@ src/obsidian_hardened_mcp/
     ├── _base.py           # @tool_call decorator + exception → ErrorCode mapping
     ├── read.py            # read_note, list_notes
     ├── meta.py            # get_vault_info, list_tools_capabilities
-    ├── frontmatter.py     # get_frontmatter (M2); set/delete/merge_frontmatter_field (M3)
+    ├── frontmatter.py     # get_frontmatter (M2); set/delete/merge_frontmatter_field (M3); manage_tags (v0.3.0)
     ├── write.py           # create_note, update_note, append_to_note, patch_note (M3)
     └── destructive.py     # delete_note, rename_note, move_note (M6)
 ```
@@ -93,12 +93,12 @@ field does not exist, this is a silent no-op. If the frontmatter block
 becomes empty after deletion, the entire block is removed from the file.
 Emits an audit event on success.
 
-#### `merge_frontmatter_field`
+#### `merge_frontmatter`
 
 Atomically merge a value (typically a dict or list) into a single YAML
 field. If the field does not exist, it is created. For objects, keys are
-merged with shallow union semantics; for lists, values are concatenated.
-Other types (scalars) are replaced. Emits an audit event on success.
+merged with shallow union semantics; lists, scalars, and type mismatches
+are replaced wholesale. Emits an audit event on success.
 
 #### `manage_tags`
 

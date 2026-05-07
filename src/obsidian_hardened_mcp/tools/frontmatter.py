@@ -209,6 +209,12 @@ def manage_tags(
             f"op={op!r} requires non-empty tags",
         )
 
+    if tags is not None and len(tags) > _MAX_TAG_COUNT:
+        return ToolResult.failure(
+            ErrorCode.INVALID_TAG,
+            f"tag count {len(tags)} exceeds max {_MAX_TAG_COUNT}",
+        )
+
     if tags is None:
         normalized: list[str] = []
     else:
@@ -256,7 +262,7 @@ def manage_tags(
         new_tags = [t for t in existing_tags if t not in normalized]
     elif op == "replace":
         new_tags = list(normalized)
-    else:  # pragma: no cover - exhaustive Literal
+    else:
         return ToolResult.failure(  # type: ignore[unreachable]
             ErrorCode.INVALID_TAG, f"unknown op {op!r}"
         )
@@ -310,7 +316,7 @@ def manage_tags(
     )
     new_content = render_note(new_parsed)
 
-    # Hooks run on the post-write state.
+    # Hooks run on the desired post-write state, BEFORE we touch disk.
     if hooks is not None:
         try:
             run_validation_hooks(
@@ -537,6 +543,14 @@ def _normalize_tag(raw: str) -> str:
         raise _InvalidTagError(
             f"tag {s!r} invalid: must match [A-Za-z0-9_./-]+"
         )
+    if len(s) > _MAX_TAG_LENGTH:
+        raise _InvalidTagError(
+            f"tag length {len(s)} exceeds max {_MAX_TAG_LENGTH}"
+        )
+    if "//" in s:
+        raise _InvalidTagError(
+            f"tag {s!r} invalid: contains consecutive '/'"
+        )
     if s.startswith("/") or s.endswith("/"):
         raise _InvalidTagError(
             f"tag {s!r} invalid: must not start or end with '/'"
@@ -630,6 +644,8 @@ _MAX_VALUE_DEPTH = 16
 _MAX_STRING_LENGTH = 64 * 1024
 _MAX_KEYS_PER_DICT = 1024
 _MAX_LIST_ITEMS = 1024
+_MAX_TAG_COUNT = 512
+_MAX_TAG_LENGTH = 256
 
 
 def _ensure_safe_value(value: Any, *, _depth: int = 0) -> None:
