@@ -483,7 +483,7 @@ results[i].error; iteration continues across them."
 **Files:**
 - Modify: `tests/unit/test_tools_read.py`
 
-- [ ] **Step 1: Write the cap-iteration tests**
+- [x] **Step 1: Write the cap-iteration tests**
 
 Add to `TestReadMultipleNotes`:
 
@@ -551,15 +551,15 @@ Add to `TestReadMultipleNotes`:
         assert result.data["stopped_early"] is False
 ```
 
-- [ ] **Step 2: Run the tests**
+- [x] **Step 2: Run the tests**
 
 Run: `uv run pytest tests/unit/test_tools_read.py::TestReadMultipleNotes -v`
 Expected: all PASS (11 in the class).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
-git add tests/unit/test_tools_read.py
+git add tests/unit/test_tools_read.py docs/superpowers/plans/2026-05-07-read-multiple-notes.md
 git commit -m "test(tools): cumulative cap coverage for read_multiple_notes
 
 Locks down the post-read cap behaviour: the entry that tips the total

@@ -216,3 +216,59 @@ class TestReadMultipleNotes:
         results = result.data["results"]
         assert "content" in results[0]
         assert results[1]["error"]["code"] == ErrorCode.FILE_TOO_LARGE.value
+
+    def test_cumulative_cap_stops_iteration(self, tmp_vault: Path) -> None:
+        # 3 files of 6 MB each; 10 MB cap; max_file_size_mb=8 (over the
+        # individual cap to allow 6 MB files).
+        cfg = AppConfig(
+            vault_root=tmp_vault,
+            max_file_size_mb=8,
+            max_batch_bytes=10 * 1024 * 1024,
+        )
+        for name in ("a.md", "b.md", "c.md"):
+            (tmp_vault / "01_Notes" / name).write_bytes(b"x" * (6 * 1024 * 1024))
+
+        paths = ["01_Notes/a.md", "01_Notes/b.md", "01_Notes/c.md"]
+        result = read_multiple_notes(cfg, paths)
+        assert result.ok
+        assert result.data is not None
+        results = result.data["results"]
+
+        assert "content" in results[0]
+        assert "content" in results[1]
+        assert results[2]["error"]["code"] == ErrorCode.BATCH_TOO_LARGE.value
+        assert "after index 1" in results[2]["error"]["message"]
+        assert result.data["stopped_early"] is True
+        assert result.data["cumulative_bytes"] == 12 * 1024 * 1024
+
+    def test_cumulative_cap_marks_remaining(self, tmp_vault: Path) -> None:
+        cfg = AppConfig(
+            vault_root=tmp_vault,
+            max_file_size_mb=8,
+            max_batch_bytes=10 * 1024 * 1024,
+        )
+        for name in ("a.md", "b.md", "c.md", "d.md", "e.md"):
+            (tmp_vault / "01_Notes" / name).write_bytes(b"x" * (4 * 1024 * 1024))
+
+        paths = [f"01_Notes/{n}" for n in ("a.md", "b.md", "c.md", "d.md", "e.md")]
+        result = read_multiple_notes(cfg, paths)
+        assert result.ok
+        assert result.data is not None
+        results = result.data["results"]
+
+        # First three succeed (4+4+4 = 12 MB > 10 MB cap, stops after #3)
+        assert "content" in results[0]
+        assert "content" in results[1]
+        assert "content" in results[2]
+        assert results[3]["error"]["code"] == ErrorCode.BATCH_TOO_LARGE.value
+        assert results[4]["error"]["code"] == ErrorCode.BATCH_TOO_LARGE.value
+        assert result.data["stopped_early"] is True
+        assert result.data["cumulative_bytes"] == 12 * 1024 * 1024
+
+    def test_no_early_stop_when_under_cap(self, config: AppConfig) -> None:
+        result = read_multiple_notes(
+            config, ["01_Notes/sample.md", "_VAULT.md", "00_Journal/2026-05-04.md"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["stopped_early"] is False
