@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from obsidian_hardened_mcp.config import AppConfig
-from obsidian_hardened_mcp.domain.results import ErrorCode, ToolResult
+from obsidian_hardened_mcp.domain.results import ErrorCode, ErrorInfo, ToolResult
 from obsidian_hardened_mcp.domain.vault_path import VaultPath
 from obsidian_hardened_mcp.fs.listing import iter_markdown
 from obsidian_hardened_mcp.fs.reader import read_text
@@ -88,7 +88,6 @@ def read_multiple_notes(config: AppConfig, paths: list[str]) -> ToolResult:
 
     results: list[dict[str, Any]] = []
     cumulative_bytes = 0
-    stopped_early = False
     cap_hit_at: int | None = None
 
     for i, raw_path in enumerate(paths):
@@ -111,13 +110,15 @@ def read_multiple_notes(config: AppConfig, paths: list[str]) -> ToolResult:
             content = read_text(vp, max_size_bytes=config.max_file_size_bytes)
         except Exception as exc:
             err = map_exception(exc)
-            assert err.error is not None
+            err_info = err.error or ErrorInfo(
+                code=ErrorCode.INTERNAL_ERROR, message=str(exc)
+            )
             results.append(
                 {
                     "path": raw_path,
                     "error": {
-                        "code": err.error.code.value,
-                        "message": err.error.message,
+                        "code": err_info.code.value,
+                        "message": err_info.message,
                     },
                 }
             )
@@ -129,12 +130,11 @@ def read_multiple_notes(config: AppConfig, paths: list[str]) -> ToolResult:
 
         if cumulative_bytes > config.max_batch_bytes:
             cap_hit_at = i
-            stopped_early = True
 
     return ToolResult.success(
         data={
             "results": results,
             "cumulative_bytes": cumulative_bytes,
-            "stopped_early": stopped_early,
+            "stopped_early": cap_hit_at is not None,
         }
     )
