@@ -11,6 +11,59 @@ from obsidian_hardened_mcp.domain.results import ErrorCode
 from obsidian_hardened_mcp.tools.frontmatter import get_frontmatter
 
 
+class TestNormalizeTag:
+    def test_strips_hash_prefix(self) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import _normalize_tag
+
+        assert _normalize_tag("#wip") == "wip"
+
+    def test_strips_whitespace(self) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import _normalize_tag
+
+        assert _normalize_tag("  wip  ") == "wip"
+
+    def test_strips_hash_then_whitespace(self) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import _normalize_tag
+
+        assert _normalize_tag(" #wip ") == "wip"
+
+    def test_accepts_hierarchy(self) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import _normalize_tag
+
+        assert _normalize_tag("project/aaa") == "project/aaa"
+
+    def test_rejects_empty_after_strip(self) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import (
+            _InvalidTagError,
+            _normalize_tag,
+        )
+
+        with pytest.raises(_InvalidTagError):
+            _normalize_tag("#")
+        with pytest.raises(_InvalidTagError):
+            _normalize_tag("   ")
+
+    def test_rejects_invalid_chars(self) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import (
+            _InvalidTagError,
+            _normalize_tag,
+        )
+
+        for bad in ("a b", "a\nb", "a\tb", "tag!", "tag?"):
+            with pytest.raises(_InvalidTagError):
+                _normalize_tag(bad)
+
+    def test_rejects_leading_or_trailing_slash(self) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import (
+            _InvalidTagError,
+            _normalize_tag,
+        )
+
+        for bad in ("/wip", "wip/", "/wip/"):
+            with pytest.raises(_InvalidTagError):
+                _normalize_tag(bad)
+
+
 @pytest.fixture
 def config(tmp_vault: Path) -> AppConfig:
     return AppConfig(vault_root=tmp_vault)

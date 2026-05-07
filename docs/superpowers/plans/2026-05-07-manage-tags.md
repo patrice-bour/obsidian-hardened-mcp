@@ -57,7 +57,7 @@ Expected: **582 passed** (baseline after v0.3 #1 merged into `main`).
 - Modify: `src/obsidian_hardened_mcp/tools/frontmatter.py`
 - Modify: `tests/unit/test_tools_frontmatter.py`
 
-- [ ] **Step 1: Add `INVALID_TAG` ErrorCode**
+- [x] **Step 1: Add `INVALID_TAG` ErrorCode**
 
 In `src/obsidian_hardened_mcp/domain/results.py`, add to `ErrorCode` (place it near `INVALID_PATH` and `BATCH_TOO_LARGE` to keep input-validation codes grouped):
 
@@ -65,7 +65,7 @@ In `src/obsidian_hardened_mcp/domain/results.py`, add to `ErrorCode` (place it n
     INVALID_TAG = "invalid_tag"
 ```
 
-- [ ] **Step 2: Write failing tests for the validation helpers**
+- [x] **Step 2: Write failing tests for the validation helpers**
 
 Add to `tests/unit/test_tools_frontmatter.py` (top-level, before any existing test classes — these test private helpers so an internal-import idiom is fine):
 
@@ -129,7 +129,7 @@ class TestNormalizeTag:
                 _normalize_tag(bad)
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 Run: `uv run pytest tests/unit/test_tools_frontmatter.py::TestNormalizeTag -v`
 Expected: 7 FAIL with `ImportError` (helpers not yet defined).
@@ -175,12 +175,12 @@ def _normalize_tag(raw: str) -> str:
 
 Place the `import re` at the top of the file with the other stdlib imports if not already there.
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `uv run pytest tests/unit/test_tools_frontmatter.py::TestNormalizeTag -v`
 Expected: 7 PASS.
 
-- [ ] **Step 6: Lint + mypy + full suite**
+- [x] **Step 6: Lint + mypy + full suite**
 
 Run:
 ```bash
@@ -191,7 +191,7 @@ uv run pytest -q
 
 Expected: all clean. **589 passed** (582 + 7 new).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/obsidian_hardened_mcp/domain/results.py src/obsidian_hardened_mcp/tools/frontmatter.py tests/unit/test_tools_frontmatter.py

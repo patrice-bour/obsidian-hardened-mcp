@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import copy
 import datetime as dt
+import re
 import time
 from collections.abc import Callable
 from typing import Any, Literal
@@ -301,6 +302,38 @@ class _FieldNotFoundError(Exception):
 
 class _UnsafeValueError(ValueError):
     """Internal sentinel raised by `_ensure_safe_value`."""
+
+
+_TAG_RE = re.compile(r"^[A-Za-z0-9_./-]+$")
+
+
+class _InvalidTagError(ValueError):
+    """Internal sentinel raised by `_normalize_tag` and friends. Caller
+    converts this to `ErrorCode.INVALID_TAG`."""
+
+
+def _normalize_tag(raw: str) -> str:
+    """Trim whitespace, strip a single leading '#', then validate.
+
+    Raises `_InvalidTagError` if the result is empty, has invalid chars
+    (anything outside [A-Za-z0-9_./-]), or starts/ends with '/'.
+    """
+    s = raw.strip()
+    if s.startswith("#"):
+        s = s[1:].strip()
+    if not s:
+        raise _InvalidTagError(
+            f"tag {raw!r} invalid: empty after '#' strip and trim"
+        )
+    if not _TAG_RE.match(s):
+        raise _InvalidTagError(
+            f"tag {s!r} invalid: must match [A-Za-z0-9_./-]+"
+        )
+    if s.startswith("/") or s.endswith("/"):
+        raise _InvalidTagError(
+            f"tag {s!r} invalid: must not start or end with '/'"
+        )
+    return s
 
 
 def _set_field(fm: CommentedMap | None, key: str, value: Any) -> CommentedMap:

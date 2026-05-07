@@ -19,6 +19,7 @@ class ErrorCode(StrEnum):
 
     INVALID_PATH = "invalid_path"
     BATCH_TOO_LARGE = "batch_too_large"
+    INVALID_TAG = "invalid_tag"
     PATH_ESCAPE = "path_escape"
     SYMLINK_ESCAPE = "symlink_escape"
     FORBIDDEN_ZONE = "forbidden_zone"
