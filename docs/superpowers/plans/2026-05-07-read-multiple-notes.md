@@ -401,7 +401,7 @@ paths are marked BATCH_TOO_LARGE and stopped_early flips to true."
 These tests should already pass — they exercise the iteration body
 written in Task 4. They lock down the contract.
 
-- [ ] **Step 1: Add the per-path error tests**
+- [x] **Step 1: Add the per-path error tests**
 
 Add to `TestReadMultipleNotes`:
 
@@ -461,12 +461,12 @@ Add to `TestReadMultipleNotes`:
         assert results[1]["error"]["code"] == ErrorCode.FILE_TOO_LARGE.value
 ```
 
-- [ ] **Step 2: Run the tests**
+- [x] **Step 2: Run the tests**
 
 Run: `uv run pytest tests/unit/test_tools_read.py::TestReadMultipleNotes -v`
 Expected: all PASS (8 in the class so far).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/unit/test_tools_read.py

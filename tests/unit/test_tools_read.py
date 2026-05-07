@@ -170,3 +170,49 @@ class TestReadMultipleNotes:
         results = result.data["results"]
         assert [r["path"] for r in results] == paths
         assert all("content" in r for r in results)
+
+    def test_partial_success_not_found(self, config: AppConfig) -> None:
+        paths = ["01_Notes/sample.md", "01_Notes/missing.md", "_VAULT.md"]
+        result = read_multiple_notes(config, paths)
+        assert result.ok
+        assert result.data is not None
+        results = result.data["results"]
+        assert "content" in results[0]
+        assert results[1]["error"]["code"] == ErrorCode.NOT_FOUND.value
+        assert "content" in results[2]
+
+    def test_partial_success_path_escape(self, config: AppConfig) -> None:
+        paths = ["01_Notes/sample.md", "../escape.md"]
+        result = read_multiple_notes(config, paths)
+        assert result.ok
+        assert result.data is not None
+        results = result.data["results"]
+        assert "content" in results[0]
+        assert results[1]["error"]["code"] == ErrorCode.PATH_ESCAPE.value
+        assert results[1]["path"] == "../escape.md"
+
+    def test_partial_success_forbidden_zone(self, config: AppConfig) -> None:
+        paths = ["01_Notes/sample.md", ".obsidian/config.json"]
+        result = read_multiple_notes(config, paths)
+        assert result.ok
+        assert result.data is not None
+        results = result.data["results"]
+        assert "content" in results[0]
+        assert results[1]["error"]["code"] == ErrorCode.FORBIDDEN_ZONE.value
+
+    def test_partial_success_file_too_large(
+        self, tmp_vault: Path
+    ) -> None:
+        # Tight max_file_size_mb so a small file already breaks it.
+        cfg = AppConfig(vault_root=tmp_vault, max_file_size_mb=1)
+        big = tmp_vault / "01_Notes" / "big.md"
+        big.write_bytes(b"x" * (2 * 1024 * 1024))  # 2 MB > 1 MB cap
+
+        result = read_multiple_notes(
+            cfg, ["01_Notes/sample.md", "01_Notes/big.md"]
+        )
+        assert result.ok
+        assert result.data is not None
+        results = result.data["results"]
+        assert "content" in results[0]
+        assert results[1]["error"]["code"] == ErrorCode.FILE_TOO_LARGE.value
