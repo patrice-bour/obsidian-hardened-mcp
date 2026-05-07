@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   per-entry cumulative-cap markers.
 - New `AppConfig.max_batch_bytes` field (default 10 MB) for configuring
   the cumulative byte cap in batch reads.
+- `manage_tags` — dedicated tag-management tool with `add`, `remove`,
+  `replace`, `list` ops. Idempotent semantics, `#`-prefix tolerance,
+  cleanup-on-empty. Closes the v0.3 mcpvault parity gap on tag
+  manipulation.
+- New `ErrorCode.INVALID_TAG` for tag-input validation failures.
 
 ## [0.2.2] - 2026-05-06
 

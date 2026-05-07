@@ -41,6 +41,9 @@ from obsidian_hardened_mcp.tools.frontmatter import (
     get_frontmatter as _get_frontmatter_impl,
 )
 from obsidian_hardened_mcp.tools.frontmatter import (
+    manage_tags as _manage_tags_impl,
+)
+from obsidian_hardened_mcp.tools.frontmatter import (
     merge_frontmatter as _merge_frontmatter_impl,
 )
 from obsidian_hardened_mcp.tools.frontmatter import (
@@ -330,6 +333,30 @@ def create_server(
             path,
             patch,
             mode=mode,  # type: ignore[arg-type]
+            hooks=hooks,
+            dry_run=dry_run,
+        )
+
+    @app.tool(
+        description=(
+            "Add, remove, replace, or list tags in a note's YAML "
+            "frontmatter. Idempotent: 'add' dedupes silently, 'remove' "
+            "no-ops on absent tags, empty result drops the 'tags:' key. "
+            "Input '#tag' is normalised to 'tag'."
+        )
+    )
+    def manage_tags(
+        path: str,
+        op: str,
+        tags: list[str] | None = None,
+        dry_run: bool = False,
+    ) -> ToolResult:
+        return _manage_tags_impl(
+            config,
+            audit,
+            path,
+            op,  # type: ignore[arg-type]
+            tags,
             hooks=hooks,
             dry_run=dry_run,
         )

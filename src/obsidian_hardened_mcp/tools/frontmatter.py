@@ -21,8 +21,9 @@ from __future__ import annotations
 
 import copy
 import datetime as dt
+import re
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import Any, Literal
 
 from ruamel.yaml.comments import CommentedMap
@@ -177,6 +178,220 @@ def merge_frontmatter(
     )
 
 
+TagOp = Literal["add", "remove", "replace", "list"]
+
+
+@tool_call
+def manage_tags(
+    config: AppConfig,
+    audit: AuditLogger,
+    path: str,
+    op: TagOp,
+    tags: list[str] | None = None,
+    *,
+    hooks: HookRegistry | None = None,
+    dry_run: bool = False,
+) -> ToolResult:
+    """Add, remove, replace, or list tags in a note's YAML frontmatter.
+
+    `op="add"`: idempotent — duplicates dropped silently.
+    `op="remove"`: silent no-op for tags that aren't present; if the
+      result is empty, the `tags:` key is removed from the frontmatter.
+    `op="replace"`: wholesale set; pass `tags=[]` to clear.
+    `op="list"`: read-only, no audit emission.
+
+    Input tags are normalised: leading '#' stripped, whitespace trimmed,
+    validated against `^[A-Za-z0-9_./-]+$` with no leading/trailing '/'.
+    """
+    if op in ("add", "remove") and (tags is None or not tags):
+        return ToolResult.failure(
+            ErrorCode.INVALID_TAG,
+            f"op={op!r} requires non-empty tags",
+        )
+
+    if tags is not None and len(tags) > _MAX_TAG_COUNT:
+        return ToolResult.failure(
+            ErrorCode.INVALID_TAG,
+            f"tag count {len(tags)} exceeds max {_MAX_TAG_COUNT}",
+        )
+
+    if tags is None:
+        normalized: list[str] = []
+    else:
+        try:
+            normalized = _dedupe_in_order(_normalize_tag(t) for t in tags)
+        except _InvalidTagError as exc:
+            return ToolResult.failure(ErrorCode.INVALID_TAG, str(exc))
+
+    started = time.monotonic()
+    request_id = new_request_id()
+
+    try:
+        vp = VaultPath.from_user(path, config.vault_root)
+    except Exception as exc:
+        return map_exception(exc)
+    if not vp.absolute.exists():
+        return ToolResult.failure(
+            ErrorCode.NOT_FOUND, f"file not found: {vp.relative}"
+        )
+
+    try:
+        existing_text = read_text(vp, max_size_bytes=config.max_file_size_bytes)
+        parsed = parse_note(existing_text)
+        existing_tags = _extract_existing_tags(parsed.frontmatter)
+    except _MalformedTagsFieldError as exc:
+        return ToolResult.failure(ErrorCode.MALFORMED_FRONTMATTER, str(exc))
+    except Exception as exc:
+        return map_exception(exc)
+
+    if op == "list":
+        return ToolResult.success(
+            data={
+                "path": str(vp.relative),
+                "tags": list(existing_tags),
+            }
+        )
+
+    # Compute the new tag list per op.
+    if op == "add":
+        new_tags = list(existing_tags)
+        for t in normalized:
+            if t not in new_tags:
+                new_tags.append(t)
+    elif op == "remove":
+        new_tags = [t for t in existing_tags if t not in normalized]
+    elif op == "replace":
+        new_tags = list(normalized)
+    else:
+        return ToolResult.failure(  # type: ignore[unreachable]
+            ErrorCode.INVALID_TAG, f"unknown op {op!r}"
+        )
+
+    added = [t for t in new_tags if t not in existing_tags]
+    removed = [t for t in existing_tags if t not in new_tags]
+    params_hash_value = params_hash(path, op, normalized)
+
+    # Skip disk write on no-op (mtime stability).
+    if new_tags == existing_tags:
+        audit_id = emit_audit(
+            audit,
+            request_id=request_id,
+            tool="manage_tags",
+            op_kind="write",
+            vault_path=str(vp.relative),
+            outcome="success",
+            started=started,
+            params_hash=params_hash_value,
+            dry_run=dry_run,
+        )
+        return ToolResult(
+            ok=True,
+            data={
+                "path": str(vp.relative),
+                "request_id": request_id,
+                "op": op,
+                "tags": new_tags,
+                "added": added,
+                "removed": removed,
+            },
+            dry_run=dry_run,
+            audit_id=audit_id,
+        )
+
+    # Build new frontmatter.
+    new_fm = (
+        copy.deepcopy(parsed.frontmatter)
+        if parsed.frontmatter is not None
+        else CommentedMap()
+    )
+    if not new_tags:
+        if "tags" in new_fm:
+            del new_fm["tags"]
+    else:
+        new_fm["tags"] = new_tags
+
+    new_parsed = ParsedNote(
+        frontmatter=(new_fm if new_fm else None),
+        body=parsed.body,
+    )
+    new_content = render_note(new_parsed)
+
+    # Hooks run on the desired post-write state, BEFORE we touch disk.
+    if hooks is not None:
+        try:
+            run_validation_hooks(
+                hooks,
+                HookContext(
+                    path=vp,
+                    new_frontmatter=(
+                        None if not new_fm else to_plain_dict(dict(new_fm))
+                    ),
+                    new_body=parsed.body,
+                    operation="manage_tags",
+                ),
+            )
+        except Exception as exc:
+            return map_exception(exc)
+
+    if dry_run:
+        audit_id = emit_audit(
+            audit,
+            request_id=request_id,
+            tool="manage_tags",
+            op_kind="write",
+            vault_path=str(vp.relative),
+            outcome="success",
+            started=started,
+            params_hash=params_hash_value,
+            dry_run=True,
+        )
+        return ToolResult(
+            ok=True,
+            data={
+                "path": str(vp.relative),
+                "request_id": request_id,
+                "op": op,
+                "tags": new_tags,
+                "added": added,
+                "removed": removed,
+                "new_content": new_content,
+            },
+            dry_run=True,
+            audit_id=audit_id,
+        )
+
+    from obsidian_hardened_mcp.fs.writer import atomic_write_text
+
+    try:
+        atomic_write_text(vp, new_content)
+    except Exception as exc:
+        return map_exception(exc)
+
+    audit_id = emit_audit(
+        audit,
+        request_id=request_id,
+        tool="manage_tags",
+        op_kind="write",
+        vault_path=str(vp.relative),
+        outcome="success",
+        started=started,
+        params_hash=params_hash_value,
+        dry_run=False,
+    )
+    return ToolResult(
+        ok=True,
+        data={
+            "path": str(vp.relative),
+            "request_id": request_id,
+            "op": op,
+            "tags": new_tags,
+            "added": added,
+            "removed": removed,
+        },
+        audit_id=audit_id,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Internals
 # ---------------------------------------------------------------------------
@@ -303,6 +518,46 @@ class _UnsafeValueError(ValueError):
     """Internal sentinel raised by `_ensure_safe_value`."""
 
 
+_TAG_RE = re.compile(r"^[A-Za-z0-9_./-]+$")
+
+
+class _InvalidTagError(ValueError):
+    """Internal sentinel raised by `_normalize_tag` and friends. Caller
+    converts this to `ErrorCode.INVALID_TAG`."""
+
+
+def _normalize_tag(raw: str) -> str:
+    """Trim whitespace, strip a single leading '#', then validate.
+
+    Raises `_InvalidTagError` if the result is empty, has invalid chars
+    (anything outside [A-Za-z0-9_./-]), or starts/ends with '/'.
+    """
+    s = raw.strip()
+    if s.startswith("#"):
+        s = s[1:].strip()
+    if not s:
+        raise _InvalidTagError(
+            f"tag {raw!r} invalid: empty after '#' strip and trim"
+        )
+    if not _TAG_RE.match(s):
+        raise _InvalidTagError(
+            f"tag {s!r} invalid: must match [A-Za-z0-9_./-]+"
+        )
+    if len(s) > _MAX_TAG_LENGTH:
+        raise _InvalidTagError(
+            f"tag length {len(s)} exceeds max {_MAX_TAG_LENGTH}"
+        )
+    if "//" in s:
+        raise _InvalidTagError(
+            f"tag {s!r} invalid: contains consecutive '/'"
+        )
+    if s.startswith("/") or s.endswith("/"):
+        raise _InvalidTagError(
+            f"tag {s!r} invalid: must not start or end with '/'"
+        )
+    return s
+
+
 def _set_field(fm: CommentedMap | None, key: str, value: Any) -> CommentedMap:
     if fm is None:
         fm = CommentedMap()
@@ -315,6 +570,42 @@ def _delete_field(fm: CommentedMap | None, key: str) -> CommentedMap:
         raise _FieldNotFoundError(f"field {key!r} not found")
     del fm[key]
     return fm
+
+
+def _dedupe_in_order(items: Iterable[str]) -> list[str]:
+    """Iterate over `items`, returning a new list with duplicates removed,
+    preserving first-occurrence order."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in items:
+        if item not in seen:
+            seen.add(item)
+            out.append(item)
+    return out
+
+
+class _MalformedTagsFieldError(ValueError):
+    """Raised when an existing 'tags:' field is not a list of strings."""
+
+
+def _extract_existing_tags(fm: CommentedMap | None) -> list[str]:
+    """Return existing tags as a `list[str]`, or `[]` if absent.
+
+    Raises `_MalformedTagsFieldError` if `tags:` exists but is not a list
+    of strings.
+    """
+    if fm is None or "tags" not in fm:
+        return []
+    raw = fm["tags"]
+    if not isinstance(raw, list):
+        raise _MalformedTagsFieldError(
+            "existing 'tags:' field is not a list of strings"
+        )
+    if not all(isinstance(t, str) for t in raw):
+        raise _MalformedTagsFieldError(
+            "existing 'tags:' field is not a list of strings"
+        )
+    return list(raw)
 
 
 def _merge(
@@ -353,6 +644,8 @@ _MAX_VALUE_DEPTH = 16
 _MAX_STRING_LENGTH = 64 * 1024
 _MAX_KEYS_PER_DICT = 1024
 _MAX_LIST_ITEMS = 1024
+_MAX_TAG_COUNT = 512
+_MAX_TAG_LENGTH = 256
 
 
 def _ensure_safe_value(value: Any, *, _depth: int = 0) -> None:

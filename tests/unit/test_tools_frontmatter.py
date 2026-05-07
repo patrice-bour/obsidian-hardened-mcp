@@ -8,7 +8,548 @@ import pytest
 
 from obsidian_hardened_mcp.config import AppConfig
 from obsidian_hardened_mcp.domain.results import ErrorCode
+from obsidian_hardened_mcp.security.audit_logger import AuditLogger
 from obsidian_hardened_mcp.tools.frontmatter import get_frontmatter
+
+
+class TestNormalizeTag:
+    def test_strips_hash_prefix(self) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import _normalize_tag
+
+        assert _normalize_tag("#wip") == "wip"
+
+    def test_strips_whitespace(self) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import _normalize_tag
+
+        assert _normalize_tag("  wip  ") == "wip"
+
+    def test_strips_hash_then_whitespace(self) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import _normalize_tag
+
+        assert _normalize_tag(" #wip ") == "wip"
+
+    def test_accepts_hierarchy(self) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import _normalize_tag
+
+        assert _normalize_tag("project/aaa") == "project/aaa"
+
+    def test_rejects_empty_after_strip(self) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import (
+            _InvalidTagError,
+            _normalize_tag,
+        )
+
+        with pytest.raises(_InvalidTagError):
+            _normalize_tag("#")
+        with pytest.raises(_InvalidTagError):
+            _normalize_tag("   ")
+
+    def test_rejects_invalid_chars(self) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import (
+            _InvalidTagError,
+            _normalize_tag,
+        )
+
+        for bad in ("a b", "a\nb", "a\tb", "tag!", "tag?"):
+            with pytest.raises(_InvalidTagError):
+                _normalize_tag(bad)
+
+    def test_rejects_leading_or_trailing_slash(self) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import (
+            _InvalidTagError,
+            _normalize_tag,
+        )
+
+        for bad in ("/wip", "wip/", "/wip/"):
+            with pytest.raises(_InvalidTagError):
+                _normalize_tag(bad)
+
+    def test_rejects_too_long(self) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import (
+            _InvalidTagError,
+            _normalize_tag,
+        )
+
+        with pytest.raises(_InvalidTagError):
+            _normalize_tag("a" * 257)
+
+    def test_accepts_at_max_length(self) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import _normalize_tag
+
+        # 256 chars is the max; should pass.
+        assert _normalize_tag("a" * 256) == "a" * 256
+
+    def test_rejects_double_slash(self) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import (
+            _InvalidTagError,
+            _normalize_tag,
+        )
+
+        with pytest.raises(_InvalidTagError):
+            _normalize_tag("a//b")
+
+
+class TestManageTags:
+    @pytest.fixture
+    def config(self, tmp_vault: Path) -> AppConfig:
+        return AppConfig(vault_root=tmp_vault)
+
+    @pytest.fixture
+    def audit(self, tmp_path: Path) -> AuditLogger:
+        return AuditLogger(tmp_path / "audit")
+
+    def test_add_with_empty_tags_rejected(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        result = manage_tags(config, audit, "01_Notes/sample.md", "add", [])
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.INVALID_TAG
+
+    def test_add_with_none_tags_rejected(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        result = manage_tags(config, audit, "01_Notes/sample.md", "add", None)
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.INVALID_TAG
+
+    def test_remove_with_empty_tags_rejected(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        result = manage_tags(config, audit, "01_Notes/sample.md", "remove", [])
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.INVALID_TAG
+
+    def test_invalid_tag_chars_rejected(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        result = manage_tags(
+            config, audit, "01_Notes/sample.md", "add", ["a b"]
+        )
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.INVALID_TAG
+
+    def test_list_empty_when_no_tags_key(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        result = manage_tags(config, audit, "01_Notes/sample.md", "list")
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == []
+        assert result.data["path"] == "01_Notes/sample.md"
+
+    def test_list_returns_existing_tags(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        (tmp_vault / "01_Notes" / "tagged.md").write_text(
+            "---\ntags:\n  - wip\n  - draft\n---\nbody\n"
+        )
+        result = manage_tags(config, audit, "01_Notes/tagged.md", "list")
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == ["wip", "draft"]
+
+    def test_list_emits_no_audit(
+        self, config: AppConfig, tmp_path: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        audit_dir = tmp_path / "audit"
+        logger = AuditLogger(audit_dir)
+        _ = manage_tags(config, logger, "01_Notes/sample.md", "list")
+        assert (not audit_dir.exists()) or not list(audit_dir.glob("*.jsonl"))
+
+    def test_list_rejects_non_list_tags(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        (tmp_vault / "01_Notes" / "csv.md").write_text(
+            "---\ntags: a, b, c\n---\nbody\n"
+        )
+        result = manage_tags(config, audit, "01_Notes/csv.md", "list")
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.MALFORMED_FRONTMATTER
+
+    def test_add_to_empty_creates_tags_key(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        result = manage_tags(
+            config, audit, "01_Notes/sample.md", "add", ["wip"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == ["wip"]
+        assert result.data["added"] == ["wip"]
+        assert result.data["removed"] == []
+        assert result.data["op"] == "add"
+
+    def test_add_dedupe_silent(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        (tmp_vault / "01_Notes" / "tagged.md").write_text(
+            "---\ntags:\n  - a\n---\nbody\n"
+        )
+        result = manage_tags(
+            config, audit, "01_Notes/tagged.md", "add", ["a", "b"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == ["a", "b"]
+        assert result.data["added"] == ["b"]
+        assert result.data["removed"] == []
+
+    def test_add_preserves_existing_order_then_new(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        (tmp_vault / "01_Notes" / "tagged.md").write_text(
+            "---\ntags:\n  - z\n  - a\n---\nbody\n"
+        )
+        result = manage_tags(
+            config, audit, "01_Notes/tagged.md", "add", ["m", "b"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == ["z", "a", "m", "b"]
+
+    def test_add_hash_prefix_stripped(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        result = manage_tags(
+            config, audit, "01_Notes/sample.md", "add", ["#wip"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == ["wip"]
+
+    def test_add_no_change_when_all_already_present(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        path = tmp_vault / "01_Notes" / "tagged.md"
+        path.write_text("---\ntags:\n  - a\n  - b\n---\nbody\n")
+        mtime_before = path.stat().st_mtime_ns
+        result = manage_tags(
+            config, audit, "01_Notes/tagged.md", "add", ["a", "b"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == ["a", "b"]
+        assert result.data["added"] == []
+        assert path.stat().st_mtime_ns == mtime_before
+
+    def test_remove_existing_tag(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        (tmp_vault / "01_Notes" / "tagged.md").write_text(
+            "---\ntags:\n  - a\n  - b\n  - c\n---\nbody\n"
+        )
+        result = manage_tags(
+            config, audit, "01_Notes/tagged.md", "remove", ["b"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == ["a", "c"]
+        assert result.data["removed"] == ["b"]
+        assert result.data["added"] == []
+
+    def test_remove_absent_tag_silent_noop(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        path = tmp_vault / "01_Notes" / "tagged.md"
+        path.write_text("---\ntags:\n  - a\n---\nbody\n")
+        mtime_before = path.stat().st_mtime_ns
+        result = manage_tags(
+            config, audit, "01_Notes/tagged.md", "remove", ["does-not-exist"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == ["a"]
+        assert result.data["removed"] == []
+        assert path.stat().st_mtime_ns == mtime_before
+
+    def test_remove_all_drops_tags_key(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.frontmatter import parse_note
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        (tmp_vault / "01_Notes" / "tagged.md").write_text(
+            "---\ntags:\n  - a\n  - b\n---\nbody\n"
+        )
+        result = manage_tags(
+            config, audit, "01_Notes/tagged.md", "remove", ["a", "b"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == []
+        assert result.data["removed"] == ["a", "b"]
+
+        text = (tmp_vault / "01_Notes" / "tagged.md").read_text()
+        parsed = parse_note(text)
+        assert parsed.frontmatter is None or "tags" not in parsed.frontmatter
+
+    def test_remove_with_no_tags_key_noop(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        result = manage_tags(
+            config, audit, "01_Notes/sample.md", "remove", ["wip"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == []
+        assert result.data["removed"] == []
+
+    def test_replace_overwrites_full_list(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        (tmp_vault / "01_Notes" / "tagged.md").write_text(
+            "---\ntags:\n  - a\n  - b\n---\nbody\n"
+        )
+        result = manage_tags(
+            config, audit, "01_Notes/tagged.md", "replace", ["x", "y"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == ["x", "y"]
+        assert sorted(result.data["added"]) == ["x", "y"]
+        assert sorted(result.data["removed"]) == ["a", "b"]
+
+    def test_replace_empty_drops_tags_key(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.frontmatter import parse_note
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        (tmp_vault / "01_Notes" / "tagged.md").write_text(
+            "---\ntags:\n  - a\n---\nbody\n"
+        )
+        result = manage_tags(
+            config, audit, "01_Notes/tagged.md", "replace", []
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == []
+        assert result.data["removed"] == ["a"]
+
+        text = (tmp_vault / "01_Notes" / "tagged.md").read_text()
+        parsed = parse_note(text)
+        assert parsed.frontmatter is None or "tags" not in parsed.frontmatter
+
+    def test_replace_same_list_is_noop(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        path = tmp_vault / "01_Notes" / "tagged.md"
+        path.write_text("---\ntags:\n  - a\n  - b\n---\nbody\n")
+        mtime_before = path.stat().st_mtime_ns
+        result = manage_tags(
+            config, audit, "01_Notes/tagged.md", "replace", ["a", "b"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == ["a", "b"]
+        assert result.data["added"] == []
+        assert result.data["removed"] == []
+        assert path.stat().st_mtime_ns == mtime_before
+
+    def test_round_trip_preserves_other_fields(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        original = (
+            "---\n"
+            "title: My Note\n"
+            "# important\n"
+            "date: 2026-05-04\n"
+            "tags:\n"
+            "  - old\n"
+            "---\n"
+            "body content\n"
+        )
+        path = tmp_vault / "01_Notes" / "rich.md"
+        path.write_text(original)
+
+        result = manage_tags(
+            config, audit, "01_Notes/rich.md", "add", ["new"]
+        )
+        assert result.ok
+
+        after = path.read_text()
+        assert "title: My Note" in after
+        assert "# important" in after
+        assert "date: 2026-05-04" in after
+        assert "body content" in after
+        assert "old" in after and "new" in after
+
+    def test_dry_run_no_disk_write(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        path = tmp_vault / "01_Notes" / "tagged.md"
+        original = "---\ntags:\n  - a\n---\nbody\n"
+        path.write_text(original)
+        result = manage_tags(
+            config, audit, "01_Notes/tagged.md", "add", ["b"], dry_run=True
+        )
+        assert result.ok
+        assert result.dry_run is True
+        assert path.read_text() == original
+
+    def test_hook_violation_rejected(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+        from obsidian_hardened_mcp.validation.hooks import (
+            HookContext,
+            HookRegistry,
+            HookResult,
+        )
+
+        class _RejectAlways:
+            name = "reject-always"
+            phase = "pre_write"
+
+            def validate(self, ctx: HookContext) -> HookResult:
+                return HookResult.reject("rejected by test hook")
+
+        hooks = HookRegistry([_RejectAlways()])
+        result = manage_tags(
+            config, audit, "01_Notes/sample.md", "add", ["wip"], hooks=hooks
+        )
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.VALIDATION_FAILED
+
+    def test_too_many_tags_rejected(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        # 513 unique tags > _MAX_TAG_COUNT=512
+        big = [f"tag{i}" for i in range(513)]
+        result = manage_tags(
+            config, audit, "01_Notes/sample.md", "add", big
+        )
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.INVALID_TAG
+
+    def test_path_escape_rejected(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        result = manage_tags(
+            config, audit, "../escape.md", "list"
+        )
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.PATH_ESCAPE
+
+    def test_replace_with_none_tags_treated_as_clear(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        """Document that replace(tags=None) is equivalent to replace([])."""
+        from obsidian_hardened_mcp.frontmatter import parse_note
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        (tmp_vault / "01_Notes" / "tagged.md").write_text(
+            "---\ntags:\n  - a\n---\nbody\n"
+        )
+        result = manage_tags(
+            config, audit, "01_Notes/tagged.md", "replace", None
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == []
+        assert result.data["removed"] == ["a"]
+
+        text = (tmp_vault / "01_Notes" / "tagged.md").read_text()
+        parsed = parse_note(text)
+        assert parsed.frontmatter is None or "tags" not in parsed.frontmatter
+
+    def test_unknown_op_rejected(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        """Sentinel for the unknown-op else branch — server boundary
+        passes op as str (with type: ignore), so unknown values can reach
+        manage_tags. Must return INVALID_TAG, not crash."""
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        # Cast to bypass mypy Literal narrowing
+        result = manage_tags(
+            config, audit, "01_Notes/sample.md", "LIST",  # type: ignore[arg-type]
+            None,
+        )
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.INVALID_TAG
+
+    def test_hook_generic_exception_propagates(
+        self, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        """A hook that raises a generic exception must not crash manage_tags.
+        HookRegistry.run() converts any exception from validate() into a
+        HookReport rejection, which raise_for_rejection() turns into
+        HookViolationError, which map_exception maps to VALIDATION_FAILED."""
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+        from obsidian_hardened_mcp.validation.hooks import (
+            HookContext,
+            HookRegistry,
+            HookResult,
+        )
+
+        class _ErrorAlways:
+            name = "error-always"
+            phase = "pre_write"
+
+            def validate(self, ctx: HookContext) -> HookResult:
+                raise ValueError("boom")
+
+        hooks = HookRegistry([_ErrorAlways()])
+        result = manage_tags(
+            config, audit, "01_Notes/sample.md", "add", ["wip"], hooks=hooks
+        )
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code is ErrorCode.VALIDATION_FAILED
 
 
 @pytest.fixture
