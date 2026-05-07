@@ -255,7 +255,7 @@ def manage_tags(
     elif op == "remove":
         new_tags = [t for t in existing_tags if t not in normalized]
     elif op == "replace":
-        raise NotImplementedError("op='replace' lands in Task 6")
+        new_tags = list(normalized)
     else:  # pragma: no cover - exhaustive Literal
         return ToolResult.failure(  # type: ignore[unreachable]
             ErrorCode.INVALID_TAG, f"unknown op {op!r}"

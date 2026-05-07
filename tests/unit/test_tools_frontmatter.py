@@ -307,6 +307,62 @@ class TestManageTags:
         assert result.data["tags"] == []
         assert result.data["removed"] == []
 
+    def test_replace_overwrites_full_list(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        (tmp_vault / "01_Notes" / "tagged.md").write_text(
+            "---\ntags:\n  - a\n  - b\n---\nbody\n"
+        )
+        result = manage_tags(
+            config, audit, "01_Notes/tagged.md", "replace", ["x", "y"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == ["x", "y"]
+        assert sorted(result.data["added"]) == ["x", "y"]
+        assert sorted(result.data["removed"]) == ["a", "b"]
+
+    def test_replace_empty_drops_tags_key(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.frontmatter import parse_note
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        (tmp_vault / "01_Notes" / "tagged.md").write_text(
+            "---\ntags:\n  - a\n---\nbody\n"
+        )
+        result = manage_tags(
+            config, audit, "01_Notes/tagged.md", "replace", []
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == []
+        assert result.data["removed"] == ["a"]
+
+        text = (tmp_vault / "01_Notes" / "tagged.md").read_text()
+        parsed = parse_note(text)
+        assert parsed.frontmatter is None or "tags" not in parsed.frontmatter
+
+    def test_replace_same_list_is_noop(
+        self, config: AppConfig, audit: AuditLogger, tmp_vault: Path
+    ) -> None:
+        from obsidian_hardened_mcp.tools.frontmatter import manage_tags
+
+        path = tmp_vault / "01_Notes" / "tagged.md"
+        path.write_text("---\ntags:\n  - a\n  - b\n---\nbody\n")
+        mtime_before = path.stat().st_mtime_ns
+        result = manage_tags(
+            config, audit, "01_Notes/tagged.md", "replace", ["a", "b"]
+        )
+        assert result.ok
+        assert result.data is not None
+        assert result.data["tags"] == ["a", "b"]
+        assert result.data["added"] == []
+        assert result.data["removed"] == []
+        assert path.stat().st_mtime_ns == mtime_before
+
 
 @pytest.fixture
 def config(tmp_vault: Path) -> AppConfig:

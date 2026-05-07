@@ -898,7 +898,7 @@ Also include the plan file with all 6 of Task 5's checkboxes ticked.
 - Modify: `src/obsidian_hardened_mcp/tools/frontmatter.py`
 - Modify: `tests/unit/test_tools_frontmatter.py`
 
-- [ ] **Step 1: Write failing tests for `replace`**
+- [x] **Step 1: Write failing tests for `replace`**
 
 Add to `TestManageTags`:
 
@@ -960,12 +960,12 @@ Add to `TestManageTags`:
         assert path.stat().st_mtime_ns == mtime_before
 ```
 
-- [ ] **Step 2: Run replace tests to verify they fail**
+- [x] **Step 2: Run replace tests to verify they fail**
 
 Run: `uv run pytest tests/unit/test_tools_frontmatter.py::TestManageTags -k "replace" -v`
 Expected: 3 FAIL — `op='replace'` raises `NotImplementedError`.
 
-- [ ] **Step 3: Implement replace op**
+- [x] **Step 3: Implement replace op**
 
 Find the `elif op == "replace":` branch in `manage_tags` and replace its `raise NotImplementedError(...)` with:
 
@@ -976,17 +976,17 @@ Find the `elif op == "replace":` branch in `manage_tags` and replace its `raise 
 
 (The downstream logic — skip-on-no-op, cleanup-on-empty, hooks, write, audit — is already in place.)
 
-- [ ] **Step 4: Run replace tests**
+- [x] **Step 4: Run replace tests**
 
 Run: `uv run pytest tests/unit/test_tools_frontmatter.py::TestManageTags -k "replace" -v`
 Expected: 3 PASS.
 
-- [ ] **Step 5: Full suite**
+- [x] **Step 5: Full suite**
 
 Run: `uv run pytest -q`
 Expected: **609 passed** (606 + 3 new).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/obsidian_hardened_mcp/tools/frontmatter.py tests/unit/test_tools_frontmatter.py
