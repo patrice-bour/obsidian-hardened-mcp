@@ -11,7 +11,7 @@ import contextlib
 from dataclasses import dataclass
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
 from pydantic import BaseModel, Field
 
 from obsidian_hardened_mcp.config import AppConfig, TrashPolicy
@@ -427,17 +427,33 @@ def create_server(
 
     @app.tool(
         description=(
-            "Delete a note. Two-phase: first call returns a `confirm_token` "
-            "and a preview without touching the disk; second call with the "
-            "same token snapshots the file under `.ohmcp-trash/` and unlinks "
-            "it. Pass `dry_run=True` to preview without issuing a token."
+            "Delete a note from the vault. Two-phase confirmation: "
+            "the first call returns a token; passing it back on the "
+            "same token snapshots the file under `.ohmcp-trash/` and "
+            "unlinks it. Pass `dry_run=True` to preview without "
+            "issuing a token. Phase 2 also requires user confirmation "
+            "via the client UI (M6-11)."
         )
     )
-    def delete_note(
+    async def delete_note(
         path: str,
         confirm_token: str | None = None,
         dry_run: bool = False,
+        ctx: Context = None,  # type: ignore[assignment,type-arg]
     ) -> ToolResult:
+        # M6-11: out-of-band confirmation gate at Phase 2 (real, not dry).
+        is_phase2 = confirm_token is not None and not dry_run
+        if is_phase2 and ctx is not None:
+            outcome = await _run_elicit_gate(
+                ctx,
+                message=f"Confirm delete on {path}?",
+                config=config,
+            )
+            if not outcome.accepted:
+                return ToolResult.failure(
+                    outcome.error_code,  # type: ignore[arg-type]
+                    outcome.error_message or "elicitation refused",
+                )
         result = _delete_note_impl(
             config,
             audit,

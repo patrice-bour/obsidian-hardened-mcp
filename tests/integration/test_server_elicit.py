@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from obsidian_hardened_mcp.config import AppConfig
-from obsidian_hardened_mcp.domain.results import ErrorCode
+from obsidian_hardened_mcp.domain.results import ErrorCode, ToolResult
 
 
 @pytest.fixture
@@ -109,3 +109,184 @@ class TestRunElicitGate:
         ctx.elicit.assert_called_once()
         kwargs = ctx.elicit.call_args.kwargs
         assert "notes/x.md" in kwargs["message"]
+
+
+# ---------------------------------------------------------------------------
+# Harness fixtures for wrapper-level tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def harness(tmp_vault: Path) -> Any:
+    """Build a thin adapter around the @app.tool registrations for testing.
+
+    Strategy: instantiate `create_server` with the test config, then
+    introspect FastMCP's tool registry to retrieve the registered async
+    tool functions. Call them directly with the mock ctx.
+    """
+    from obsidian_hardened_mcp.server import create_server
+
+    cfg = AppConfig(vault_root=tmp_vault)
+    server = create_server(cfg)
+
+    class _Harness:
+        async def delete_note(self, ctx: Any, **kwargs: Any) -> ToolResult:
+            tool_fn = server._tool_manager._tools["delete_note"].fn
+            return await tool_fn(ctx=ctx, **kwargs)
+
+        async def execute_command(self, ctx: Any, **kwargs: Any) -> ToolResult:
+            tool_fn = server._tool_manager._tools["execute_command"].fn
+            return await tool_fn(ctx=ctx, **kwargs)
+
+    return _Harness()
+
+
+@pytest.fixture
+def harness_optout(tmp_vault: Path) -> Any:
+    """Same as `harness` but with require_elicitation=False."""
+    from obsidian_hardened_mcp.server import create_server
+
+    cfg = AppConfig(vault_root=tmp_vault, require_elicitation=False)
+    server = create_server(cfg)
+
+    class _Harness:
+        async def delete_note(self, ctx: Any, **kwargs: Any) -> ToolResult:
+            tool_fn = server._tool_manager._tools["delete_note"].fn
+            return await tool_fn(ctx=ctx, **kwargs)
+
+    return _Harness()
+
+
+class TestDeleteNoteWrapper:
+    """End-to-end behaviour of the @app.tool delete_note wrapper.
+
+    These tests build a real FastMCP-style server with the existing
+    impl and a mock ctx, and call the wrapper directly to verify
+    elicit branching at Phase 2.
+    """
+
+    @pytest.mark.asyncio
+    async def test_delete_phase1_no_elicit(
+        self, harness: Any, tmp_vault: Path
+    ) -> None:
+        ctx = _mock_ctx(elicit_action="accept", confirm=True)
+        result = await harness.delete_note(
+            ctx, path="01_Notes/sample.md", confirm_token=None, dry_run=False
+        )
+        assert result.ok is True
+        assert "confirm_token" in (result.data or {})
+        ctx.elicit.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_delete_dry_run_no_elicit(
+        self, harness: Any, tmp_vault: Path
+    ) -> None:
+        ctx = _mock_ctx(elicit_action="accept", confirm=True)
+        result = await harness.delete_note(
+            ctx, path="01_Notes/sample.md", confirm_token=None, dry_run=True
+        )
+        assert result.ok is True
+        ctx.elicit.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_delete_phase2_dry_run_no_elicit(
+        self, harness: Any, tmp_vault: Path
+    ) -> None:
+        ctx = _mock_ctx(elicit_action="accept", confirm=True)
+        phase1 = await harness.delete_note(
+            ctx, path="01_Notes/sample.md", confirm_token=None, dry_run=False
+        )
+        token = phase1.data["confirm_token"]
+        ctx.elicit.reset_mock()
+        result = await harness.delete_note(
+            ctx, path="01_Notes/sample.md", confirm_token=token, dry_run=True
+        )
+        assert result.ok is True
+        ctx.elicit.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_delete_phase2_elicit_accept(
+        self, harness: Any, tmp_vault: Path
+    ) -> None:
+        ctx = _mock_ctx(elicit_action="accept", confirm=True)
+        phase1 = await harness.delete_note(
+            ctx, path="01_Notes/sample.md", confirm_token=None, dry_run=False
+        )
+        token = phase1.data["confirm_token"]
+        ctx.elicit.reset_mock()
+        result = await harness.delete_note(
+            ctx, path="01_Notes/sample.md", confirm_token=token, dry_run=False
+        )
+        assert result.ok is True
+        ctx.elicit.assert_called_once()
+        assert not (tmp_vault / "01_Notes" / "sample.md").exists()
+
+    @pytest.mark.asyncio
+    async def test_delete_phase2_elicit_reject(
+        self, harness: Any, tmp_vault: Path
+    ) -> None:
+        ctx_accept = _mock_ctx(elicit_action="accept", confirm=True)
+        phase1 = await harness.delete_note(
+            ctx_accept, path="01_Notes/sample.md", confirm_token=None, dry_run=False
+        )
+        token = phase1.data["confirm_token"]
+
+        ctx_reject = _mock_ctx(elicit_action="reject", confirm=False)
+        result = await harness.delete_note(
+            ctx_reject, path="01_Notes/sample.md", confirm_token=token, dry_run=False
+        )
+        assert result.ok is False
+        assert result.error.code is ErrorCode.ELICITATION_REJECTED
+        assert (tmp_vault / "01_Notes" / "sample.md").exists()
+
+    @pytest.mark.asyncio
+    async def test_delete_phase2_elicit_unsupported_strict(
+        self, harness: Any, tmp_vault: Path
+    ) -> None:
+        ctx_accept = _mock_ctx(elicit_action="accept", confirm=True)
+        phase1 = await harness.delete_note(
+            ctx_accept, path="01_Notes/sample.md", confirm_token=None, dry_run=False
+        )
+        token = phase1.data["confirm_token"]
+
+        ctx_unsup = _mock_ctx_unsupported()
+        result = await harness.delete_note(
+            ctx_unsup, path="01_Notes/sample.md", confirm_token=token, dry_run=False
+        )
+        assert result.ok is False
+        assert result.error.code is ErrorCode.ELICITATION_UNSUPPORTED
+        assert (tmp_vault / "01_Notes" / "sample.md").exists()
+
+    @pytest.mark.asyncio
+    async def test_delete_phase2_elicit_unsupported_optout(
+        self, harness_optout: Any, tmp_vault: Path
+    ) -> None:
+        ctx_accept = _mock_ctx(elicit_action="accept", confirm=True)
+        phase1 = await harness_optout.delete_note(
+            ctx_accept, path="01_Notes/sample.md", confirm_token=None, dry_run=False
+        )
+        token = phase1.data["confirm_token"]
+
+        ctx_unsup = _mock_ctx_unsupported()
+        result = await harness_optout.delete_note(
+            ctx_unsup, path="01_Notes/sample.md", confirm_token=token, dry_run=False
+        )
+        assert result.ok is True
+        assert not (tmp_vault / "01_Notes" / "sample.md").exists()
+
+    @pytest.mark.asyncio
+    async def test_elicit_message_contains_path(
+        self, harness: Any, tmp_vault: Path
+    ) -> None:
+        ctx_accept = _mock_ctx(elicit_action="accept", confirm=True)
+        phase1 = await harness.delete_note(
+            ctx_accept, path="01_Notes/sample.md", confirm_token=None, dry_run=False
+        )
+        token = phase1.data["confirm_token"]
+        ctx_check = _mock_ctx(elicit_action="accept", confirm=True)
+        await harness.delete_note(
+            ctx_check, path="01_Notes/sample.md", confirm_token=token, dry_run=False
+        )
+        kwargs = ctx_check.elicit.call_args.kwargs
+        assert "01_Notes/sample.md" in kwargs["message"]
+        assert "delete" in kwargs["message"].lower()
