@@ -8,12 +8,14 @@ the server implements. The server runs over stdio.
 from __future__ import annotations
 
 import contextlib
+from dataclasses import dataclass
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
+from pydantic import BaseModel, Field
 
 from obsidian_hardened_mcp.config import AppConfig, TrashPolicy
-from obsidian_hardened_mcp.domain.results import ToolResult
+from obsidian_hardened_mcp.domain.results import ErrorCode, ToolResult
 from obsidian_hardened_mcp.fs.pruner import prune_trash
 from obsidian_hardened_mcp.rest.client import RestClient
 from obsidian_hardened_mcp.rest.detector import RestAvailabilityDetector
@@ -71,6 +73,66 @@ from obsidian_hardened_mcp.validation.config_loader import (
     load_validation_config,
 )
 from obsidian_hardened_mcp.validation.hooks import HookRegistry
+
+
+class _ConfirmDestructive(BaseModel):
+    """User-facing schema for ctx.elicit confirmation prompt (M6-11)."""
+
+    confirm: bool = Field(
+        description="Confirm the destructive operation",
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _ElicitOutcome:
+    """Result of `_run_elicit_gate`."""
+
+    accepted: bool
+    error_code: ErrorCode | None
+    error_message: str | None = None
+
+
+async def _run_elicit_gate(
+    ctx: Any, *, message: str, config: AppConfig
+) -> _ElicitOutcome:
+    """Ask the MCP client to confirm a destructive operation via
+    `ctx.elicit`.
+
+    Returns:
+        `_ElicitOutcome(accepted=True, ...)` if the user accepted (or
+        if the client lacks elicit support AND
+        `config.require_elicitation` is False);
+        `_ElicitOutcome(accepted=False, error_code=...)` otherwise.
+
+    The caller decides what to do with a non-accept outcome (typically
+    return `ToolResult.failure(outcome.error_code, ...)`).
+    """
+    try:
+        result = await ctx.elicit(
+            message=message,
+            schema=_ConfirmDestructive,
+        )
+    except Exception as exc:  # client lacks elicit support, or transport error
+        if not config.require_elicitation:
+            return _ElicitOutcome(accepted=True, error_code=None)
+        return _ElicitOutcome(
+            accepted=False,
+            error_code=ErrorCode.ELICITATION_UNSUPPORTED,
+            error_message=f"client does not support Context.elicit: {exc}",
+        )
+
+    accepted = (
+        getattr(result, "action", None) == "accept"
+        and getattr(result, "data", None) is not None
+        and bool(getattr(result.data, "confirm", False))
+    )
+    if accepted:
+        return _ElicitOutcome(accepted=True, error_code=None)
+    return _ElicitOutcome(
+        accepted=False,
+        error_code=ErrorCode.ELICITATION_REJECTED,
+        error_message="user declined the destructive operation",
+    )
 
 
 def create_server(
