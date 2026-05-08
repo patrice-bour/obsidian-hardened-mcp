@@ -360,3 +360,37 @@ class TestExecuteCommandWrapper:
         )
         assert result.ok is False
         assert result.error.code is ErrorCode.ELICITATION_REJECTED
+
+
+class TestOutOfScopeOps:
+    """rename_note and move_note do NOT use elicit in v0.3.0.
+    Locks the design spec scope decision."""
+
+    def test_rename_and_move_do_not_elicit(self) -> None:
+        """Static guard: rename_note and move_note source has no elicit call."""
+        import inspect
+
+        from obsidian_hardened_mcp import server
+
+        src = inspect.getsource(server)
+
+        # Locate the rename_note and move_note registration blocks. They
+        # are nested inside `create_server`, decorated with `@app.tool`.
+        # Crude but effective: split on the function defs and check the
+        # next ~50 lines for an elicit call.
+        rename_idx = src.index("def rename_note")
+        move_idx = src.index("def move_note")
+        # Block ends at the next function definition.
+        rename_block = src[rename_idx:move_idx]
+        # move_block ends at the next @app.tool registration or function.
+        move_block_full = src[move_idx:]
+        # Take up to the next @app.tool (or end of file).
+        next_tool = move_block_full.find("@app.tool", 1)
+        move_block = move_block_full[:next_tool] if next_tool > 0 else move_block_full
+
+        assert "ctx.elicit" not in rename_block, (
+            "rename_note should not use ctx.elicit in v0.3.0 (out of scope)"
+        )
+        assert "ctx.elicit" not in move_block, (
+            "move_note should not use ctx.elicit in v0.3.0 (out of scope)"
+        )
