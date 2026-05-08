@@ -394,3 +394,45 @@ class TestOutOfScopeOps:
         assert "ctx.elicit" not in move_block, (
             "move_note should not use ctx.elicit in v0.3.0 (out of scope)"
         )
+
+
+class TestCtxNoneBypass:
+    """Closes a bypass discovered by the final reviewer: ctx=None in
+    Phase 2 must fail with ELICITATION_UNSUPPORTED in strict mode, not
+    silently fall through to the impl."""
+
+    @pytest.mark.asyncio
+    async def test_delete_phase2_ctx_none_strict(
+        self, harness: Any, tmp_vault: Path
+    ) -> None:
+        ctx_accept = _mock_ctx(elicit_action="accept", confirm=True)
+        phase1 = await harness.delete_note(
+            ctx_accept, path="01_Notes/sample.md", confirm_token=None, dry_run=False
+        )
+        token = phase1.data["confirm_token"]
+
+        # Phase 2 with ctx=None — must NOT silently fall through.
+        result = await harness.delete_note(
+            None, path="01_Notes/sample.md", confirm_token=token, dry_run=False
+        )
+        assert result.ok is False
+        assert result.error.code is ErrorCode.ELICITATION_UNSUPPORTED
+        # File still on disk.
+        assert (tmp_vault / "01_Notes" / "sample.md").exists()
+
+    @pytest.mark.asyncio
+    async def test_delete_phase2_ctx_none_optout(
+        self, harness_optout: Any, tmp_vault: Path
+    ) -> None:
+        ctx_accept = _mock_ctx(elicit_action="accept", confirm=True)
+        phase1 = await harness_optout.delete_note(
+            ctx_accept, path="01_Notes/sample.md", confirm_token=None, dry_run=False
+        )
+        token = phase1.data["confirm_token"]
+
+        # ctx=None + opt-out → falls through to impl (HMAC only).
+        result = await harness_optout.delete_note(
+            None, path="01_Notes/sample.md", confirm_token=token, dry_run=False
+        )
+        assert result.ok is True
+        assert not (tmp_vault / "01_Notes" / "sample.md").exists()

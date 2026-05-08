@@ -443,7 +443,7 @@ def create_server(
     ) -> ToolResult:
         # M6-11: out-of-band confirmation gate at Phase 2 (real, not dry).
         is_phase2 = confirm_token is not None and not dry_run
-        if is_phase2 and ctx is not None:
+        if is_phase2:
             outcome = await _run_elicit_gate(
                 ctx,
                 message=f"Confirm delete on {path}?",
@@ -537,7 +537,7 @@ def create_server(
     ) -> ToolResult:
         # M6-11: out-of-band confirmation gate at Phase 2 (real, not dry).
         is_phase2 = confirm_token is not None and not dry_run
-        if is_phase2 and ctx is not None:
+        if is_phase2:
             outcome = await _run_elicit_gate(
                 ctx,
                 message=f"Confirm Obsidian command '{command_id}'?",

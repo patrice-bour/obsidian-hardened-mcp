@@ -19,7 +19,7 @@ uv run python tests/e2e/run_e2e.py
 Expected output (last lines):
 
 ```
-TOTAL                        PASS       100/100
+TOTAL                        PASS       110/110
 ```
 
 Exit code is `0` on full pass, `1` if any scenario has at least one
