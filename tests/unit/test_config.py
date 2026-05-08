@@ -147,3 +147,11 @@ class TestRestUrlLoopbackOnly:
                 vault_root=tmp_vault,
                 rest_url="http://0.0.0.0:27124",
             )
+
+    def test_require_elicitation_default_true(self, tmp_vault: Path) -> None:
+        cfg = AppConfig(vault_root=tmp_vault)
+        assert cfg.require_elicitation is True
+
+    def test_require_elicitation_optout(self, tmp_vault: Path) -> None:
+        cfg = AppConfig(vault_root=tmp_vault, require_elicitation=False)
+        assert cfg.require_elicitation is False
