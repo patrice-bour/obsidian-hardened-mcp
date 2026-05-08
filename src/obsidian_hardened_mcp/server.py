@@ -525,15 +525,29 @@ def create_server(
         description=(
             "Execute a named Obsidian command via the Local REST API plugin. "
             "Requires the plugin to be running and `OBSIDIAN_REST_TOKEN` set. "
-            "Two-phase HMAC confirm (same protocol as delete_note); the token "
-            "is bound to the command id."
+            "Two-phase confirmation + Phase 2 requires user confirmation "
+            "via the client UI (M6-11)."
         )
     )
-    def execute_command(
+    async def execute_command(
         command_id: str,
         confirm_token: str | None = None,
         dry_run: bool = False,
+        ctx: Context = None,  # type: ignore[assignment,type-arg]
     ) -> ToolResult:
+        # M6-11: out-of-band confirmation gate at Phase 2 (real, not dry).
+        is_phase2 = confirm_token is not None and not dry_run
+        if is_phase2 and ctx is not None:
+            outcome = await _run_elicit_gate(
+                ctx,
+                message=f"Confirm Obsidian command '{command_id}'?",
+                config=config,
+            )
+            if not outcome.accepted:
+                return ToolResult.failure(
+                    outcome.error_code,  # type: ignore[arg-type]
+                    outcome.error_message or "elicitation refused",
+                )
         return _execute_command_impl(
             config,
             audit,

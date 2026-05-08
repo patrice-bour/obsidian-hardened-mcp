@@ -290,3 +290,73 @@ class TestDeleteNoteWrapper:
         kwargs = ctx_check.elicit.call_args.kwargs
         assert "01_Notes/sample.md" in kwargs["message"]
         assert "delete" in kwargs["message"].lower()
+
+
+class TestExecuteCommandWrapper:
+    """Mirror of TestDeleteNoteWrapper for execute_command."""
+
+    @pytest.mark.asyncio
+    async def test_execute_command_phase1_no_elicit(
+        self, harness: Any, tmp_vault: Path
+    ) -> None:
+        ctx = _mock_ctx(elicit_action="accept", confirm=True)
+        await harness.execute_command(
+            ctx,
+            command_id="editor:save-file",
+            confirm_token=None,
+            dry_run=False,
+        )
+        # Phase 1 issues a token (or returns REST_UNAVAILABLE if REST is
+        # missing). We assert ONLY: elicit not called.
+        ctx.elicit.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_execute_command_phase2_elicit_accept(
+        self, harness: Any, tmp_vault: Path
+    ) -> None:
+        ctx_accept = _mock_ctx(elicit_action="accept", confirm=True)
+        phase1 = await harness.execute_command(
+            ctx_accept,
+            command_id="editor:save-file",
+            confirm_token=None,
+            dry_run=False,
+        )
+        token = (phase1.data or {}).get("confirm_token")
+        if token is None:
+            pytest.skip("Phase 1 did not issue a token (REST unavailable)")
+
+        ctx_check = _mock_ctx(elicit_action="accept", confirm=True)
+        await harness.execute_command(
+            ctx_check,
+            command_id="editor:save-file",
+            confirm_token=token,
+            dry_run=False,
+        )
+        ctx_check.elicit.assert_called_once()
+        kwargs = ctx_check.elicit.call_args.kwargs
+        assert "editor:save-file" in kwargs["message"]
+
+    @pytest.mark.asyncio
+    async def test_execute_command_phase2_elicit_reject(
+        self, harness: Any, tmp_vault: Path
+    ) -> None:
+        ctx_accept = _mock_ctx(elicit_action="accept", confirm=True)
+        phase1 = await harness.execute_command(
+            ctx_accept,
+            command_id="editor:save-file",
+            confirm_token=None,
+            dry_run=False,
+        )
+        token = (phase1.data or {}).get("confirm_token")
+        if token is None:
+            pytest.skip("Phase 1 did not issue a token (REST unavailable)")
+
+        ctx_reject = _mock_ctx(elicit_action="reject", confirm=False)
+        result = await harness.execute_command(
+            ctx_reject,
+            command_id="editor:save-file",
+            confirm_token=token,
+            dry_run=False,
+        )
+        assert result.ok is False
+        assert result.error.code is ErrorCode.ELICITATION_REJECTED
