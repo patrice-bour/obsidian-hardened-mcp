@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-09
+
 ### Added
 - `read_multiple_notes` — batch-read tool with partial-success semantics
   and a cumulative byte cap (`max_batch_bytes`, default 10 MB).
