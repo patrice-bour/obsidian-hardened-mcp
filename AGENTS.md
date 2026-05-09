@@ -52,26 +52,19 @@ The approved v0.1 plan lives at `~/.claude/plans/les-serveurs-mcp-existants-tran
 ## Where to resume (for a fresh session)
 
 **TL;DR for a Claude Code session resuming a long-running thread**:
-the project is at **v0.2.1**, ready to flip from private to public on
-GitHub. The reference plans for the pre-public-flip work live at
-`~/.claude/plans/avant-de-publier-sur-zippy-simon.md` (parent flip
-plan) and `~/.claude/plans/v0.2.1-v0.2.2-pre-flip-fixes.md` (the
-v0.2.0 → v0.2.1/v0.2.2 patch fixes). Read those, then come back here
-for the milestones / sanity check. The user (Patrice) is preparing to
-flip; ask which step to pick up before doing anything visible (push,
-gh repo edit, PyPI publish).
+the project is at **v0.3.0**, just tagged. v0.3.0 ships
+`read_multiple_notes` (mcpvault batch-read parity), `manage_tags`
+(dedicated tag tool), and M6-11 `Context.elicit` out-of-band
+confirmation for `delete_note` + `execute_command` (closes the HMAC
+coherent-hallucination gap surfaced in the v0.2.0 honesty pass).
+The repo is still private — the public flip + PyPI publish are the
+immediate next steps. Ask which step to pick up before doing anything
+visible (push, `gh repo edit`, PyPI publish).
 
-**Last merged on `main`**: `fix(release): v0.2.1` — pre-public-flip
-patch closing the credibility gaps from the v0.1.2..v0.2.0 code
-review. Doc/version coherence only (no behavioural change):
-`__version__` now derives from `importlib.metadata`; `Status:` /
-install pin / supported-versions table all bumped; stale `v0.2
-followup` labels (M6-11, restore_from_snapshot, M7-03 TLS CA bundle)
-relabelled to `v0.3`; personal `migration/pbr` example replaced with
-generic `migration/legacy`; off-repo plan paths in this section
-generalised to `~/.claude/plans/...`. Adds `RELEASE-CHECKLIST.md`
-to prevent future drift. **v0.2.1 tagged.** v0.1.0 (`f24827b`),
-v0.1.1, v0.1.2, v0.2.0 tags preserved.
+**Last merged on `main`**: `chore(release): v0.3.0` — three features
+(read_multiple_notes, manage_tags, M6-11 Context.elicit) + version
+bump across pyproject.toml / README / SECURITY / CHANGELOG /
+docs/security-model.md. **v0.3.0 tagged.** All prior tags preserved.
 
 **State of the public-flip plan** (per
 `~/.claude/plans/avant-de-publier-sur-zippy-simon.md`):
@@ -81,8 +74,9 @@ v0.1.1, v0.1.2, v0.2.0 tags preserved.
 - ✅ PR3 — Lot C (trash auto-cleanup) — commit `2a6ae2b`
 - ✅ Pre-flip extras #1 (`.gitattributes`), #2 (git log audit, clean),
   #4 (docs coherence) — commit `f2c8731`
+- ✅ v0.3.0 features + release bump — merged, tagged
 - ⏳ Pre-flip extra #3 — verify GitHub repo metadata
-  (Issues ON / Wiki OFF / Discussions OFF). User deferred this.
+  (Issues ON / Wiki OFF / Discussions OFF / Projects OFF).
 - ⏳ The actual flip itself:
   ```bash
   gh repo edit patrice-bour/obsidian-hardened-mcp --visibility public --accept-visibility-change-consequences
@@ -94,13 +88,9 @@ v0.1.1, v0.1.2, v0.2.0 tags preserved.
     "allow_force_pushes": false, "allow_deletions": false }
   JSON
   ```
-- ⏳ Post-flip: PyPI publish (the longer-running 1→4 plan from the
-  earlier conversation). User has no PyPI account yet — they'll
+- ⏳ Post-flip: PyPI publish. User has no PyPI account yet — they'll
   create one + 2FA + token, then we wire `uv publish` (token-based
   one-shot first; Trusted Publishers via GitHub Actions later).
-- ⏳ Optional v0.3 / mcpvault-parity gaps: `read_multiple_notes`
-  (batch read) and `manage_tags` (dedicated tag tool, sugar over
-  `merge_frontmatter`).
 
 **Milestones progress** (commits in `git log`):
 
@@ -123,40 +113,37 @@ v0.1.1, v0.1.2, v0.2.0 tags preserved.
 | 🎉 | **v0.1.2 tagged** — public-flip prep (SECURITY/CONTRIBUTING/CoC/templates/SPDX/uvx docs) + repo rename `full → hardened` | tag `v0.1.2` | 533 + 101 E2E |
 | 🎉 | **v0.2.0 tagged** — HMAC honesty + README revamp + trash auto-cleanup + pre-flip extras | tag `v0.2.0` | 558 + 101 E2E |
 | 🎉 | **v0.2.1 tagged** — pre-flip credibility fixes (`__version__` via importlib.metadata, doc/version coherence, `migration/legacy`, `RELEASE-CHECKLIST.md`) | tag `v0.2.1` | 558 + 101 E2E |
+| 🎉 | **v0.2.2 tagged** — audit-invariant fixes for fs/pruner (`request_id` correlation, real `duration_ms`, sweep summary event, `params_hash` canonicalisation) | tag `v0.2.2` | 562 + 101 E2E |
+| 🎉 | **v0.3.0 tagged** — `read_multiple_notes` + `manage_tags` + M6-11 `Context.elicit` | tag `v0.3.0` | 640 + 110 E2E |
 
 **Next task** (in this exact order):
 
 1. Verify GitHub repo metadata (Issues ON / Wiki OFF / Discussions OFF /
-   Projects OFF). Pre-flip extra #3 from
-   `~/.claude/plans/avant-de-publier-sur-zippy-simon.md`.
+   Projects OFF).
 2. Flip GitHub repo from private to public + activate branch
-   protection on `main` (commands in the `Where to resume` block
-   above).
+   protection on `main` (commands in the `State of the public-flip plan`
+   block above).
 3. PyPI publish (the user must first create a PyPI account + 2FA +
    generate a token; then `UV_PUBLISH_TOKEN=… uv build && uv publish`
    one-shot for now, Trusted Publishers via GitHub Actions later).
-4. Optional v0.3 / mcpvault-parity: `read_multiple_notes` (batch
-   read), `manage_tags` (dedicated tag tool, sugar over
-   `merge_frontmatter`).
 
-**v0.3 backlog** (carried over from v0.1-followups.md): ripgrep-backed
+**v0.4 backlog** (carried over from v0.1-followups.md): ripgrep-backed
 `search_notes` with TTL index cache (M5-01 + M5-02), `path_routing`
 built-in hook (M4-01), `execute_command` allow-list (M7-04), TLS CA
-bundle (M7-03), `search_notes` REST routing (M7-01), and **M6-11 —
-out-of-band confirmation via MCP `Context.elicit()`** (the real fix
-for the HMAC coherent-hallucination gap surfaced in v0.2.0).
+bundle (M7-03, retargeted from v0.3), `search_notes` REST routing
+(M7-01), `restore_from_snapshot` tool, `Context.elicit` extension to
+`rename_note` / `move_note` (M6-11 v0.3.x).
 
-**Sanity check** to confirm a clean v0.2.1 base:
+**Sanity check** to confirm a clean v0.3.0 base:
 
 ```bash
 cd <repo-root>
-uv run pytest -q                                    # expect 558 passed
-uv run python tests/e2e/run_e2e.py                  # expect 101/101 PASS
+uv run pytest -q                                    # expect 640 passed + 2 skip
+uv run python tests/e2e/run_e2e.py                  # expect 110/110 PASS
 uv run ruff check src tests                         # expect "All checks passed"
 uv run mypy src                                     # expect "no issues found"
-git tag -l                                          # expect 'v0.1.0', 'v0.1.1', 'v0.1.2', 'v0.2.0', 'v0.2.1'
+git tag -l                                          # expect v0.1.0, v0.1.1, v0.1.2, v0.2.0, v0.2.1, v0.2.2, v0.3.0
 ```
 
-**Detailed backlog** lives in `docs/v0.1-followups.md` (36 v0.2/v0.3
-entries from the M8 audit, plus the new M6-11 from the HMAC honesty
-pass).
+**Detailed backlog** lives in `docs/v0.1-followups.md` (entries from
+the M8 audit and subsequent honesty passes).

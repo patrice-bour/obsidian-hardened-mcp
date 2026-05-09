@@ -202,7 +202,7 @@ Threat-model decisions:
   because (a) the endpoint is loopback only — an attacker that can
   speak to it already has process-level access — and (b) the bearer
   token is what actually authenticates the call. A user-provided CA
-  bundle is a v0.3 followup (M7-03).
+  bundle is a v0.4 followup (M7-03).
 - **Token never logged.** `RestClient.__repr__` masks it. Audit
   records carry `tool="execute_command"` but never the token. Auth
   failures surface as `REST_AUTH_FAILED` with no token in the message.
