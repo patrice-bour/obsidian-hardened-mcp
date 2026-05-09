@@ -116,48 +116,62 @@ older than 90 s would have expired anyway.
 | Token forge by a remote attacker | **prevented** | HMAC over the secret + payload + expiry + nonce. The secret never leaves the server. |
 | Cross-target token reuse (apply token from delete A to delete B) | **prevented** | `payload_hash` in the HMAC binds the token to the exact operation parameters. Phase 2 with mismatched payload fails. |
 | Token replay / reuse | **prevented** | Single-use (consumed on phase 2). 90 s TTL. In-memory store cleared on restart. |
-| Coherently-hallucinating LLM that fires phase 1 → reads token from its own context → fires phase 2 with that token | **NOT prevented** | The two calls are legitimate from the registry's point of view. The HMAC mechanism cannot tell a coherent hallucination from an intentional destructive op. |
-| Prompt-injection-driven agent that walks the LLM through both phases | **NOT prevented** | Same as above — the protocol completes successfully. |
+| Coherently-hallucinating LLM that fires phase 1 → reads token from its own context → fires phase 2 with that token | **mitigated (v0.3.0)** | The HMAC mechanism alone cannot distinguish a coherent hallucination from intent — but v0.3.0 adds layer 2 (out-of-band elicit confirmation) for `delete_note` and `execute_command`, which routes the second factor through the MCP client UI rather than the LLM context. See [Defence layers](#defence-layers-against-destructive-intent) below. |
+| Prompt-injection-driven agent that walks the LLM through both phases | **mitigated (v0.3.0)** | Same as above — layer 2 (elicit gate) requires an explicit human click in the client UI before Phase 2 proceeds. |
 | Local code execution under the same POSIX user reading the secret file directly | **NOT prevented** | Out of scope. An attacker with code execution privileges can already do anything the server can. |
 
 #### Defence-in-depth layers
 
-The 2-phase HMAC is one layer among several. The full destruction-safety
-story for v0.1 is:
+The 2-phase HMAC is one layer among several. See the
+[Defence layers](#defence-layers-against-destructive-intent) subsection
+below for the full v0.3.0 destruction-safety story.
 
-1. **HMAC binding** (this section): single-shot prevention, forge
-   prevention, cross-target prevention, replay prevention.
-2. **Snapshot trash** (next section): every successful phase 2 first
-   copies the original under `<vault>/.ohmcp-trash/<UTC-ts>-<hash>/` so
-   recovery is always a `cp` away — even if a coherent hallucination
-   walks both phases.
-3. **Audit log**: a JSONL entry with deterministic content hash lands
-   on disk for every destructive op, before and after. Post-incident
-   detection is reliable.
-4. **Client-side confirmation**: Claude Desktop and Claude Code render
-   a confirm UI before tool calls. The human in the loop is the last
-   line of defence against a hallucinated chain.
+#### Out-of-band confirmation (v0.3.0)
 
-#### Real out-of-band confirmation (v0.3 followup)
+The gap identified in the v0.2.0 honesty pass — a coherently-hallucinating
+LLM walking both HMAC phases — is closed in v0.3.0 for `delete_note` and
+`execute_command` via `Context.elicit()`. Servers can request structured
+input from the user, rendered by the client UI (Claude Desktop, Claude
+Code), at any point in the request lifecycle. An LLM cannot fabricate the
+elicitation response because it routes through the client, not the model.
 
-The honest answer to "what stops a coherently-hallucinating LLM from
-walking both phases?" is **nothing in the HMAC mechanism alone** — by
-construction, the mechanism cannot distinguish a coherent hallucination
-from intent. Closing this gap requires moving the second factor *out of
-the LLM's context*. The MCP spec already provides this via
-`Context.elicit()`: servers can request structured input from the user,
-rendered by the client UI (Claude Desktop, Claude Code), at any point
-in the request lifecycle. An LLM cannot fabricate the elicitation
-response because it routes through the client, not the model.
-
-This is tracked as
+Phase-2 entry points for these two tools call
+`ctx.elicit("Confirm <op> on <target>?")` before consuming the HMAC token.
+Clients without elicitation support return
+`ELICITATION_UNSUPPORTED` (strict default); set `require_elicitation: false`
+in the YAML config to fall back to HMAC-only (the explicit opt-out, with
+documented residual risk). See
 [M6-11](v0.1-followups.md#m6-11--2-phase-hmac-does-not-stop-a-coherently-hallucinating-llm)
-for v0.3. The plan is to wrap phase-2 entry points in a thin layer that
-calls `ctx.elicit("Confirm <op> on <target>?")` before consuming the
-HMAC token, with graceful soft-fail for clients that don't implement
-elicitation (an explicit `elicitation_unsupported` error code, so
-automation paths can opt in knowingly rather than silently bypassing
-the layer).
+for the full implementation history.
+
+### Defence layers against destructive intent
+
+Three independent layers stop a hallucinated, injected, or compromised
+destructive call from mutating the vault:
+
+1. **Cryptographic binding (single-shot prevention)** — 2-phase HMAC
+   token, payload-bound, single-use, TTL 90s. A single hallucinated
+   tool call cannot mutate; the server first issues a token bound to
+   the exact call, then requires the same token plus the same payload
+   on a follow-up call.
+
+2. **Out-of-band confirmation (live human gate)** — `delete_note` and
+   `execute_command` route a confirmation through the MCP client's UI
+   via `Context.elicit`. The user's accept/reject decision bypasses
+   the LLM context entirely; a coherently-hallucinating LLM cannot
+   fabricate it. Disabled with `require_elicitation: false` for
+   clients that do not implement elicit (residual risk:
+   coherent-hallucination bypass; opt-out is explicit).
+
+3. **Recovery + detection (post-incident)** — All destructive ops
+   snapshot the target file under `.ohmcp-trash/` before mutation;
+   an append-only JSONL audit log records every successful mutation
+   with content-hash `audit_id` and shared `request_id`.
+
+v0.3.0 ships layers 1 + 3 for all destructive ops, layer 2 for
+`delete_note` and `execute_command`. `rename_note` and `move_note`
+have layer 1 + 3 only (lower risk: snapshot-restorable, basename
+rename). Extending layer 2 to those tools is tracked as v0.3.x.
 
 Snapshots accumulate under `<vault>/.ohmcp-trash/`. They are NEVER
 re-exposed by read tools (the directory is in the VaultPath

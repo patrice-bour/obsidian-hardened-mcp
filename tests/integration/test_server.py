@@ -168,12 +168,18 @@ async def test_delete_note_two_phase_through_mcp(
 ) -> None:
     """End-to-end: phase 1 returns a token, file untouched; phase 2 with
     that token deletes the file."""
-    from obsidian_hardened_mcp.security.confirm import ConfirmRegistry
-
     # Use an explicit registry so the server doesn't bootstrap the secret
     # from disk for this isolated assertion.
+    # require_elicitation=False: this test exercises the HMAC flow via
+    # server.call_tool() which has no real request context for ctx.elicit.
+    from obsidian_hardened_mcp.config import AppConfig as _AppConfig
+    from obsidian_hardened_mcp.security.confirm import ConfirmRegistry
+
+    hmac_cfg = _AppConfig(
+        vault_root=config.vault_root, require_elicitation=False
+    )
     registry = ConfirmRegistry(secret=b"k" * 32)
-    server = create_server(config, registry=registry)
+    server = create_server(hmac_cfg, registry=registry)
 
     # Phase 1: no token.
     raw1 = await server.call_tool(
@@ -306,13 +312,19 @@ async def test_execute_command_two_phase_through_mcp(
 ) -> None:
     """End-to-end via FastMCP: phase 1 returns a token, phase 2 with the
     same token + matching command_id triggers the REST POST."""
+    from obsidian_hardened_mcp.config import AppConfig as _AppConfig
     from obsidian_hardened_mcp.security.confirm import ConfirmRegistry
 
     client = _FakeRestClient(healthy=True)
     detector = _detector_with_state(client)
     registry = ConfirmRegistry(secret=b"k" * 32)
+    # require_elicitation=False: this test exercises the HMAC flow via
+    # server.call_tool() which has no real request context for ctx.elicit.
+    hmac_cfg = _AppConfig(
+        vault_root=config.vault_root, require_elicitation=False
+    )
     server = create_server(
-        config, registry=registry, rest_detector=detector
+        hmac_cfg, registry=registry, rest_detector=detector
     )
 
     # Phase 1.

@@ -191,6 +191,8 @@ Every destructive tool (`delete_note`, `rename_note`, `move_note`, `execute_comm
 
 What this prevents (in a nutshell): single-shot accidents, token forgery without the secret, applying a token meant for one note to a different note, replays after expiry. What it does *not* prevent: an LLM that fires phase 1, reads the returned token from its own context, and fires phase 2 cleanly. For that scenario, you fall back on the snapshot trash, the audit log, and your client's confirm UI.
 
+v0.3.0 adds `Context.elicit`-based out-of-band confirmation for `delete_note` and `execute_command`. When a Phase 2 call reaches the server, it asks the MCP client to display a confirmation dialog to the user; only an explicit user click proceeds. The LLM cannot synthesise this response. Set `require_elicitation: false` in the YAML config to opt out for clients without elicit support.
+
 For the full threat-by-threat matrix and the planned out-of-band fix, see [docs/security-model.md § LLM-driven destructive ops](./docs/security-model.md#llm-driven-destructive-ops).
 
 ## Example: recovering a deleted note

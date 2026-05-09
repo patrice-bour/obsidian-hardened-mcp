@@ -20,6 +20,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cleanup-on-empty. Closes the v0.3 mcpvault parity gap on tag
   manipulation.
 - New `ErrorCode.INVALID_TAG` for tag-input validation failures.
+- M6-11 `Context.elicit` out-of-band confirmation for `delete_note`
+  and `execute_command`. Routes confirmation through the MCP client
+  UI, bypassing the LLM context. Default-strict; opt-out via
+  `require_elicitation: false`. Closes the v0.2.0 HMAC
+  coherent-hallucination gap for these two ops.
+- New `ErrorCode.ELICITATION_UNSUPPORTED` and
+  `ErrorCode.ELICITATION_REJECTED`.
+- New `AppConfig.require_elicitation` field (default `true`).
+
+### Changed
+- `delete_note` and `execute_command` MCP wrappers are now `async def`
+  (was sync). Behaviour unchanged for clients that complete the elicit
+  prompt; clients without elicit support hit `ELICITATION_UNSUPPORTED`
+  in default-strict mode.
 
 ## [0.2.2] - 2026-05-06
 

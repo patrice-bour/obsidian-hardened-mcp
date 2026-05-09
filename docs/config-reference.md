@@ -173,6 +173,14 @@ The server enforces soft limits on batch operations and file sizes:
 These are set at server startup via `AppConfig` and are not currently
 overridable per-vault via `<vault>/.obsidian-hardened-mcp.yaml`.
 
+## Elicitation gate
+
+- `require_elicitation` (default `true`) — gate destructive `delete_note`
+  and `execute_command` calls behind a `Context.elicit` prompt at
+  Phase 2. Set to `false` for automated deployments without an
+  elicit-capable MCP client (residual risk:
+  coherent-hallucination bypass).
+
 ## Custom hooks (v0.2+)
 
 The `ValidationHook` Protocol is public; user-defined classes can be

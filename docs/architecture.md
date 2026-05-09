@@ -112,6 +112,14 @@ trimmed, validated against `^[A-Za-z0-9_./-]+$`, no leading/trailing
 entirely. Reuses the `parse_note` / `render_note` / `atomic_write_text` primitives
 directly (the same building blocks `_mutate_frontmatter` uses) for round-trip preservation.
 
+### Async wrappers for elicit-gated tools (M6-11)
+
+`delete_note` and `execute_command` are registered as `async def`
+wrappers in `server.py`. They `await ctx.elicit(...)` at Phase 2
+before delegating to the sync impl in `tools/destructive.py`. This
+keeps the impl unchanged (213 existing test hits at the impl level
+are unaffected) while routing the confirmation through the client UI.
+
 ## Tool result shape
 
 Every tool returns `ToolResult`:

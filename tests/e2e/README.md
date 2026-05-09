@@ -19,7 +19,7 @@ uv run python tests/e2e/run_e2e.py
 Expected output (last lines):
 
 ```
-TOTAL                        PASS       100/100
+TOTAL                        PASS       110/110
 ```
 
 Exit code is `0` on full pass, `1` if any scenario has at least one
@@ -148,3 +148,12 @@ always trigger writes, so this should not happen in practice.
 **REST with-token loop fails** — Obsidian must be open AND the Local
 REST API plugin enabled. The plugin's bearer token is shown in
 its settings panel; export it via `OBSIDIAN_E2E_REST_TOKEN`.
+
+## Destructive op coverage
+
+E2E scenarios for `delete_note` and `execute_command` cover Phase 1
+(token issuance) and dry-run paths only. The Phase 2 elicit flow
+(M6-11) requires an elicit-capable client (Claude Desktop, Claude
+Code) to render the confirmation dialog. Phase 2 is therefore tested
+at the wrapper level via `tests/integration/test_server_elicit.py`
+with mocked `Context.elicit`.

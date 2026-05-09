@@ -62,18 +62,41 @@ The following are documented operational assumptions, not bugs:
   configured to bind on `0.0.0.0`.
 - Vault contents trust: the server treats the vault as authoritative
   text owned by the user. Hooks and validators are advisory.
-- Coherent LLM hallucination chains: the 2-phase HMAC mechanism
-  prevents single-shot mishaps, token forge, cross-target reuse, and
-  replay. It does **not** prevent an LLM that hallucinates phase 1,
-  reads the returned token from its own context, and fires phase 2
-  with that token — the registry sees both calls as legitimate. The
-  recovery path is the snapshot trash + audit log; the real prevention
-  layer is tracked as a v0.3 followup
-  ([M6-11](docs/v0.1-followups.md#m6-11--2-phase-hmac-does-not-stop-a-coherently-hallucinating-llm),
-  out-of-band confirmation via MCP `Context.elicit()`).
+- Coherent LLM hallucination chains for `rename_note` / `move_note`:
+  the 2-phase HMAC mechanism prevents single-shot mishaps, token
+  forge, cross-target reuse, and replay. It does **not** prevent an
+  LLM that hallucinates phase 1, reads the token from its own
+  context, and fires phase 2 — the registry sees both calls as
+  legitimate. Recovery for these ops: snapshot trash + audit log.
+  (For `delete_note` and `execute_command` this gap is closed in
+  v0.3.0 — see [How destructive operations are protected](#how-destructive-operations-are-protected-v030)
+  below.)
 
 For the full operational threat model, see
 [`docs/security-model.md`](docs/security-model.md).
+
+### How destructive operations are protected (v0.3.0)
+
+Three layers of defence apply to `delete_note`, `rename_note`,
+`move_note`, and `execute_command`:
+
+1. **Cryptographic binding** — HMAC-signed two-phase confirmation
+   tokens. A single hallucinated call cannot mutate; the same payload
+   must be confirmed across two calls.
+2. **Out-of-band confirmation** — for `delete_note` and
+   `execute_command`, the server prompts the MCP client UI (Claude
+   Desktop, Claude Code, etc.) via `Context.elicit` before consuming
+   the token. Disabled with `require_elicitation: false` for clients
+   that do not implement elicit.
+3. **Recovery** — every destructive call snapshots the target into
+   `.ohmcp-trash/` before mutation, with retention configurable via
+   `trash_policy`. An append-only JSONL audit log records every
+   successful mutation.
+
+Layer 2 is the v0.3.0 fix for the gap surfaced in the v0.2.0 honesty
+pass: a coherently-hallucinating LLM could previously walk both HMAC
+phases. With elicit, the user's accept/reject bypasses the LLM
+context entirely.
 
 ## Disclosure history
 

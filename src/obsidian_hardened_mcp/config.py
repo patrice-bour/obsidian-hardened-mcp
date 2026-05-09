@@ -90,6 +90,10 @@ class AppConfig(BaseModel):
     max_batch_bytes: int = DEFAULT_MAX_BATCH_BYTES
     rest_url: str = DEFAULT_REST_URL
     rest_token: str | None = None
+    require_elicitation: bool = True
+    """If True (default), require out-of-band confirmation via MCP
+    Context.elicit() for destructive/confirmation operations. If False,
+    fall back to 2-phase HMAC tokens."""
     trash_policy: TrashPolicy = Field(default_factory=TrashPolicy)
     """Auto-cleanup of `.ohmcp-trash/`. Default applies if no
     ``trash:`` block is present in the vault YAML."""

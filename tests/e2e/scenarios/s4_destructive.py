@@ -1,11 +1,18 @@
 """S4 — destructive ops with 2-phase HMAC confirm.
 
 Covers:
-- delete_note: phase 1 -> token -> phase 2 -> .ohmcp-trash snapshot
+- delete_note: phase 1 -> token -> phase 2 via stdio now returns
+  ELICITATION_UNSUPPORTED (M6-11: Phase 2 requires elicit-capable client)
 - rename_note + update_backlinks: rewrite of [[old]] in linked notes
 - move_note + update_backlinks
-- token tampering -> invalid_confirmation_token
-- token reuse -> invalid_confirmation_token (single-use)
+- token tampering -> elicitation_unsupported (elicit gate fires before HMAC)
+- token tampering: file preserved (disk untouched on any Phase 2 failure)
+
+Note: Phase 2 delete coverage (token consumption, file removal, snapshot
+verification, token reuse) is exercised in
+`tests/integration/test_server_elicit.py` with a mocked elicit-capable
+client. The stdio harness cannot render the elicit dialog so Phase 2
+always returns ELICITATION_UNSUPPORTED here.
 
 Note: token EXPIRY (90s TTL) is covered in unit tests (`tests/unit/
 test_confirm.py`); we skip it here to keep the E2E run fast.
@@ -29,7 +36,6 @@ from ._assert import (
 async def run(h: E2EHarness) -> ScenarioReport:
     rep = ScenarioReport("S4", "destructive")
     vault = h.vault
-    trash = vault / ".ohmcp-trash"
 
     # ---------- delete_note ----------
     # Use a throwaway file we can recreate freely.
@@ -53,28 +59,20 @@ async def run(h: E2EHarness) -> ScenarioReport:
     )
 
     token = field_value(p1, "confirm_token")
-    # Phase 2
-    p2 = await h.call("delete_note", path=target, confirm_token=token)
-    ok, why = expect_ok(p2, where="delete phase 2")
-    rep.add("delete phase 2 ok", ok, why)
-    rep.add(
-        "phase 2 removed file",
-        not (vault / target).exists(),
-        "file still present after phase 2",
-    )
-    snap_id = field_value(p2, "snapshot_id")
-    rep.add(
-        "phase 2 returns snapshot_id",
-        bool(snap_id),
-        f"snapshot_id={snap_id!r}",
-    )
-    trash_listing = (
-        [p.name for p in trash.iterdir()] if trash.exists() else "absent"
+
+    # Phase 2 via stdio harness: elicit not supported → ELICITATION_UNSUPPORTED.
+    # Phase 2 delete coverage (accept/reject/file-removal/snapshot) lives in
+    # tests/integration/test_server_elicit.py (mocked elicit-capable client).
+    p2_attempt = await h.call("delete_note", path=target, confirm_token=token)
+    ok, why = expect_error(
+        p2_attempt,
+        "elicitation_unsupported",
+        where="phase 2 via stdio",
     )
     rep.add(
-        ".ohmcp-trash holds the snapshot",
-        bool(_find_snapshot(trash, snap_id)),
-        f".ohmcp-trash listing: {trash_listing}",
+        "phase 2 returns ELICITATION_UNSUPPORTED via stdio (M6-11)",
+        ok,
+        why,
     )
 
     # ---------- rename_note + update_backlinks ----------
@@ -148,42 +146,26 @@ async def run(h: E2EHarness) -> ScenarioReport:
     )
 
     # ---------- token tampering ----------
+    # Phase 2 with a tampered token: elicit gate fires first (before HMAC),
+    # returning ELICITATION_UNSUPPORTED via the stdio harness (M6-11).
     target_t = "scratch/tamper.md"
     await h.call("create_note", path=target_t, content=body)
     p1t = await h.call("delete_note", path=target_t)
     real_token = field_value(p1t, "confirm_token") or ""
-    # Build a fully-random base64url token of similar length. Using
-    # secrets.token_urlsafe() keeps the alphabet valid (so the server's
-    # decoding stage doesn't reject it before the HMAC check) while
-    # making collision with the real token cryptographically impossible.
+    # Build a fully-random base64url token of similar length.
     bad_token = secrets.token_urlsafe(64)[: len(real_token)]
     p2t = await h.call(
         "delete_note", path=target_t, confirm_token=bad_token
     )
     ok, why = expect_error(
-        p2t, "invalid_confirmation_token", where="tampered token"
+        p2t, "elicitation_unsupported", where="tampered token"
     )
-    rep.add("tampered token rejected", ok, why)
+    rep.add("tampered token: elicitation_unsupported via stdio", ok, why)
     rep.add(
         "tampered token: file preserved",
         (vault / target_t).exists(),
         "file removed despite invalid token",
     )
-
-    # ---------- token reuse (single-use) ----------
-    # Use the still-valid `real_token` for tamper.md, consume once, then reuse.
-    p2t_ok = await h.call(
-        "delete_note", path=target_t, confirm_token=real_token
-    )
-    ok, why = expect_ok(p2t_ok, where="reuse: first phase 2")
-    rep.add("first phase 2 with valid token ok", ok, why)
-    p2t_replay = await h.call(
-        "delete_note", path=target_t, confirm_token=real_token
-    )
-    ok, why = expect_error(
-        p2t_replay, "invalid_confirmation_token", where="reused token"
-    )
-    rep.add("token reuse rejected", ok, why)
 
     return rep
 

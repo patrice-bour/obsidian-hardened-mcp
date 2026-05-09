@@ -8,12 +8,14 @@ the server implements. The server runs over stdio.
 from __future__ import annotations
 
 import contextlib
+from dataclasses import dataclass
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
+from pydantic import BaseModel, Field
 
 from obsidian_hardened_mcp.config import AppConfig, TrashPolicy
-from obsidian_hardened_mcp.domain.results import ToolResult
+from obsidian_hardened_mcp.domain.results import ErrorCode, ToolResult
 from obsidian_hardened_mcp.fs.pruner import prune_trash
 from obsidian_hardened_mcp.rest.client import RestClient
 from obsidian_hardened_mcp.rest.detector import RestAvailabilityDetector
@@ -71,6 +73,66 @@ from obsidian_hardened_mcp.validation.config_loader import (
     load_validation_config,
 )
 from obsidian_hardened_mcp.validation.hooks import HookRegistry
+
+
+class _ConfirmDestructive(BaseModel):
+    """User-facing schema for ctx.elicit confirmation prompt (M6-11)."""
+
+    confirm: bool = Field(
+        description="Confirm the destructive operation",
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _ElicitOutcome:
+    """Result of `_run_elicit_gate`."""
+
+    accepted: bool
+    error_code: ErrorCode | None
+    error_message: str | None = None
+
+
+async def _run_elicit_gate(
+    ctx: Any, *, message: str, config: AppConfig
+) -> _ElicitOutcome:
+    """Ask the MCP client to confirm a destructive operation via
+    `ctx.elicit`.
+
+    Returns:
+        `_ElicitOutcome(accepted=True, ...)` if the user accepted (or
+        if the client lacks elicit support AND
+        `config.require_elicitation` is False);
+        `_ElicitOutcome(accepted=False, error_code=...)` otherwise.
+
+    The caller decides what to do with a non-accept outcome (typically
+    return `ToolResult.failure(outcome.error_code, ...)`).
+    """
+    try:
+        result = await ctx.elicit(
+            message=message,
+            schema=_ConfirmDestructive,
+        )
+    except Exception as exc:  # client lacks elicit support, or transport error
+        if not config.require_elicitation:
+            return _ElicitOutcome(accepted=True, error_code=None)
+        return _ElicitOutcome(
+            accepted=False,
+            error_code=ErrorCode.ELICITATION_UNSUPPORTED,
+            error_message=f"client does not support Context.elicit: {exc}",
+        )
+
+    accepted = (
+        getattr(result, "action", None) == "accept"
+        and getattr(result, "data", None) is not None
+        and bool(getattr(result.data, "confirm", False))
+    )
+    if accepted:
+        return _ElicitOutcome(accepted=True, error_code=None)
+    return _ElicitOutcome(
+        accepted=False,
+        error_code=ErrorCode.ELICITATION_REJECTED,
+        error_message="user declined the destructive operation",
+    )
 
 
 def create_server(
@@ -365,17 +427,33 @@ def create_server(
 
     @app.tool(
         description=(
-            "Delete a note. Two-phase: first call returns a `confirm_token` "
-            "and a preview without touching the disk; second call with the "
-            "same token snapshots the file under `.ohmcp-trash/` and unlinks "
-            "it. Pass `dry_run=True` to preview without issuing a token."
+            "Delete a note from the vault. Two-phase confirmation: "
+            "the first call returns a token; passing it back on the "
+            "same token snapshots the file under `.ohmcp-trash/` and "
+            "unlinks it. Pass `dry_run=True` to preview without "
+            "issuing a token. Phase 2 also requires user confirmation "
+            "via the client UI (M6-11)."
         )
     )
-    def delete_note(
+    async def delete_note(
         path: str,
         confirm_token: str | None = None,
         dry_run: bool = False,
+        ctx: Context = None,  # type: ignore[assignment,type-arg]
     ) -> ToolResult:
+        # M6-11: out-of-band confirmation gate at Phase 2 (real, not dry).
+        is_phase2 = confirm_token is not None and not dry_run
+        if is_phase2:
+            outcome = await _run_elicit_gate(
+                ctx,
+                message=f"Confirm delete on {path}?",
+                config=config,
+            )
+            if not outcome.accepted:
+                return ToolResult.failure(
+                    outcome.error_code,  # type: ignore[arg-type]
+                    outcome.error_message or "elicitation refused",
+                )
         result = _delete_note_impl(
             config,
             audit,
@@ -447,15 +525,29 @@ def create_server(
         description=(
             "Execute a named Obsidian command via the Local REST API plugin. "
             "Requires the plugin to be running and `OBSIDIAN_REST_TOKEN` set. "
-            "Two-phase HMAC confirm (same protocol as delete_note); the token "
-            "is bound to the command id."
+            "Two-phase confirmation + Phase 2 requires user confirmation "
+            "via the client UI (M6-11)."
         )
     )
-    def execute_command(
+    async def execute_command(
         command_id: str,
         confirm_token: str | None = None,
         dry_run: bool = False,
+        ctx: Context = None,  # type: ignore[assignment,type-arg]
     ) -> ToolResult:
+        # M6-11: out-of-band confirmation gate at Phase 2 (real, not dry).
+        is_phase2 = confirm_token is not None and not dry_run
+        if is_phase2:
+            outcome = await _run_elicit_gate(
+                ctx,
+                message=f"Confirm Obsidian command '{command_id}'?",
+                config=config,
+            )
+            if not outcome.accepted:
+                return ToolResult.failure(
+                    outcome.error_code,  # type: ignore[arg-type]
+                    outcome.error_message or "elicitation refused",
+                )
         return _execute_command_impl(
             config,
             audit,
