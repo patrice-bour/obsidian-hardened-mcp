@@ -14,12 +14,12 @@ from obsidian_hardened_mcp.domain.results import ErrorCode, ToolResult
 
 @pytest.fixture
 def config(tmp_vault: Path) -> AppConfig:
-    return AppConfig(vault_root=tmp_vault)
+    return AppConfig(vault_root=tmp_vault)  # default: require_elicitation=False
 
 
 @pytest.fixture
-def config_optout(tmp_vault: Path) -> AppConfig:
-    return AppConfig(vault_root=tmp_vault, require_elicitation=False)
+def config_strict(tmp_vault: Path) -> AppConfig:
+    return AppConfig(vault_root=tmp_vault, require_elicitation=True)
 
 
 def _mock_ctx(elicit_action: str = "accept", confirm: bool = True) -> Any:
@@ -77,23 +77,23 @@ class TestRunElicitGate:
         assert outcome.error_code is ErrorCode.ELICITATION_REJECTED
 
     @pytest.mark.asyncio
-    async def test_unsupported_strict(self, config: AppConfig) -> None:
+    async def test_unsupported_strict(self, config_strict: AppConfig) -> None:
         from obsidian_hardened_mcp.server import _run_elicit_gate
 
         ctx = _mock_ctx_unsupported()
         outcome = await _run_elicit_gate(
-            ctx, message="Confirm delete?", config=config
+            ctx, message="Confirm delete?", config=config_strict
         )
         assert outcome.accepted is False
         assert outcome.error_code is ErrorCode.ELICITATION_UNSUPPORTED
 
     @pytest.mark.asyncio
-    async def test_unsupported_optout(self, config_optout: AppConfig) -> None:
+    async def test_unsupported_optout(self, config: AppConfig) -> None:
         from obsidian_hardened_mcp.server import _run_elicit_gate
 
         ctx = _mock_ctx_unsupported()
         outcome = await _run_elicit_gate(
-            ctx, message="Confirm delete?", config=config_optout
+            ctx, message="Confirm delete?", config=config
         )
         assert outcome.accepted is True
         assert outcome.error_code is None
@@ -123,10 +123,12 @@ def harness(tmp_vault: Path) -> Any:
     Strategy: instantiate `create_server` with the test config, then
     introspect FastMCP's tool registry to retrieve the registered async
     tool functions. Call them directly with the mock ctx.
+
+    Uses default config (require_elicitation=False since v0.3.1).
     """
     from obsidian_hardened_mcp.server import create_server
 
-    cfg = AppConfig(vault_root=tmp_vault)
+    cfg = AppConfig(vault_root=tmp_vault)  # default: require_elicitation=False
     server = create_server(cfg)
 
     class _Harness:
@@ -142,16 +144,20 @@ def harness(tmp_vault: Path) -> Any:
 
 
 @pytest.fixture
-def harness_optout(tmp_vault: Path) -> Any:
-    """Same as `harness` but with require_elicitation=False."""
+def harness_strict(tmp_vault: Path) -> Any:
+    """Same as `harness` but with require_elicitation=True (strict mode)."""
     from obsidian_hardened_mcp.server import create_server
 
-    cfg = AppConfig(vault_root=tmp_vault, require_elicitation=False)
+    cfg = AppConfig(vault_root=tmp_vault, require_elicitation=True)
     server = create_server(cfg)
 
     class _Harness:
         async def delete_note(self, ctx: Any, **kwargs: Any) -> ToolResult:
             tool_fn = server._tool_manager._tools["delete_note"].fn
+            return await tool_fn(ctx=ctx, **kwargs)
+
+        async def execute_command(self, ctx: Any, **kwargs: Any) -> ToolResult:
+            tool_fn = server._tool_manager._tools["execute_command"].fn
             return await tool_fn(ctx=ctx, **kwargs)
 
     return _Harness()
@@ -206,15 +212,15 @@ class TestDeleteNoteWrapper:
 
     @pytest.mark.asyncio
     async def test_delete_phase2_elicit_accept(
-        self, harness: Any, tmp_vault: Path
+        self, harness_strict: Any, tmp_vault: Path
     ) -> None:
         ctx = _mock_ctx(elicit_action="accept", confirm=True)
-        phase1 = await harness.delete_note(
+        phase1 = await harness_strict.delete_note(
             ctx, path="01_Notes/sample.md", confirm_token=None, dry_run=False
         )
         token = phase1.data["confirm_token"]
         ctx.elicit.reset_mock()
-        result = await harness.delete_note(
+        result = await harness_strict.delete_note(
             ctx, path="01_Notes/sample.md", confirm_token=token, dry_run=False
         )
         assert result.ok is True
@@ -223,16 +229,16 @@ class TestDeleteNoteWrapper:
 
     @pytest.mark.asyncio
     async def test_delete_phase2_elicit_reject(
-        self, harness: Any, tmp_vault: Path
+        self, harness_strict: Any, tmp_vault: Path
     ) -> None:
         ctx_accept = _mock_ctx(elicit_action="accept", confirm=True)
-        phase1 = await harness.delete_note(
+        phase1 = await harness_strict.delete_note(
             ctx_accept, path="01_Notes/sample.md", confirm_token=None, dry_run=False
         )
         token = phase1.data["confirm_token"]
 
         ctx_reject = _mock_ctx(elicit_action="reject", confirm=False)
-        result = await harness.delete_note(
+        result = await harness_strict.delete_note(
             ctx_reject, path="01_Notes/sample.md", confirm_token=token, dry_run=False
         )
         assert result.ok is False
@@ -241,6 +247,24 @@ class TestDeleteNoteWrapper:
 
     @pytest.mark.asyncio
     async def test_delete_phase2_elicit_unsupported_strict(
+        self, harness_strict: Any, tmp_vault: Path
+    ) -> None:
+        ctx_accept = _mock_ctx(elicit_action="accept", confirm=True)
+        phase1 = await harness_strict.delete_note(
+            ctx_accept, path="01_Notes/sample.md", confirm_token=None, dry_run=False
+        )
+        token = phase1.data["confirm_token"]
+
+        ctx_unsup = _mock_ctx_unsupported()
+        result = await harness_strict.delete_note(
+            ctx_unsup, path="01_Notes/sample.md", confirm_token=token, dry_run=False
+        )
+        assert result.ok is False
+        assert result.error.code is ErrorCode.ELICITATION_UNSUPPORTED
+        assert (tmp_vault / "01_Notes" / "sample.md").exists()
+
+    @pytest.mark.asyncio
+    async def test_delete_phase2_elicit_unsupported_optout(
         self, harness: Any, tmp_vault: Path
     ) -> None:
         ctx_accept = _mock_ctx(elicit_action="accept", confirm=True)
@@ -253,38 +277,20 @@ class TestDeleteNoteWrapper:
         result = await harness.delete_note(
             ctx_unsup, path="01_Notes/sample.md", confirm_token=token, dry_run=False
         )
-        assert result.ok is False
-        assert result.error.code is ErrorCode.ELICITATION_UNSUPPORTED
-        assert (tmp_vault / "01_Notes" / "sample.md").exists()
-
-    @pytest.mark.asyncio
-    async def test_delete_phase2_elicit_unsupported_optout(
-        self, harness_optout: Any, tmp_vault: Path
-    ) -> None:
-        ctx_accept = _mock_ctx(elicit_action="accept", confirm=True)
-        phase1 = await harness_optout.delete_note(
-            ctx_accept, path="01_Notes/sample.md", confirm_token=None, dry_run=False
-        )
-        token = phase1.data["confirm_token"]
-
-        ctx_unsup = _mock_ctx_unsupported()
-        result = await harness_optout.delete_note(
-            ctx_unsup, path="01_Notes/sample.md", confirm_token=token, dry_run=False
-        )
         assert result.ok is True
         assert not (tmp_vault / "01_Notes" / "sample.md").exists()
 
     @pytest.mark.asyncio
     async def test_elicit_message_contains_path(
-        self, harness: Any, tmp_vault: Path
+        self, harness_strict: Any, tmp_vault: Path
     ) -> None:
         ctx_accept = _mock_ctx(elicit_action="accept", confirm=True)
-        phase1 = await harness.delete_note(
+        phase1 = await harness_strict.delete_note(
             ctx_accept, path="01_Notes/sample.md", confirm_token=None, dry_run=False
         )
         token = phase1.data["confirm_token"]
         ctx_check = _mock_ctx(elicit_action="accept", confirm=True)
-        await harness.delete_note(
+        await harness_strict.delete_note(
             ctx_check, path="01_Notes/sample.md", confirm_token=token, dry_run=False
         )
         kwargs = ctx_check.elicit.call_args.kwargs
@@ -312,10 +318,10 @@ class TestExecuteCommandWrapper:
 
     @pytest.mark.asyncio
     async def test_execute_command_phase2_elicit_accept(
-        self, harness: Any, tmp_vault: Path
+        self, harness_strict: Any, tmp_vault: Path
     ) -> None:
         ctx_accept = _mock_ctx(elicit_action="accept", confirm=True)
-        phase1 = await harness.execute_command(
+        phase1 = await harness_strict.execute_command(
             ctx_accept,
             command_id="editor:save-file",
             confirm_token=None,
@@ -326,7 +332,7 @@ class TestExecuteCommandWrapper:
             pytest.skip("Phase 1 did not issue a token (REST unavailable)")
 
         ctx_check = _mock_ctx(elicit_action="accept", confirm=True)
-        await harness.execute_command(
+        await harness_strict.execute_command(
             ctx_check,
             command_id="editor:save-file",
             confirm_token=token,
@@ -338,10 +344,10 @@ class TestExecuteCommandWrapper:
 
     @pytest.mark.asyncio
     async def test_execute_command_phase2_elicit_reject(
-        self, harness: Any, tmp_vault: Path
+        self, harness_strict: Any, tmp_vault: Path
     ) -> None:
         ctx_accept = _mock_ctx(elicit_action="accept", confirm=True)
-        phase1 = await harness.execute_command(
+        phase1 = await harness_strict.execute_command(
             ctx_accept,
             command_id="editor:save-file",
             confirm_token=None,
@@ -352,7 +358,7 @@ class TestExecuteCommandWrapper:
             pytest.skip("Phase 1 did not issue a token (REST unavailable)")
 
         ctx_reject = _mock_ctx(elicit_action="reject", confirm=False)
-        result = await harness.execute_command(
+        result = await harness_strict.execute_command(
             ctx_reject,
             command_id="editor:save-file",
             confirm_token=token,
@@ -403,16 +409,16 @@ class TestCtxNoneBypass:
 
     @pytest.mark.asyncio
     async def test_delete_phase2_ctx_none_strict(
-        self, harness: Any, tmp_vault: Path
+        self, harness_strict: Any, tmp_vault: Path
     ) -> None:
         ctx_accept = _mock_ctx(elicit_action="accept", confirm=True)
-        phase1 = await harness.delete_note(
+        phase1 = await harness_strict.delete_note(
             ctx_accept, path="01_Notes/sample.md", confirm_token=None, dry_run=False
         )
         token = phase1.data["confirm_token"]
 
-        # Phase 2 with ctx=None — must NOT silently fall through.
-        result = await harness.delete_note(
+        # Phase 2 with ctx=None — must NOT silently fall through in strict mode.
+        result = await harness_strict.delete_note(
             None, path="01_Notes/sample.md", confirm_token=token, dry_run=False
         )
         assert result.ok is False
@@ -422,16 +428,16 @@ class TestCtxNoneBypass:
 
     @pytest.mark.asyncio
     async def test_delete_phase2_ctx_none_optout(
-        self, harness_optout: Any, tmp_vault: Path
+        self, harness: Any, tmp_vault: Path
     ) -> None:
         ctx_accept = _mock_ctx(elicit_action="accept", confirm=True)
-        phase1 = await harness_optout.delete_note(
+        phase1 = await harness.delete_note(
             ctx_accept, path="01_Notes/sample.md", confirm_token=None, dry_run=False
         )
         token = phase1.data["confirm_token"]
 
-        # ctx=None + opt-out → falls through to impl (HMAC only).
-        result = await harness_optout.delete_note(
+        # ctx=None + default optout → falls through to impl (HMAC only).
+        result = await harness.delete_note(
             None, path="01_Notes/sample.md", confirm_token=token, dry_run=False
         )
         assert result.ok is True

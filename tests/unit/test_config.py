@@ -100,6 +100,29 @@ class TestFromEnv:
         cfg = AppConfig.from_env(tmp_vault, rest_token="from-cli")
         assert cfg.rest_token == "from-cli"
 
+    def test_require_elicitation_env_true(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_vault: Path
+    ) -> None:
+        for truthy in ("true", "True", "TRUE", "1", "yes", "YES"):
+            monkeypatch.setenv("OBSIDIAN_REQUIRE_ELICITATION", truthy)
+            cfg = AppConfig.from_env(tmp_vault)
+            assert cfg.require_elicitation is True, f"failed for {truthy!r}"
+
+    def test_require_elicitation_env_false(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_vault: Path
+    ) -> None:
+        for falsy in ("false", "0", "no", "", "anything-else"):
+            monkeypatch.setenv("OBSIDIAN_REQUIRE_ELICITATION", falsy)
+            cfg = AppConfig.from_env(tmp_vault)
+            assert cfg.require_elicitation is False, f"failed for {falsy!r}"
+
+    def test_require_elicitation_env_absent_uses_default(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_vault: Path
+    ) -> None:
+        monkeypatch.delenv("OBSIDIAN_REQUIRE_ELICITATION", raising=False)
+        cfg = AppConfig.from_env(tmp_vault)
+        assert cfg.require_elicitation is False  # v0.3.1 default
+
 
 class TestRestUrlLoopbackOnly:
     """M7.5 — rest_url must point at loopback. Otherwise the
@@ -148,10 +171,10 @@ class TestRestUrlLoopbackOnly:
                 rest_url="http://0.0.0.0:27124",
             )
 
-    def test_require_elicitation_default_true(self, tmp_vault: Path) -> None:
+    def test_require_elicitation_default_false(self, tmp_vault: Path) -> None:
         cfg = AppConfig(vault_root=tmp_vault)
-        assert cfg.require_elicitation is True
-
-    def test_require_elicitation_optout(self, tmp_vault: Path) -> None:
-        cfg = AppConfig(vault_root=tmp_vault, require_elicitation=False)
         assert cfg.require_elicitation is False
+
+    def test_require_elicitation_optin_true(self, tmp_vault: Path) -> None:
+        cfg = AppConfig(vault_root=tmp_vault, require_elicitation=True)
+        assert cfg.require_elicitation is True

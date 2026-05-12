@@ -1,18 +1,19 @@
 """S4 — destructive ops with 2-phase HMAC confirm.
 
 Covers:
-- delete_note: phase 1 -> token -> phase 2 via stdio now returns
-  ELICITATION_UNSUPPORTED (M6-11: Phase 2 requires elicit-capable client)
+- delete_note: phase 1 -> token -> phase 2 via stdio succeeds (file removed)
+  because require_elicitation defaults to false since v0.3.1. The stdio
+  harness cannot render the elicit dialog, but with the default opt-out
+  setting the server falls through to HMAC-only.
 - rename_note + update_backlinks: rewrite of [[old]] in linked notes
 - move_note + update_backlinks
-- token tampering -> elicitation_unsupported (elicit gate fires before HMAC)
+- token tampering -> invalid_confirmation_token (HMAC check, since elicit
+  gate is bypassed with require_elicitation=false default)
 - token tampering: file preserved (disk untouched on any Phase 2 failure)
 
-Note: Phase 2 delete coverage (token consumption, file removal, snapshot
-verification, token reuse) is exercised in
+Note: Phase 2 delete coverage for strict mode (elicit accept/reject) is in
 `tests/integration/test_server_elicit.py` with a mocked elicit-capable
-client. The stdio harness cannot render the elicit dialog so Phase 2
-always returns ELICITATION_UNSUPPORTED here.
+client using require_elicitation=True.
 
 Note: token EXPIRY (90s TTL) is covered in unit tests (`tests/unit/
 test_confirm.py`); we skip it here to keep the E2E run fast.
@@ -60,19 +61,20 @@ async def run(h: E2EHarness) -> ScenarioReport:
 
     token = field_value(p1, "confirm_token")
 
-    # Phase 2 via stdio harness: elicit not supported → ELICITATION_UNSUPPORTED.
-    # Phase 2 delete coverage (accept/reject/file-removal/snapshot) lives in
-    # tests/integration/test_server_elicit.py (mocked elicit-capable client).
+    # Phase 2 via stdio harness: with require_elicitation=false (default since
+    # v0.3.1), the elicit exception is swallowed and the op proceeds via HMAC
+    # only. The file should be deleted and the result ok.
     p2_attempt = await h.call("delete_note", path=target, confirm_token=token)
-    ok, why = expect_error(
-        p2_attempt,
-        "elicitation_unsupported",
-        where="phase 2 via stdio",
-    )
+    ok, why = expect_ok(p2_attempt, where="phase 2 via stdio (elicit opt-out default)")
     rep.add(
-        "phase 2 returns ELICITATION_UNSUPPORTED via stdio (M6-11)",
+        "phase 2 succeeds via stdio with require_elicitation=false (v0.3.1)",
         ok,
         why,
+    )
+    rep.add(
+        "phase 2 file removed",
+        not (vault / target).exists(),
+        "file still present after phase 2",
     )
 
     # ---------- rename_note + update_backlinks ----------
@@ -146,8 +148,9 @@ async def run(h: E2EHarness) -> ScenarioReport:
     )
 
     # ---------- token tampering ----------
-    # Phase 2 with a tampered token: elicit gate fires first (before HMAC),
-    # returning ELICITATION_UNSUPPORTED via the stdio harness (M6-11).
+    # Phase 2 with a tampered token: with require_elicitation=false (default
+    # since v0.3.1), the elicit gate is bypassed and the HMAC check runs,
+    # returning invalid_confirmation_token.
     target_t = "scratch/tamper.md"
     await h.call("create_note", path=target_t, content=body)
     p1t = await h.call("delete_note", path=target_t)
@@ -158,9 +161,9 @@ async def run(h: E2EHarness) -> ScenarioReport:
         "delete_note", path=target_t, confirm_token=bad_token
     )
     ok, why = expect_error(
-        p2t, "elicitation_unsupported", where="tampered token"
+        p2t, "invalid_confirmation_token", where="tampered token"
     )
-    rep.add("tampered token: elicitation_unsupported via stdio", ok, why)
+    rep.add("tampered token: invalid_confirmation_token (HMAC gate)", ok, why)
     rep.add(
         "tampered token: file preserved",
         (vault / target_t).exists(),

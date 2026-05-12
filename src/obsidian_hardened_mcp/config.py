@@ -90,10 +90,15 @@ class AppConfig(BaseModel):
     max_batch_bytes: int = DEFAULT_MAX_BATCH_BYTES
     rest_url: str = DEFAULT_REST_URL
     rest_token: str | None = None
-    require_elicitation: bool = True
-    """If True (default), require out-of-band confirmation via MCP
-    Context.elicit() for destructive/confirmation operations. If False,
-    fall back to 2-phase HMAC tokens."""
+    require_elicitation: bool = False
+    """If True, require out-of-band confirmation via MCP Context.elicit()
+    for destructive/confirmation operations (`delete_note`,
+    `execute_command`). Default is False because empirical testing on
+    Claude Desktop (May 2026) confirmed that no current Claude client
+    implements Context.elicit — it returns "Method not found" at the
+    JSON-RPC level, making the strict default unusable out-of-the-box.
+    Set to True once your MCP client supports elicit for the strongest
+    defence against coherent-hallucination bypass (layer 2)."""
     trash_policy: TrashPolicy = Field(default_factory=TrashPolicy)
     """Auto-cleanup of `.ohmcp-trash/`. Default applies if no
     ``trash:`` block is present in the vault YAML."""
@@ -175,5 +180,11 @@ class AppConfig(BaseModel):
             # outside the default ~/.obsidian-hardened-mcp/audit/. Useful when
             # publishing test artefacts that would otherwise leak $HOME.
             kwargs["audit_dir"] = Path(audit).expanduser()
+        if (elicit := os.getenv("OBSIDIAN_REQUIRE_ELICITATION")) is not None:
+            # Truthy: "true"/"1"/"yes" (case-insensitive). Anything else => False.
+            # Lets users flip the M6-11 live-human-gate on without a YAML config.
+            kwargs["require_elicitation"] = elicit.strip().lower() in (
+                "true", "1", "yes",
+            )
         kwargs.update(overrides)
         return cls(**kwargs)  # type: ignore[arg-type]
