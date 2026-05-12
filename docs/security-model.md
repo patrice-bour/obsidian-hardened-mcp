@@ -137,10 +137,11 @@ elicitation response because it routes through the client, not the model.
 
 Phase-2 entry points for these two tools call
 `ctx.elicit("Confirm <op> on <target>?")` before consuming the HMAC token.
-Clients without elicitation support return
-`ELICITATION_UNSUPPORTED` (strict default); set `require_elicitation: false`
-in the YAML config to fall back to HMAC-only (the explicit opt-out, with
-documented residual risk). See
+Clients without elicitation support return `ELICITATION_UNSUPPORTED` when
+`require_elicitation: true` is set. As of v0.3.1 the default is `false`
+(HMAC-only, no live gate) because no current Claude client implements
+`Context.elicit`. Set `require_elicitation: true` to enable layer 2 once
+your client ships elicit support. See
 [M6-11](v0.1-followups.md#m6-11--2-phase-hmac-does-not-stop-a-coherently-hallucinating-llm)
 for the full implementation history.
 
@@ -156,12 +157,16 @@ destructive call from mutating the vault:
    on a follow-up call.
 
 2. **Out-of-band confirmation (live human gate)** — `delete_note` and
-   `execute_command` route a confirmation through the MCP client's UI
-   via `Context.elicit`. The user's accept/reject decision bypasses
+   `execute_command` can route a confirmation through the MCP client's
+   UI via `Context.elicit`. The user's accept/reject decision bypasses
    the LLM context entirely; a coherently-hallucinating LLM cannot
-   fabricate it. Disabled with `require_elicitation: false` for
-   clients that do not implement elicit (residual risk:
-   coherent-hallucination bypass; opt-out is explicit).
+   fabricate it. As of v0.3.1, empirical testing on Claude Desktop
+   (May 2026) confirmed that no current Claude client (Desktop, Code,
+   web) implements `Context.elicit` — it returns "Method not found"
+   at the JSON-RPC level. `require_elicitation` therefore defaults to
+   `false` (opt-in, not default). Set `require_elicitation: true`
+   once your client ships elicit support for the strongest posture
+   against coherent-hallucination bypass.
 
 3. **Recovery + detection (post-incident)** — All destructive ops
    snapshot the target file under `.ohmcp-trash/` before mutation;

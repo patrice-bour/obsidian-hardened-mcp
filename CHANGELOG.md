@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-05-12
+
+### Changed
+- `AppConfig.require_elicitation` default flipped from `true` to `false`.
+  Empirical testing on Claude Desktop v0.x (May 2026) confirmed that
+  the MCP `Context.elicit` method is not implemented by current Claude
+  clients (Desktop, Code, web), making the strict default unusable
+  for `delete_note` and `execute_command` out of the box. The
+  3-layer defence model is preserved: layer 2 (live human gate) is
+  now opt-in via `require_elicitation: true` once client support
+  lands. Layers 1 (HMAC) and 3 (snapshot + audit) are unchanged.
+
+### Added
+- `OBSIDIAN_REQUIRE_ELICITATION` env var wired into `AppConfig.from_env`.
+  Truthy values (`true` / `1` / `yes`, case-insensitive) set
+  `require_elicitation=True`; any other value keeps the v0.3.1 default
+  (`False`). Lets Claude Desktop users opt INTO the strict mode via
+  `claude_desktop_config.json` `env:` block without a YAML config file.
+
+### Notes
+- This is a UX fix, not a security regression. The HMAC binding still
+  prevents single-shot hallucinated calls; the snapshot trash still
+  provides recovery; the audit log still records every mutation.
+  Only the live-human-gate is opt-in.
+
 ## [0.3.0] - 2026-05-09
 
 ### Added

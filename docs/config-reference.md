@@ -175,11 +175,21 @@ overridable per-vault via `<vault>/.obsidian-hardened-mcp.yaml`.
 
 ## Elicitation gate
 
-- `require_elicitation` (default `true`) — gate destructive `delete_note`
+- `require_elicitation` (default `false`) — gate destructive `delete_note`
   and `execute_command` calls behind a `Context.elicit` prompt at
-  Phase 2. Set to `false` for automated deployments without an
-  elicit-capable MCP client (residual risk:
-  coherent-hallucination bypass).
+  Phase 2. Default flipped from `true` to `false` in v0.3.1 because no
+  Claude client (Desktop, Code, web) implements `Context.elicit` yet
+  (verified empirically on Claude Desktop May 2026 — returns "Method not
+  found" at the JSON-RPC level), making the strict default unusable
+  out-of-the-box. Set to `true` when your MCP client supports elicit to
+  enable the live human gate (layer 2 of the 3-layer defence model).
+
+  Override via env: `OBSIDIAN_REQUIRE_ELICITATION=true` (or `1` / `yes`,
+  case-insensitive). Convenient for Claude Desktop's
+  `claude_desktop_config.json` where YAML-config-file shenanigans would
+  be awkward. Any other value (including `false`, `0`, empty) keeps the
+  default. CLI flags (passed via `AppConfig.from_env(**overrides)`)
+  take precedence over the env var.
 
 ## Custom hooks (v0.2+)
 

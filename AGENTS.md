@@ -52,19 +52,23 @@ The approved v0.1 plan lives at `~/.claude/plans/les-serveurs-mcp-existants-tran
 ## Where to resume (for a fresh session)
 
 **TL;DR for a Claude Code session resuming a long-running thread**:
-the project is at **v0.3.0**, just tagged. v0.3.0 ships
-`read_multiple_notes` (mcpvault batch-read parity), `manage_tags`
-(dedicated tag tool), and M6-11 `Context.elicit` out-of-band
-confirmation for `delete_note` + `execute_command` (closes the HMAC
-coherent-hallucination gap surfaced in the v0.2.0 honesty pass).
+the project is at **v0.3.1**, just tagged. v0.3.1 is a UX fix over
+v0.3.0: `require_elicitation` default flipped to `false` after
+empirical testing on Claude Desktop (May 2026) confirmed that no
+current Claude client implements `Context.elicit` (returns "Method
+not found" at JSON-RPC level), making the v0.3.0 strict default
+unusable out-of-the-box for `delete_note` and `execute_command`.
 The repo is still private — the public flip + PyPI publish are the
 immediate next steps. Ask which step to pick up before doing anything
 visible (push, `gh repo edit`, PyPI publish).
 
-**Last merged on `main`**: `chore(release): v0.3.0` — three features
-(read_multiple_notes, manage_tags, M6-11 Context.elicit) + version
-bump across pyproject.toml / README / SECURITY / CHANGELOG /
-docs/security-model.md. **v0.3.0 tagged.** All prior tags preserved.
+**Last merged on `main`**: `chore(release): v0.3.1` — UX fix:
+`require_elicitation` default flipped from `true` to `false`.
+Empirical test 4 of the v0.3.0 validation suite (Claude Desktop)
+revealed elicit is not yet supported in any Claude client. The
+3-layer defence is preserved: layer 2 (live human gate) is now
+opt-in via `require_elicitation: true`. **v0.3.1 tagged.** All
+prior tags preserved.
 
 **State of the public-flip plan** (per
 `~/.claude/plans/avant-de-publier-sur-zippy-simon.md`):
@@ -115,6 +119,7 @@ docs/security-model.md. **v0.3.0 tagged.** All prior tags preserved.
 | 🎉 | **v0.2.1 tagged** — pre-flip credibility fixes (`__version__` via importlib.metadata, doc/version coherence, `migration/legacy`, `RELEASE-CHECKLIST.md`) | tag `v0.2.1` | 558 + 101 E2E |
 | 🎉 | **v0.2.2 tagged** — audit-invariant fixes for fs/pruner (`request_id` correlation, real `duration_ms`, sweep summary event, `params_hash` canonicalisation) | tag `v0.2.2` | 562 + 101 E2E |
 | 🎉 | **v0.3.0 tagged** — `read_multiple_notes` + `manage_tags` + M6-11 `Context.elicit` | tag `v0.3.0` | 640 + 110 E2E |
+| 🎉 | **v0.3.1 tagged** — UX fix: `require_elicitation` default flipped to `false` (elicit not yet supported in any Claude client) | tag `v0.3.1` | 640 + 110 E2E |
 
 **Next task** (in this exact order):
 
@@ -134,7 +139,7 @@ bundle (M7-03, retargeted from v0.3), `search_notes` REST routing
 (M7-01), `restore_from_snapshot` tool, `Context.elicit` extension to
 `rename_note` / `move_note` (M6-11 v0.3.x).
 
-**Sanity check** to confirm a clean v0.3.0 base:
+**Sanity check** to confirm a clean v0.3.1 base:
 
 ```bash
 cd <repo-root>
@@ -142,7 +147,7 @@ uv run pytest -q                                    # expect 640 passed + 2 skip
 uv run python tests/e2e/run_e2e.py                  # expect 110/110 PASS
 uv run ruff check src tests                         # expect "All checks passed"
 uv run mypy src                                     # expect "no issues found"
-git tag -l                                          # expect v0.1.0, v0.1.1, v0.1.2, v0.2.0, v0.2.1, v0.2.2, v0.3.0
+git tag -l                                          # expect v0.1.0, v0.1.1, v0.1.2, v0.2.0, v0.2.1, v0.2.2, v0.3.0, v0.3.1
 ```
 
 **Detailed backlog** lives in `docs/v0.1-followups.md` (entries from

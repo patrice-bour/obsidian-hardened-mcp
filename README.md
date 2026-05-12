@@ -2,7 +2,7 @@
 
 A safe, audited bridge between any [Obsidian](https://obsidian.md) vault and any MCP-compatible AI assistant — Claude Desktop, Claude Code, and friends.
 
-> **Status**: v0.3.0, community-preview. Solo, local-first use is production-ready.
+> **Status**: v0.3.1, community-preview. Solo, local-first use is production-ready.
 
 The headline difference vs. lighter Obsidian MCP servers: this one assumes the AI **will eventually make a mistake**, and is built so that mistake is recoverable. Every write is atomic, every destruction leaves a copy in trash, every action is logged, and every path is checked before it touches disk.
 
@@ -25,7 +25,7 @@ uvx --from git+https://github.com/patrice-bour/obsidian-hardened-mcp obsidian-ha
 
 `uvx` clones the package into an isolated environment, installs it, and runs the bin. The server speaks MCP over standard input/output — there's no port to open, no service to manage. Press `Ctrl+C` once you've confirmed it boots cleanly.
 
-For reproducible setups, pin to a release tag: `git+https://github.com/patrice-bour/obsidian-hardened-mcp@v0.3.0`.
+For reproducible setups, pin to a release tag: `git+https://github.com/patrice-bour/obsidian-hardened-mcp@v0.3.1`.
 
 ### 2. Wire it into your AI client
 
@@ -191,7 +191,9 @@ Every destructive tool (`delete_note`, `rename_note`, `move_note`, `execute_comm
 
 What this prevents (in a nutshell): single-shot accidents, token forgery without the secret, applying a token meant for one note to a different note, replays after expiry. What it does *not* prevent: an LLM that fires phase 1, reads the returned token from its own context, and fires phase 2 cleanly. For that scenario, you fall back on the snapshot trash, the audit log, and your client's confirm UI.
 
-v0.3.0 adds `Context.elicit`-based out-of-band confirmation for `delete_note` and `execute_command`. When a Phase 2 call reaches the server, it asks the MCP client to display a confirmation dialog to the user; only an explicit user click proceeds. The LLM cannot synthesise this response. Set `require_elicitation: false` in the YAML config to opt out for clients without elicit support.
+v0.3.0 adds `Context.elicit`-based out-of-band confirmation for `delete_note` and `execute_command`. When a Phase 2 call reaches the server, it asks the MCP client to display a confirmation dialog to the user; only an explicit user click proceeds. The LLM cannot synthesise this response.
+
+**v0.3.1 note:** empirical testing on Claude Desktop (May 2026) confirmed that no current Claude client (Desktop, Code, web) implements `Context.elicit` — it returns "Method not found" at the JSON-RPC level. `require_elicitation` therefore defaults to `false` so destructive ops work out-of-the-box with HMAC + snapshot-recovery (layers 1 and 3). To activate the live human gate (layer 2) once your client ships elicit support, set `require_elicitation: true` in the YAML config.
 
 For the full threat-by-threat matrix and the planned out-of-band fix, see [docs/security-model.md § LLM-driven destructive ops](./docs/security-model.md#llm-driven-destructive-ops).
 

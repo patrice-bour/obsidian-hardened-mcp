@@ -83,11 +83,15 @@ Three layers of defence apply to `delete_note`, `rename_note`,
 1. **Cryptographic binding** — HMAC-signed two-phase confirmation
    tokens. A single hallucinated call cannot mutate; the same payload
    must be confirmed across two calls.
-2. **Out-of-band confirmation** — for `delete_note` and
-   `execute_command`, the server prompts the MCP client UI (Claude
-   Desktop, Claude Code, etc.) via `Context.elicit` before consuming
-   the token. Disabled with `require_elicitation: false` for clients
-   that do not implement elicit.
+2. **Out-of-band confirmation (live human gate)** — `delete_note` and
+   `execute_command` can route a confirmation through the MCP client's
+   UI via `Context.elicit` (set `require_elicitation: true` to
+   enable). As of v0.3.1, no Claude client (Desktop, Code, web)
+   implements the MCP elicit method yet, so this layer is **opt-in,
+   not default**. When client support lands, flip
+   `require_elicitation: true` for the strongest defence against
+   coherent-hallucination bypass. Until then, layers 1 (HMAC) + 3
+   (snapshot/audit) apply.
 3. **Recovery** — every destructive call snapshots the target into
    `.ohmcp-trash/` before mutation, with retention configurable via
    `trash_policy`. An append-only JSONL audit log records every
