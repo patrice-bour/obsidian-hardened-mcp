@@ -280,6 +280,5 @@ applies the change atomically.
 Co-Authored-By: Claude ...
 ```
 
-After M6 is committed and merged, run the M6 code review (see the loop
-documented in `AGENTS.md` § "Where to resume"), fix critical findings
-inline as M6.5, and only then proceed to M7.
+After M6 is committed and merged, run the M6 code review, fix
+critical findings inline as M6.5, and only then proceed to M7.
