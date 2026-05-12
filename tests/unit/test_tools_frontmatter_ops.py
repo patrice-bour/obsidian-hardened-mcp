@@ -53,12 +53,12 @@ class TestSetFrontmatterField:
         self, config: AppConfig, audit: AuditLogger, fm_note: Path
     ) -> None:
         result = set_frontmatter_field(
-            config, audit, "01_Notes/fm.md", "author", "Patrice"
+            config, audit, "01_Notes/fm.md", "author", "Alice"
         )
         assert result.ok
         new = parse_note(fm_note.read_text())
         assert new.frontmatter is not None
-        assert new.frontmatter["author"] == "Patrice"
+        assert new.frontmatter["author"] == "Alice"
 
     def test_overwrites_existing_field(
         self, config: AppConfig, audit: AuditLogger, fm_note: Path
@@ -169,7 +169,7 @@ class TestMergeFrontmatter:
     def test_shallow_merge_overrides_top_level(
         self, config: AppConfig, audit: AuditLogger, fm_note: Path
     ) -> None:
-        patch = {"title": "New", "author": "Patrice"}
+        patch = {"title": "New", "author": "Alice"}
         result = merge_frontmatter(
             config, audit, "01_Notes/fm.md", patch, mode="shallow"
         )
@@ -177,7 +177,7 @@ class TestMergeFrontmatter:
         new = parse_note(fm_note.read_text())
         assert new.frontmatter is not None
         assert new.frontmatter["title"] == "New"
-        assert new.frontmatter["author"] == "Patrice"
+        assert new.frontmatter["author"] == "Alice"
         assert "tags" in new.frontmatter
 
     def test_shallow_merge_replaces_nested_structures(

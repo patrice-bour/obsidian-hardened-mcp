@@ -64,10 +64,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.2] - 2026-05-06
 
-Restores the audit-invariant contract documented in `CLAUDE.md` for
-the v0.2.0 trash pruner. Behavioural change is observable only in
-the audit log; the pruner's user-facing semantics (what gets pruned,
-when) are unchanged.
+Restores the audit-invariant contract for the v0.2.0 trash pruner.
+Behavioural change is observable only in the audit log; the pruner's
+user-facing semantics (what gets pruned, when) are unchanged.
 
 ### Fixed
 - **`request_id` correlation** in `fs/pruner.prune_trash`: a single
@@ -75,15 +74,15 @@ when) are unchanged.
   `tools._base.new_request_id()`) and shares it across every event
   emitted by that sweep. The previous implementation generated a
   fresh `request_id` per pruned snapshot, breaking the per-call
-  correlation guarantee CLAUDE.md §7 promises.
+  correlation guarantee of the audit invariants.
 - **Real `duration_ms`** on per-snapshot prune events: each
   `shutil.rmtree` is now wrapped in a `time.monotonic()` window. The
   field was previously hardcoded to `0`, hiding pruner runtime from
   the audit log.
 - **`params_hash` canonicalisation**: per-snapshot prune events now
   hash via `tools._base.params_hash()` (canonical JSON, sha256-16)
-  instead of an f-string, matching the project-wide convention
-  documented in CLAUDE.md forbidden patterns §6.
+  instead of an f-string, matching the project-wide canonical-JSON
+  hashing convention.
 
 ### Added
 - **Sweep summary event** (`op_kind="meta"`,
@@ -124,13 +123,10 @@ v0.1.2..v0.2.0 code review. No behavioural change for users.
   point at `v0.2.1`.
 
 ### Changed
-- Renamed the `migration/pbr` example tag (a personal vault
-  convention) to the generic `migration/legacy` in
-  `docs/config-reference.md`, the `ReservedTagsHook` docstring, and
-  the corresponding test fixture. No public API impact.
-- Generalised the off-repo plan paths in `AGENTS.md` "Where to
-  resume" from `/Users/pbr/.claude/plans/...` to
-  `~/.claude/plans/...`.
+- Replaced an environment-specific example tag with the generic
+  `migration/legacy` in `docs/config-reference.md`, the
+  `ReservedTagsHook` docstring, and the corresponding test fixture.
+  No public API impact.
 
 ### Added
 - `RELEASE-CHECKLIST.md` documents the per-release knobs that drift
@@ -245,12 +241,11 @@ who installed pre-flip from `obsidian-full-mcp`.
 - README status line now says v0.1.1 (was v0.1.0).
 - README test-count drift: `533 passed` (was `530 passed`); E2E
   invocation documented.
-- `AGENTS.md` sanity-check block: replaced personal absolute path with
-  `<repo-root>` placeholder.
 - `CHANGELOG.md` now defines `[Unreleased]` and `[0.1.1]` compare
   links (the v0.1.1 link was missing on tag-cut day).
-- `tests/security/test_round_trip_golden.py` golden #39 swapped
-  `Patrice Bour` → `Jane Doe` in the dotted-key fixture.
+- `tests/security/test_round_trip_golden.py` golden #39: replaced
+  the author placeholder with a generic name in the dotted-key
+  fixture.
 
 ## [0.1.1] - 2026-05-04
 

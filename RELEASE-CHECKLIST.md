@@ -63,13 +63,13 @@ file from "would-be-nice" to "must run before tagging".
    bulk-rename "v0.2 followup" / "v0.2 roadmap" → "v0.3 …" wherever
    M6-11 / restore / M7-03 are mentioned.
 
-8. **`AGENTS.md` "Where to resume"** — bump the headline version
-   number and insert a one-liner about what landed.
+8. **Internal handoff note** — bump the headline version number and
+   insert a one-liner about what landed.
 
 ## Push gates
 
 These need explicit user confirmation each time (per the project's
-durable workflow preference — `~/.claude/projects/.../workflow_preferences.md`):
+durable workflow preference):
 
 - `git push origin <branch>`
 - `git push origin v<X.Y.Z>` (tag push)

@@ -67,8 +67,8 @@ per-path failures (path escape, not-found, file-too-large, etc.) into
 applies to empty inputs and to `len(paths) > config.max_batch`. A
 cumulative byte cap (`config.max_batch_bytes`, default 10 MB) stops
 iteration once exceeded; remaining entries are marked
-`BATCH_TOO_LARGE`. No audit emission (per CLAUDE.md invariant #4 —
-write/destructive only).
+`BATCH_TOO_LARGE`. No audit emission (read paths do not emit audit
+events — only write/destructive operations do).
 
 ### Frontmatter operations
 

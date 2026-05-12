@@ -75,3 +75,8 @@ secret
 # E2E test vault (ephemeral, recreated by tests/e2e/seed_vault.py)
 tests/e2e/.test-vault/
 tests/e2e/.runs/
+
+# Internal artefacts (kept off-repo)
+docs/superpowers/
+AGENTS.md
+CLAUDE.md
