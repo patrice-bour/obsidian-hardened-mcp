@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 import pytest
 
@@ -103,3 +103,14 @@ class TestParseContract:
 
     def test_policies_constant(self) -> None:
         assert POLICIES == ("auto", "on_read", "flag")
+
+    def test_datetime_value_is_coerced_to_date(self) -> None:
+        c = parse_contract(
+            {"refresh_every": "1m", "refresh_last": datetime(2026, 7, 5, 12, 30)}
+        )
+        assert c is not None
+        assert c.last == date(2026, 7, 5)
+
+    def test_non_date_non_str_last_raises(self) -> None:
+        with pytest.raises(InvalidContractError, match="refresh_last"):
+            parse_contract({"refresh_every": "1m", "refresh_last": 20260705})

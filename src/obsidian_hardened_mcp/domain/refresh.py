@@ -13,6 +13,7 @@ import re
 from calendar import monthrange
 from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import Any
 
 POLICIES: tuple[str, ...] = ("auto", "on_read", "flag")
 DEFAULT_POLICY = "flag"
@@ -73,7 +74,7 @@ def _coerce_date(value: object, *, field: str) -> dt.date:
     raise InvalidContractError(f"invalid {field}: {value!r}")
 
 
-def parse_contract(fm: Mapping | None) -> RefreshContract | None:
+def parse_contract(fm: Mapping[str, Any] | None) -> RefreshContract | None:
     """Extract the refresh contract from a frontmatter mapping.
 
     Returns None when the note is not under contract (neither
