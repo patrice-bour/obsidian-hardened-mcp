@@ -23,7 +23,7 @@ LlmFactory = Callable[[str, str], Callable[[str, list[dict[str, str]]], tuple[st
 
 def _fake_llm_factory(calls: list[str] | None = None) -> LlmFactory:
     def factory(
-        base_url: str, api_key: str
+        base_url: str, api_key: str, **_kwargs: object
     ) -> Callable[[str, list[dict[str, str]]], tuple[str, float]]:
         def complete(route: str, messages: list[dict[str, str]]) -> tuple[str, float]:
             if calls is not None:
@@ -41,6 +41,7 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("TAVILY_API_KEY", raising=False)
     monkeypatch.delenv("LITELLM_BASE_URL", raising=False)
     monkeypatch.delenv("LITELLM_API_KEY", raising=False)
+    monkeypatch.delenv("LITELLM_TIMEOUT_S", raising=False)
 
 
 class TestMain:
@@ -112,6 +113,25 @@ class TestMain:
         report_text = (exec_vault_cloud_denied / REPORT_PATH).read_text()
         assert "⚠ t1" in report_text
         assert "cloud route not allowed" in report_text
+
+    def test_litellm_timeout_s_env_var_threaded_to_factory(
+        self, exec_vault: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        captured: dict[str, object] = {}
+
+        def factory(
+            base_url: str, api_key: str, **kwargs: object
+        ) -> Callable[[str, list[dict[str, str]]], tuple[str, float]]:
+            captured.update(kwargs)
+            return _fake_llm_factory()(base_url, api_key)
+
+        monkeypatch.setattr(cli, "litellm_complete_factory", factory)
+        monkeypatch.setenv("LITELLM_TIMEOUT_S", "7.5")
+
+        exit_code = cli.main(["--vault", str(exec_vault), "--dry-run"])
+
+        assert exit_code == 0
+        assert captured["timeout_s"] == 7.5
 
     def test_task_filter_skips_other_tasks_without_calling_llm(
         self, exec_vault_two_tasks: Path, monkeypatch: pytest.MonkeyPatch

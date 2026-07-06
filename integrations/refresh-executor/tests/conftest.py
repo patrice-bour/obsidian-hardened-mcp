@@ -208,6 +208,32 @@ def exec_vault_web(tmp_vault: Path) -> Path:
 
 
 @pytest.fixture
+def exec_vault_broken_whitelist(tmp_vault: Path) -> Path:
+    """A vault whose whitelist has one valid task (`t1`) and one BROKEN
+    entry (`broken-task`, missing the required `prompt`) — `run_cycle`
+    must still run `t1` to completion AND surface `broken-task` as an
+    anomaly TaskResult (Finding 1: scan/config anomalies must not be
+    silently dropped)."""
+    (tmp_vault / ".obsidian-hardened-mcp.yaml").write_text(
+        "refresh_tasks:\n"
+        "  t1:\n"
+        "    note: 01_Notes/auto.md\n"
+        "    prompt: Refresh this note with the latest summary.\n"
+        "  broken-task:\n"
+        "    note: 01_Notes/other.md\n"
+    )
+    (tmp_vault / "01_Notes" / "auto.md").write_text(
+        "---\n"
+        "refresh_policy: auto\n"
+        "refresh_task: t1\n"
+        "refresh_every: 1m\n"
+        "refresh_last: 2026-05-01\n"
+        "---\n" + _STALE_BODY
+    )
+    return tmp_vault
+
+
+@pytest.fixture
 def exec_vault_two_tasks(tmp_vault: Path) -> Path:
     """A vault with two executable tasks: `t1` (fine) and `boom-task`
     (whose prompt contains the word "boom", so a flaky `llm_complete`

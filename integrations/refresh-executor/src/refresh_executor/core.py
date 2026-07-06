@@ -97,6 +97,16 @@ def run_cycle(
     into the user message) — see `_build_messages`. A task declaring
     `"web"` while `web_search` is `None` (no API key configured) is an
     anomaly (`"web unavailable"`), never a silent no-op.
+
+    Scan/config anomalies (a typo'd whitelist entry, an unreadable note, a
+    task/note pinning mismatch, ...) are folded into the returned
+    `CycleReport` as `TaskResult`s with `status="anomaly"` — so they show
+    up in `_print_report`'s CLI output and in the report note, exactly like
+    a failed task. `load_refresh_config`'s own error messages are NOT
+    re-added here: `list_stale_notes` already calls `load_refresh_config`
+    itself and folds its `InvalidTaskError` messages into
+    `scan.data["anomalies"]` (under `path=CONFIG_FILE_NAME`), so doing it
+    again here would double-report the same broken whitelist entry.
     """
     config = AppConfig.from_env(vault_root)
     audit = AuditLogger(audit_dir=config.audit_dir)
@@ -110,6 +120,18 @@ def run_cycle(
 
     results: list[TaskResult] = []
     total_cost = 0.0
+
+    for anomaly in scan.data.get("anomalies", []):
+        results.append(
+            TaskResult(
+                task_id="<config>",
+                path=str(anomaly.get("path", "")),
+                status="anomaly",
+                reason=str(anomaly.get("reason", "")),
+                model="",
+                cost=0.0,
+            )
+        )
 
     for entry in scan.data.get("stale", []):
         if not entry.get("executable"):

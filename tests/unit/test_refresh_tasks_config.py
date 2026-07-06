@@ -78,6 +78,11 @@ class TestParseRefreshTask:
         t = parse_refresh_task("t", dict(VALID, note="./01_Notes/target.md"))
         assert t.note == "01_Notes/target.md"
 
+    @pytest.mark.parametrize("bad_model", [["gpt-4"], {"model": "gpt-4"}, 4])
+    def test_non_string_model_rejected(self, bad_model: object) -> None:
+        with pytest.raises(InvalidTaskError, match="model"):
+            parse_refresh_task("t", dict(VALID, model=bad_model))
+
     def test_note_nfd_typed_stored_nfc_equal(self) -> None:
         # A note typed with an NFD-decomposed accented filename (e.g. copy-
         # pasted from a macOS/iCloud Finder path) must be stored NFC, so it

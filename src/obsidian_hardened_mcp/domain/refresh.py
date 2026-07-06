@@ -180,11 +180,15 @@ def parse_refresh_task(task_id: str, raw: Mapping[str, Any]) -> RefreshTask:
     if "web" in tools and not queries:
         raise InvalidTaskError(f"task {task_id!r}: web requires web_queries")
     model = raw.get("model")
+    if model is not None and not isinstance(model, str):
+        raise InvalidTaskError(
+            f"task {task_id!r}: model must be a string, got {type(model).__name__}"
+        )
     return RefreshTask(
         task_id=task_id,
         note=note,
         prompt=prompt,
         tools=tools,
-        model=None if model is None else str(model),
+        model=model,
         web_queries=queries,
     )

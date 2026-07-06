@@ -10,6 +10,10 @@ Environment variables:
                         Default: http://127.0.0.1:4000/v1
     LITELLM_API_KEY    Bearer token for the LiteLLM endpoint.
                         Default: sk-hermes-local
+    LITELLM_TIMEOUT_S   Read/write timeout (seconds) for LiteLLM HTTP calls.
+                        Default: 120.0 — httpx's own 5s default is far too
+                        short for LLM completions (local reasoning routes
+                        routinely exceed it).
     TAVILY_API_KEY      Tavily API key. When unset, tasks declaring the
                         "web" tool become anomalies rather than silently
                         skipping their search (see `core.run_cycle`).
@@ -30,6 +34,7 @@ from refresh_executor.web import tavily_search_factory
 
 _DEFAULT_LITELLM_BASE_URL = "http://127.0.0.1:4000/v1"
 _DEFAULT_LITELLM_API_KEY = "sk-hermes-local"
+_DEFAULT_LITELLM_TIMEOUT_S = 120.0
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -68,9 +73,10 @@ def main(argv: list[str] | None = None) -> int:
 
     base_url = os.environ.get("LITELLM_BASE_URL", _DEFAULT_LITELLM_BASE_URL)
     api_key = os.environ.get("LITELLM_API_KEY", _DEFAULT_LITELLM_API_KEY)
+    timeout_s = float(os.environ.get("LITELLM_TIMEOUT_S", _DEFAULT_LITELLM_TIMEOUT_S))
     tavily_key = os.environ.get("TAVILY_API_KEY")
 
-    llm_complete = litellm_complete_factory(base_url, api_key)
+    llm_complete = litellm_complete_factory(base_url, api_key, timeout_s=timeout_s)
     web_search = tavily_search_factory(tavily_key) if tavily_key else None
 
     try:

@@ -20,19 +20,26 @@ from refresh_executor.core import WebSearch
 
 _TAVILY_URL = "https://api.tavily.com/search"
 _MAX_RESULTS = 5
+_DEFAULT_TIMEOUT_S = 120.0
 
 
 def tavily_search_factory(
     api_key: str,
     *,
     transport: httpx.BaseTransport | None = None,
+    timeout_s: float = _DEFAULT_TIMEOUT_S,
 ) -> WebSearch:
     """Build a `WebSearch` posting to Tavily's `/search` endpoint.
 
     `transport` is exposed so tests can inject `httpx.MockTransport`
     against a fake server instead of hitting a real network endpoint.
+
+    `timeout_s` sets both the read and the write/pool timeout; the connect
+    timeout is fixed at 10s — httpx's own default (5s total) is too tight
+    a margin for a search API under load, so an explicit timeout is always
+    passed rather than relying on the library default.
     """
-    client = httpx.Client(transport=transport)
+    client = httpx.Client(transport=transport, timeout=httpx.Timeout(timeout_s, connect=10.0))
 
     def search(query: str) -> str:
         response = client.post(

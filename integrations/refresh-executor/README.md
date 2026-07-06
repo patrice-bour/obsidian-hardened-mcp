@@ -50,6 +50,7 @@ que le reste de l'exécuteur.
 |---------------------|---------------------------------|------|
 | `LITELLM_BASE_URL`   | `http://127.0.0.1:4000/v1`      | URL de base du proxy LiteLLM (ou compatible) interrogé pour chaque tâche. |
 | `LITELLM_API_KEY`    | `sk-hermes-local`                | Jeton `Authorization: Bearer` envoyé au proxy LiteLLM. |
+| `LITELLM_TIMEOUT_S`  | `120.0`                          | Timeout (secondes) de lecture/écriture pour les appels HTTP LiteLLM. Le défaut httpx (5 s) est bien trop court pour une complétion LLM — les routes de raisonnement local le dépassent couramment. |
 | `TAVILY_API_KEY`     | *(absent)*                       | Clé Tavily. Si absente, toute tâche déclarant l'outil `web` devient une anomalie (`web unavailable`) plutôt que de sauter silencieusement sa recherche. |
 
 ## Planification (launchd, macOS)

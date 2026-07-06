@@ -21,21 +21,32 @@ from refresh_executor.core import LlmComplete
 _COST_HEADER = "x-litellm-response-cost"
 
 
+_DEFAULT_TIMEOUT_S = 120.0
+
+
 def litellm_complete_factory(
     base_url: str,
     api_key: str,
     *,
     transport: httpx.BaseTransport | None = None,
+    timeout_s: float = _DEFAULT_TIMEOUT_S,
 ) -> LlmComplete:
     """Build an `LlmComplete` posting `{base_url}/chat/completions`.
 
     `transport` is exposed so tests can inject `httpx.MockTransport`
     against a fake server instead of hitting a real network endpoint.
+
+    `timeout_s` sets both the read and the write/pool timeout; the connect
+    timeout is fixed at 10s. httpx's own default (5s total) is far too
+    short for LLM completions — local reasoning routes routinely exceed
+    it — so this factory always passes an explicit timeout rather than
+    relying on the library default.
     """
     client = httpx.Client(
         base_url=base_url,
         headers={"Authorization": f"Bearer {api_key}"},
         transport=transport,
+        timeout=httpx.Timeout(timeout_s, connect=10.0),
     )
 
     def complete(route: str, messages: list[dict[str, str]]) -> tuple[str, float]:

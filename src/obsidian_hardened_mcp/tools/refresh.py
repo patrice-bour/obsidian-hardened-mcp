@@ -316,16 +316,18 @@ def refresh_apply(
         except InvalidContractError as exc:
             return ToolResult.failure(ErrorCode.VALIDATION_FAILED, str(exc))
 
-        task_id = None if fm is None else fm.get("refresh_task")
+        if contract is None:
+            return ToolResult.failure(
+                ErrorCode.VALIDATION_FAILED,
+                f"refresh_apply refused for {rel}: not an executable auto contract",
+            )
         tasks, _settings, _errors = load_refresh_config(config.vault_root)
-        pinned = (
-            contract is not None
-            and contract.policy == "auto"
-            and task_id is not None
-            and str(task_id) in tasks
-            and tasks[str(task_id)].note == rel
-        )
-        if not pinned or contract is None:
+        # Reuse the SAME pinning rule the scan applies (`_resolve_auto`),
+        # rather than re-deriving it inline — a throwaway `anomalies` sink
+        # is passed since refresh_apply reports failure via ToolResult, not
+        # via the scan's anomaly list.
+        _task_id, executable = _resolve_auto(contract, rel, fm, tasks, anomalies=[])
+        if not executable:
             return ToolResult.failure(
                 ErrorCode.VALIDATION_FAILED,
                 f"refresh_apply refused for {rel}: not an executable auto contract",

@@ -54,3 +54,43 @@ class TestLitellmCompleteFactory:
         complete("cloud-x", messages)
 
         assert captured["body"] == {"model": "cloud-x", "messages": messages}
+
+
+class TestLitellmCompleteFactoryTimeout:
+    def test_default_timeout_is_120s_with_10s_connect(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        captured: dict[str, object] = {}
+        real_client = httpx.Client
+
+        def spy_client(*args: object, **kwargs: object) -> httpx.Client:
+            captured.update(kwargs)
+            return real_client(*args, **kwargs)
+
+        monkeypatch.setattr(httpx, "Client", spy_client)
+        transport = _handler("x", cost_header=None)
+
+        litellm_complete_factory("http://fake", "key", transport=transport)
+
+        timeout = captured["timeout"]
+        assert isinstance(timeout, httpx.Timeout)
+        assert timeout.read == 120.0
+        assert timeout.connect == 10.0
+
+    def test_timeout_s_is_configurable(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        captured: dict[str, object] = {}
+        real_client = httpx.Client
+
+        def spy_client(*args: object, **kwargs: object) -> httpx.Client:
+            captured.update(kwargs)
+            return real_client(*args, **kwargs)
+
+        monkeypatch.setattr(httpx, "Client", spy_client)
+        transport = _handler("x", cost_header=None)
+
+        litellm_complete_factory("http://fake", "key", transport=transport, timeout_s=5.0)
+
+        timeout = captured["timeout"]
+        assert isinstance(timeout, httpx.Timeout)
+        assert timeout.read == 5.0
+        assert timeout.connect == 10.0

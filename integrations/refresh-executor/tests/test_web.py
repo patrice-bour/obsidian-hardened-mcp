@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 import httpx
+import pytest
 
 from refresh_executor.web import tavily_search_factory
 
@@ -73,3 +74,43 @@ class TestTavilySearchFactory:
         assert "bounded query" in text
         assert "Result 0" in text
         assert "Result 9" not in text
+
+
+class TestTavilySearchFactoryTimeout:
+    def test_default_timeout_is_120s_with_10s_connect(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        captured: dict[str, object] = {}
+        real_client = httpx.Client
+
+        def spy_client(*args: object, **kwargs: object) -> httpx.Client:
+            captured.update(kwargs)
+            return real_client(*args, **kwargs)
+
+        monkeypatch.setattr(httpx, "Client", spy_client)
+        transport = _handler({"answer": "", "results": []})
+
+        tavily_search_factory("key", transport=transport)
+
+        timeout = captured["timeout"]
+        assert isinstance(timeout, httpx.Timeout)
+        assert timeout.read == 120.0
+        assert timeout.connect == 10.0
+
+    def test_timeout_s_is_configurable(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        captured: dict[str, object] = {}
+        real_client = httpx.Client
+
+        def spy_client(*args: object, **kwargs: object) -> httpx.Client:
+            captured.update(kwargs)
+            return real_client(*args, **kwargs)
+
+        monkeypatch.setattr(httpx, "Client", spy_client)
+        transport = _handler({"answer": "", "results": []})
+
+        tavily_search_factory("key", transport=transport, timeout_s=5.0)
+
+        timeout = captured["timeout"]
+        assert isinstance(timeout, httpx.Timeout)
+        assert timeout.read == 5.0
+        assert timeout.connect == 10.0

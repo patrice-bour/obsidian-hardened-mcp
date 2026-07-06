@@ -96,6 +96,23 @@ class TestRunCycle:
         assert by_id["hybrid1"].model == "local-thinker"
         assert by_id["hybrid1"].cost == 0.0
 
+    def test_broken_whitelist_entry_surfaces_as_anomaly(
+        self, exec_vault_broken_whitelist: Path
+    ) -> None:
+        """A whitelist entry that fails to parse (missing `prompt`) must
+        not be silently dropped: it should show up as an anomaly
+        TaskResult alongside the other, unrelated task still running."""
+        report = run_cycle(exec_vault_broken_whitelist, llm_complete=fake_llm, today=TODAY)
+
+        anomalies = [r for r in report.results if r.task_id == "<config>"]
+        assert len(anomalies) == 1
+        assert anomalies[0].status == "anomaly"
+        assert "broken-task" in anomalies[0].reason
+        assert "prompt" in anomalies[0].reason
+
+        [t1_result] = [r for r in report.results if r.task_id == "t1"]
+        assert t1_result.status == "applied"
+
     def test_only_task_filters_before_any_llm_call(self, exec_vault_two_tasks: Path) -> None:
         """`only_task` must skip the non-matching task entirely — never even
         reaching the LLM — not merely omit it from the report after a call."""
