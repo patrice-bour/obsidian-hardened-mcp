@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import datetime as dt
 import re
+import unicodedata
 from calendar import monthrange
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -144,6 +145,14 @@ def parse_refresh_task(task_id: str, raw: Mapping[str, Any]) -> RefreshTask:
     note = str(raw.get("note") or "").strip()
     if not note:
         raise InvalidTaskError(f"task {task_id!r}: note is required")
+    # Pinning comparisons (scan + `refresh_apply`) both key off `VaultPath`'s
+    # NFC-normalised relative path (`domain.vault_path.VaultPath.from_user`).
+    # Normalize the whitelist side the same way here, once, at parse time —
+    # so a `./`-prefixed or NFD-typed `note:` still pins correctly instead of
+    # silently failing closed on a macOS/iCloud filename encoding mismatch.
+    note = unicodedata.normalize("NFC", note)
+    if note.startswith("./"):
+        note = note[2:]
     prompt = str(raw.get("prompt") or "").strip()
     if not prompt:
         raise InvalidTaskError(f"task {task_id!r}: prompt is required")

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import unicodedata
 from datetime import date
 from pathlib import Path
 
@@ -382,3 +383,37 @@ class TestAutoResolution:
             e["executable"] is False and e["task"] is None
             for e in result.data["stale"]
         )
+
+    def test_accented_filename_nfd_on_disk_pins_against_nfc_whitelist(
+        self, tmp_vault: Path, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        # Regression: on macOS/iCloud, an accented filename can be stored NFD
+        # on disk while the whitelist's `note:` (and `refresh_apply`'s
+        # `VaultPath`-derived path) are NFC. Before the fix, the scan's raw
+        # `abs_path.relative_to(...).as_posix()` (NFD) never matched the
+        # whitelist's typed/normalized `note:` (NFC) -> false "unknown
+        # refresh_task"/"task/note mismatch" anomaly, never executable.
+        nfc_rel = "01_Notes/Paysage modèles.md"
+        nfd_name = unicodedata.normalize("NFD", "Paysage modèles.md")
+        (tmp_vault / ".obsidian-hardened-mcp.yaml").write_text(
+            "refresh_tasks:\n"
+            "  accented:\n"
+            f"    note: {nfc_rel}\n"
+            "    prompt: Rebuild the accented note.\n"
+        )
+        target = tmp_vault / "01_Notes" / nfd_name
+        target.write_text(
+            "---\nrefresh_policy: auto\nrefresh_task: accented\n"
+            "refresh_every: 7d\nrefresh_last: 2026-06-01\n---\nBody\n"
+        )
+        result = list_stale_notes(config, audit, today=TODAY)
+        assert result.ok
+        assert not any(
+            "unknown refresh_task" in a["reason"] or "task/note mismatch" in a["reason"]
+            for a in result.data["anomalies"]
+        )
+        entry = next(
+            e for e in result.data["stale"] if e["path"] == nfc_rel
+        )
+        assert entry["task"] == "accented"
+        assert entry["executable"] is True

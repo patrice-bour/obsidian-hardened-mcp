@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import unicodedata
 from pathlib import Path
 
 import pytest
@@ -70,6 +71,24 @@ class TestParseRefreshTask:
     def test_non_list_web_queries_rejected(self, bad_queries: object) -> None:
         with pytest.raises(InvalidTaskError, match="web_queries"):
             parse_refresh_task("t", dict(VALID, web_queries=bad_queries))
+
+    def test_note_dot_slash_prefix_normalized(self) -> None:
+        # A `./`-prefixed note must pin identically to the un-prefixed form,
+        # since the scan/apply sides never carry a `./` in `rel`.
+        t = parse_refresh_task("t", dict(VALID, note="./01_Notes/target.md"))
+        assert t.note == "01_Notes/target.md"
+
+    def test_note_nfd_typed_stored_nfc_equal(self) -> None:
+        # A note typed with an NFD-decomposed accented filename (e.g. copy-
+        # pasted from a macOS/iCloud Finder path) must be stored NFC, so it
+        # compares equal to the NFC relative path the scan/`refresh_apply`
+        # sides derive from `VaultPath` (see `domain.vault_path.VaultPath`).
+        nfc_name = "01_Notes/Paysage modèles.md"  # è as a single codepoint
+        nfd_name = unicodedata.normalize("NFD", nfc_name)
+        assert nfd_name != nfc_name  # sanity: the two forms really differ
+        t = parse_refresh_task("t", dict(VALID, note=nfd_name))
+        assert t.note == nfc_name
+        assert unicodedata.is_normalized("NFC", t.note)
 
 
 class TestLoadRefreshConfig:

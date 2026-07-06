@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import unicodedata
 from datetime import date
 from pathlib import Path
 
@@ -100,3 +101,36 @@ class TestApply:
         refresh_apply(config, audit, "01_Notes/auto.md", "New\n", today=TODAY)
         logs = "".join(p.read_text() for p in config.audit_dir.glob("*.jsonl"))
         assert '"tool":"refresh_apply"' in logs and '"snapshot_id":' in logs
+
+
+class TestUnicodeNormalization:
+    def test_accented_filename_nfd_on_disk_pins_against_nfc_whitelist(
+        self, tmp_vault: Path, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        # Regression: mirrors TestAutoResolution's scan-side test in
+        # test_tools_refresh.py. The note is stored NFD on disk (as a
+        # macOS/iCloud-synced accented filename can be); the whitelist's
+        # `note:` is typed/stored NFC (`parse_refresh_task` normalizes it).
+        # Before the fix, `refresh_apply`'s `rel = str(vp.relative)` (NFC,
+        # via `VaultPath`) was already NFC — so this specific comparison
+        # worked — but the scan side fed the executor the raw NFD `rel`,
+        # which then failed the `tasks[task_id].note == rel` pinning check
+        # here. This exercises the full pinned round trip end-to-end.
+        nfc_rel = "01_Notes/Paysage modèles.md"
+        nfd_name = unicodedata.normalize("NFD", "Paysage modèles.md")
+        (tmp_vault / ".obsidian-hardened-mcp.yaml").write_text(
+            "refresh_tasks:\n"
+            "  accented:\n"
+            f"    note: {nfc_rel}\n"
+            "    prompt: Rebuild the accented note.\n"
+        )
+        target = tmp_vault / "01_Notes" / nfd_name
+        target.write_text(
+            "---\nrefresh_policy: auto\nrefresh_task: accented\n"
+            "refresh_every: 1m\nrefresh_last: 2026-05-01\n---\nOld body\n"
+        )
+        result = refresh_apply(config, audit, nfc_rel, "New body\n", today=TODAY)
+        assert result.ok, result.error
+        parsed = parse_note(target.read_text())
+        assert parsed.body == "New body\n"
+        assert str(parsed.frontmatter["refresh_last"]) == "2026-07-06"

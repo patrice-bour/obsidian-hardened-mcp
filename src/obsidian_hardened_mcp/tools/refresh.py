@@ -103,6 +103,14 @@ def list_stale_notes(
         scanned += 1
         try:
             vp = VaultPath.from_user(rel, config.vault_root)
+            # `VaultPath.from_user` NFC-normalises the relative path; reuse
+            # that canonical form (rather than the raw, possibly NFD, on-disk
+            # posix path) for every downstream comparison and report field.
+            # This keeps the scan side in lockstep with `refresh_apply`'s
+            # `rel = str(vp.relative)` and the whitelist's normalized `note:`
+            # (`domain.refresh.parse_refresh_task`) — one normalization idiom,
+            # not three independently-drifting ones.
+            rel = str(vp.relative)
             text = read_text(vp, max_size_bytes=config.max_file_size_bytes)
             parsed = parse_note(text)
             contract = parse_contract(parsed.frontmatter)
