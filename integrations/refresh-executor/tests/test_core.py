@@ -113,6 +113,27 @@ class TestRunCycle:
         [t1_result] = [r for r in report.results if r.task_id == "t1"]
         assert t1_result.status == "applied"
 
+    def test_unrelated_scan_anomalies_are_aggregated(self, exec_vault: Path) -> None:
+        """Malformed frontmatter elsewhere in the vault must not flood the
+        report with one anomaly line per broken note: unrelated scan
+        anomalies collapse into a single `<scan>` count line, while the
+        executable task still runs."""
+        for i in range(3):
+            (exec_vault / "01_Notes" / f"broken-{i}.md").write_text(
+                "---\naliases:\n- not: [valid yaml\n---\nBody\n"
+            )
+
+        report = run_cycle(exec_vault, llm_complete=fake_llm, today=TODAY)
+
+        assert not [r for r in report.results if r.task_id == "<config>"]
+        [aggregate] = [r for r in report.results if r.task_id == "<scan>"]
+        assert aggregate.status == "anomaly"
+        assert "3 unrelated scan anomalies" in aggregate.reason
+        assert "\n" not in aggregate.reason
+
+        [t1_result] = [r for r in report.results if r.task_id == "t1"]
+        assert t1_result.status == "applied"
+
     def test_only_task_filters_before_any_llm_call(self, exec_vault_two_tasks: Path) -> None:
         """`only_task` must skip the non-matching task entirely — never even
         reaching the LLM — not merely omit it from the report after a call."""
