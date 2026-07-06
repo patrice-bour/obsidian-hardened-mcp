@@ -583,6 +583,8 @@ def create_server(
         )
     )
     def list_stale_notes(mark: bool = False, policy: str | None = None) -> ToolResult:
-        return _list_stale_notes_impl(config, audit, mark=mark, policy=policy)
+        return _list_stale_notes_impl(
+            config, audit, mark=mark, policy=policy, hooks=hooks
+        )
 
     return app

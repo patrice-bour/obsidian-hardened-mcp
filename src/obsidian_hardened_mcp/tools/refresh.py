@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
 """vault-refresh tool — `list_stale_notes`.
 
-Deterministic scan of the vault's `refresh_*` contracts (see
-docs/superpowers/specs/2026-07-06-vault-refresh-design.md). Read-only by
-default; `mark=True` stamps the two derived fields (`refresh_due`,
-`refresh_stale`) through the round-trip-aware frontmatter layer, so those
-writes are atomic and audited like any other frontmatter write.
+Deterministic scan of the vault's `refresh_*` contracts (vault-refresh v1
+design, 2026-07-06). Read-only by default; `mark=True` stamps the two
+derived fields (`refresh_due`, `refresh_stale`) through the round-trip-aware
+frontmatter layer, so those writes are atomic and audited like any other
+frontmatter write.
 """
 
 from __future__ import annotations
@@ -28,6 +28,7 @@ from obsidian_hardened_mcp.fs.reader import read_text
 from obsidian_hardened_mcp.security.audit_logger import AuditLogger
 from obsidian_hardened_mcp.tools._base import tool_call
 from obsidian_hardened_mcp.tools.frontmatter import merge_frontmatter
+from obsidian_hardened_mcp.validation.hooks import HookRegistry
 
 
 @tool_call
@@ -38,17 +39,25 @@ def list_stale_notes(
     mark: bool = False,
     policy: str | None = None,
     today: dt.date | None = None,
+    hooks: HookRegistry | None = None,
 ) -> ToolResult:
     """Scan the vault for notes whose refresh contract is overdue.
 
     A note is under contract when its frontmatter carries `refresh_every`
     AND `refresh_last`. Never touches note bodies. `today` is injectable
-    for tests; defaults to the local date.
+    for tests; defaults to the local date. When `policy` is given, only
+    matching notes are marked and reported; `with_contract` still counts
+    all contracted notes.
     """
     if policy is not None and policy not in POLICIES:
         return ToolResult.failure(
             ErrorCode.VALIDATION_FAILED,
             f"unknown policy: {policy!r} (expected one of {POLICIES})",
+        )
+    if not config.vault_root.is_dir():
+        return ToolResult.failure(
+            ErrorCode.NOT_FOUND,
+            "vault root unavailable: " + str(config.vault_root),
         )
     if today is None:
         today = dt.date.today()
@@ -78,7 +87,15 @@ def list_stale_notes(
         due = compute_due(contract.last, contract.every)
         is_stale = today >= due
         if mark:
-            marked += _mark_note(config, audit, rel, due=due, stale=is_stale)
+            marked += _mark_note(
+                config,
+                audit,
+                rel,
+                due=due,
+                stale=is_stale,
+                anomalies=anomalies,
+                hooks=hooks,
+            )
         if is_stale:
             stale.append(
                 {
@@ -109,10 +126,15 @@ def _mark_note(
     *,
     due: dt.date,
     stale: bool,
+    anomalies: list[dict[str, str]],
+    hooks: HookRegistry | None = None,
 ) -> int:
     """Stamp `refresh_due`/`refresh_stale` when they differ from the stored
     values. Returns 1 when a write happened, 0 otherwise. Delegates to
-    `merge_frontmatter` so the write is atomic, round-trip-safe and audited."""
+    `merge_frontmatter` so the write is atomic, round-trip-safe and audited.
+
+    A failed write (e.g. rejected by a validation hook) is recorded into
+    `anomalies` rather than silently counted as a no-op."""
     vp = VaultPath.from_user(rel, config.vault_root)
     text = read_text(vp, max_size_bytes=config.max_file_size_bytes)
     fm: dict[str, Any] = parse_note(text).frontmatter or {}
@@ -127,5 +149,16 @@ def _mark_note(
         rel,
         {"refresh_due": due.isoformat(), "refresh_stale": stale},
         mode="shallow",
+        hooks=hooks,
     )
-    return 1 if result.ok else 0
+    if not result.ok:
+        anomalies.append(
+            {
+                "path": rel,
+                "reason": (
+                    f"mark failed: {result.error.code.value if result.error else 'unknown'}"
+                ),
+            }
+        )
+        return 0
+    return 1

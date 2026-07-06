@@ -12,6 +12,11 @@ from obsidian_hardened_mcp.domain.results import ErrorCode
 from obsidian_hardened_mcp.frontmatter import parse_note as _parse_note
 from obsidian_hardened_mcp.security.audit_logger import AuditLogger
 from obsidian_hardened_mcp.tools.refresh import list_stale_notes
+from obsidian_hardened_mcp.validation.hooks import (
+    HookContext,
+    HookRegistry,
+    HookResult,
+)
 
 TODAY = date(2026, 7, 6)
 
@@ -177,3 +182,61 @@ class TestMark:
         assert logs, "mark=True must leave an audit trail"
         content = "".join(p.read_text() for p in logs)
         assert "merge_frontmatter" in content
+
+
+class _RejectAllHook:
+    """Test-only hook that rejects every write, to prove `list_stale_notes`
+    threads its `hooks` param down into `merge_frontmatter` and surfaces
+    the resulting failure as an anomaly rather than a silent no-op."""
+
+    name = "reject_all"
+    phase = "pre_write"
+
+    def validate(self, ctx: HookContext) -> HookResult:
+        return HookResult.reject("test hook rejects all writes")
+
+
+class TestMarkWithHooks:
+    def test_rejecting_hook_blocks_mark_and_reports_anomaly(
+        self, seeded_vault: Path, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        hooks = HookRegistry([_RejectAllHook()])
+        result = list_stale_notes(config, audit, mark=True, today=TODAY, hooks=hooks)
+        assert result.ok
+        assert result.data["marked"] == 0
+        anomalies = result.data["anomalies"]
+        mark_failures = [a for a in anomalies if "mark failed" in a["reason"]]
+        assert {a["path"] for a in mark_failures} == {
+            "01_Notes/stale-flag.md",
+            "01_Notes/fresh.md",
+            "01_Notes/stale-on-read.md",
+        }
+        # No frontmatter was actually written.
+        fm = _parse_note(
+            (seeded_vault / "01_Notes" / "stale-flag.md").read_text()
+        ).frontmatter
+        assert "refresh_due" not in fm
+
+    def test_empty_registry_still_marks(
+        self, seeded_vault: Path, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        hooks = HookRegistry([])
+        result = list_stale_notes(config, audit, mark=True, today=TODAY, hooks=hooks)
+        assert result.ok
+        assert result.data["marked"] == 3
+        # broken-contract.md still reports its parse anomaly; no mark failures.
+        assert not any("mark failed" in a["reason"] for a in result.data["anomalies"])
+
+
+class TestVaultRootUnavailable:
+    def test_missing_vault_root_returns_not_found(
+        self, seeded_vault: Path, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        import shutil
+
+        shutil.rmtree(seeded_vault)
+        result = list_stale_notes(config, audit, today=TODAY)
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code == ErrorCode.NOT_FOUND
+        assert "vault root unavailable" in result.error.message

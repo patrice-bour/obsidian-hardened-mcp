@@ -124,7 +124,7 @@ def list_tools_capabilities(config: AppConfig) -> ToolResult:
         },
         {
             "name": "list_stale_notes",
-            "kind": "read",
+            "kind": "write",
             "description": (
                 "Scan refresh_* contracts and list overdue notes. "
                 "mark=true stamps refresh_due/refresh_stale (write)."
