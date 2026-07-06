@@ -20,6 +20,8 @@ Layout:
         to-rename.md
         to-move.md
         refresh/stale-contract.md
+        refresh/auto-pinned.md
+        .obsidian-hardened-mcp.yaml   (refresh_tasks: whitelist, always dropped)
         unsafe-yaml.md           (only when seed_unsafe=True)
 
 Calling `seed(target, unsafe=False, with_hooks_config=False)` wipes the
@@ -106,6 +108,14 @@ _REFRESH_STALE_BODY = """\
 
 Long overdue on purpose (refresh_last far in the past) so it is stale
 under every refresh policy, regardless of when this vault is seeded.
+"""
+
+_REFRESH_AUTO_PINNED_BODY = """\
+# Auto-pinned refresh contract
+
+Old body content, pending replacement by `refresh_apply`. Stale on
+purpose (refresh_last far in the past), policy `auto`, whitelisted in
+`.obsidian-hardened-mcp.yaml` under `refresh_tasks:`.
 """
 
 # Unsafe YAML — uses an explicit non-default tag. The parser MUST reject
@@ -216,11 +226,31 @@ def seed(
         + _REFRESH_STALE_BODY,
     )
 
+    # vault-refresh v2 — auto-policy note pinned in the whitelist below,
+    # always overdue so `refresh_apply` has a live target to act on.
+    _write(
+        target / "refresh" / "auto-pinned.md",
+        _frontmatter(
+            "type: reference\n"
+            "refresh_policy: auto\n"
+            "refresh_task: e2e-auto-refresh\n"
+            "refresh_every: 7d\n"
+            "refresh_last: 2020-01-01\n"
+        )
+        + _REFRESH_AUTO_PINNED_BODY,
+    )
+
     if unsafe:
         _write(target / "unsafe-yaml.md", _UNSAFE_YAML_BODY)
 
+    # `refresh_tasks:` whitelist — always dropped so `refresh_apply` has a
+    # pinned, executable task to resolve against (vault-refresh v2). Merged
+    # with `_HOOKS_CONFIG` (sibling top-level YAML key) when the caller also
+    # asks for the hooks block.
+    config_text = _REFRESH_TASKS_CONFIG
     if with_hooks_config:
-        _write(target / ".obsidian-hardened-mcp.yaml", _HOOKS_CONFIG)
+        config_text += _HOOKS_CONFIG
+    _write(target / ".obsidian-hardened-mcp.yaml", config_text)
 
     return target
 
@@ -229,6 +259,16 @@ def _frontmatter(body: str) -> str:
     """Wrap a YAML body in `---` delimiters with a trailing newline."""
     return "---\n" + body + "---\n\n"
 
+
+# vault-refresh v2 whitelist — always dropped (see `seed()`). Pins
+# `e2e-auto-refresh` to `refresh/auto-pinned.md`, the sole note it is
+# executable against (S11).
+_REFRESH_TASKS_CONFIG = """\
+refresh_tasks:
+  e2e-auto-refresh:
+    note: refresh/auto-pinned.md
+    prompt: "Re-check this fact and refresh the body."
+"""
 
 # Validation hooks config dropped only for S7. The schemas come from
 # `docs/config-reference.md` § built-in hooks.

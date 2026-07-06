@@ -61,6 +61,9 @@ from obsidian_hardened_mcp.tools.read import read_note as _read_note_impl
 from obsidian_hardened_mcp.tools.refresh import (
     list_stale_notes as _list_stale_notes_impl,
 )
+from obsidian_hardened_mcp.tools.refresh import (
+    refresh_apply as _refresh_apply_impl,
+)
 from obsidian_hardened_mcp.tools.search import search_notes as _search_notes_impl
 from obsidian_hardened_mcp.tools.wikilink import (
     resolve_wikilink as _resolve_wikilink_impl,
@@ -586,5 +589,14 @@ def create_server(
         return _list_stale_notes_impl(
             config, audit, mark=mark, policy=policy, hooks=hooks
         )
+
+    @app.tool(
+        description=(
+            "Body-only auto-refresh write: snapshot + server-managed "
+            "refresh_* fields. Only valid for pinned auto contracts."
+        )
+    )
+    def refresh_apply(path: str, body: str) -> ToolResult:
+        return _refresh_apply_impl(config, audit, path, body, hooks=hooks)
 
     return app

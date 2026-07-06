@@ -1,6 +1,6 @@
 """End-to-end runner for `obsidian-hardened-mcp` v0.1.0.
 
-Orchestrates scenarios S0-S9 against a fresh seeded test vault, talking
+Orchestrates scenarios S0-S11 against a fresh seeded test vault, talking
 to the server through a real stdio MCP subprocess. Prints a final
 table summarising pass/fail per scenario.
 
@@ -44,6 +44,7 @@ from scenarios import (  # noqa: E402
     s8_audit,
     s9_rest,
     s10_refresh,
+    s11_refresh_apply,
 )
 from scenarios._assert import ScenarioReport  # noqa: E402
 from seed_vault import seed  # noqa: E402
@@ -82,6 +83,7 @@ async def main() -> int:
             s5_path_sandbox.run,
             s6_yaml_safety.run,
             s10_refresh.run,
+            s11_refresh_apply.run,
         ):
             print(f"--- {fn.__module__} ---")
             rep = await fn(h)
