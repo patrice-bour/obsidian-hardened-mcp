@@ -16,16 +16,15 @@ mkdir -p ~/.hermes/skills/note-taking/vault-refresh
 cp vault-refresh/SKILL.md ~/.hermes/skills/note-taking/vault-refresh/
 ```
 
-Hermes' skill sync never overwrites user-added skills (manifest-hash based).
+Hermes' skill sync only manages its own bundled skills; a user-added skill like this one is outside its scope and is never overwritten.
 
 ## Schedule the weekly cycle
 
 ```bash
-hermes cron add vault-refresh \
-  --schedule "30 8 * * 1" \
-  --prompt "Load the vault-refresh skill and run its scheduled cycle."
+hermes cron create "30 8 * * 1" "Load the vault-refresh skill and run its scheduled cycle." \
+  --name vault-refresh --skill vault-refresh
 ```
 
-(Check `hermes cron add --help` for the exact flag names on your version.)
+(Check `hermes cron create --help` for the exact flag names on your version.)
 If the Hermes gateway is not always running, trigger due jobs with
 `hermes cron tick` from launchd/cron instead.
