@@ -1,0 +1,57 @@
+[project]
+name = "refresh-executor"
+version = "0.1.0"
+description = "Vault-only refresh execution core for vault-refresh v2 — calls the obsidian-hardened-mcp server's tools as a library."
+requires-python = ">=3.11"
+dependencies = [
+    "obsidian-hardened-mcp",
+]
+
+[tool.uv.sources]
+obsidian-hardened-mcp = { path = "../..", editable = true }
+
+[build-system]
+requires = ["uv_build>=0.11.8,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "mypy>=1.10",
+    "ruff>=0.4",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["error"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",
+    "I",
+    "B",
+    "S",
+    "UP",
+    "N",
+    "RUF",
+    "PTH",
+    "SIM",
+]
+ignore = [
+    "S101",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "PTH"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+pretty = true
+warn_unreachable = true
+warn_redundant_casts = true
+warn_unused_ignores = true
