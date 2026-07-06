@@ -58,6 +58,9 @@ from obsidian_hardened_mcp.tools.meta import (
 from obsidian_hardened_mcp.tools.read import list_notes as _list_notes_impl
 from obsidian_hardened_mcp.tools.read import read_multiple_notes as _read_multiple_notes_impl
 from obsidian_hardened_mcp.tools.read import read_note as _read_note_impl
+from obsidian_hardened_mcp.tools.refresh import (
+    list_stale_notes as _list_stale_notes_impl,
+)
 from obsidian_hardened_mcp.tools.search import search_notes as _search_notes_impl
 from obsidian_hardened_mcp.tools.wikilink import (
     resolve_wikilink as _resolve_wikilink_impl,
@@ -571,5 +574,15 @@ def create_server(
     @app.tool(description="Return the manifest of tools available on this server.")
     def list_tools_capabilities() -> ToolResult:
         return _list_tools_capabilities_impl(config)
+
+    @app.tool(
+        description=(
+            "Scan the vault for notes whose refresh contract (refresh_* "
+            "frontmatter) is overdue. Read-only by default; mark=true stamps "
+            "refresh_due/refresh_stale on contracted notes."
+        )
+    )
+    def list_stale_notes(mark: bool = False, policy: str | None = None) -> ToolResult:
+        return _list_stale_notes_impl(config, audit, mark=mark, policy=policy)
 
     return app

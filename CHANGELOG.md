@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `list_stale_notes` tool: deterministic scan of `refresh_*` frontmatter
+  contracts (policy `auto|on_read|flag`), optional `mark=true` stamping of
+  `refresh_due`/`refresh_stale`. Companion Hermes Agent skill under
+  `integrations/harnesses/hermes/`.
+
 ## [0.3.1] - 2026-05-12
 
 ### Changed

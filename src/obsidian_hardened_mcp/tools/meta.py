@@ -122,6 +122,14 @@ def list_tools_capabilities(config: AppConfig) -> ToolResult:
                 "Idempotent semantics; cleanup-on-empty; '#'-prefix tolerance."
             ),
         },
+        {
+            "name": "list_stale_notes",
+            "kind": "read",
+            "description": (
+                "Scan refresh_* contracts and list overdue notes. "
+                "mark=true stamps refresh_due/refresh_stale (write)."
+            ),
+        },
         # Destructive (2-phase HMAC confirm)
         {
             "name": "delete_note",
