@@ -132,6 +132,56 @@ def exec_vault_cost_cap(tmp_vault: Path) -> Path:
 
 
 @pytest.fixture
+def exec_vault_cap_hybrid(tmp_vault: Path) -> Path:
+    """Like `exec_vault_cost_cap`, plus a `hybrid1` task that DECLARES the
+    `cloud` tool but has no `model` override — its resolved route is local,
+    so its calls cannot bill and the cost cap must never stop it.
+
+    `hybrid.md` lives in a SUBDIRECTORY of `01_Notes/`: `iter_markdown`
+    yields a directory's own files before any of its subdirectories' files
+    (subdirs are stacked and popped after the current directory finishes),
+    so `hybrid1` is guaranteed to run AFTER the cloud tasks have already
+    blown past the cap — the exact ordering that exposes a cap check keyed
+    on declared permission instead of resolved route."""
+    (tmp_vault / ".obsidian-hardened-mcp.yaml").write_text(
+        "refresh_executor:\n"
+        "  max_usd_per_cycle: 0.01\n"
+        "  local_routes:\n"
+        "    - local-thinker\n"
+        "refresh_tasks:\n"
+        "  cloud1:\n"
+        "    note: 01_Notes/cloud1.md\n"
+        "    prompt: Refresh this note via the cloud model.\n"
+        "    tools: [cloud]\n"
+        "    model: cloud-x\n"
+        "  cloud2:\n"
+        "    note: 01_Notes/cloud2.md\n"
+        "    prompt: Refresh this other note via the cloud model.\n"
+        "    tools: [cloud]\n"
+        "    model: cloud-x\n"
+        "  hybrid1:\n"
+        "    note: 01_Notes/deep/hybrid.md\n"
+        "    prompt: Refresh this note; cloud allowed but route stays local.\n"
+        "    tools: [vault, cloud]\n"
+    )
+    (tmp_vault / "01_Notes" / "deep").mkdir()
+    for rel, task_id in (
+        ("cloud1.md", "cloud1"),
+        ("cloud2.md", "cloud2"),
+        ("deep/hybrid.md", "hybrid1"),
+    ):
+        (tmp_vault / "01_Notes" / rel).write_text(
+            "---\n"
+            "refresh_policy: auto\n"
+            f"refresh_task: {task_id}\n"
+            "refresh_every: 1m\n"
+            "refresh_last: 2026-05-01\n"
+            "---\n" + _STALE_BODY
+        )
+    return tmp_vault
+
+
+@pytest.fixture
 def exec_vault_two_tasks(tmp_vault: Path) -> Path:
     """A vault with two executable tasks: `t1` (fine) and `boom-task`
     (whose prompt contains the word "boom", so a flaky `llm_complete`

@@ -70,3 +70,28 @@ class TestRunCycle:
         assert cap_anomaly.cost == 0.0
 
         assert by_id["vault1"].status == "applied"
+
+    def test_cloud_tool_with_local_route_survives_cost_cap(
+        self, exec_vault_cap_hybrid: Path
+    ) -> None:
+        """`hybrid1` declares the `cloud` tool but resolves to a LOCAL route
+        (no `model` override) — its calls cannot bill, so the cap must never
+        stop it. The fixture guarantees it runs AFTER the cloud tasks have
+        exceeded the cap (subdirectory ordering), the very case where a cap
+        keyed on declared permission (instead of resolved route) fails."""
+        def route_priced_llm(route: str, messages: list[dict[str, str]]) -> tuple[str, float]:
+            cost = 0.02 if route == "cloud-x" else 0.0
+            return "# Refreshed\n\nNew generated body, long enough to pass ratio.\n", cost
+
+        report = run_cycle(exec_vault_cap_hybrid, llm_complete=route_priced_llm, today=TODAY)
+        by_id = {r.task_id: r for r in report.results}
+
+        # Cap engaged: one cloud task applied, the other stopped.
+        cloud_statuses = sorted([by_id["cloud1"].status, by_id["cloud2"].status])
+        assert cloud_statuses == ["anomaly", "applied"]
+
+        # The hybrid task ran after the cap was exceeded, on a local route:
+        # zero-cost, so it continues.
+        assert by_id["hybrid1"].status == "applied"
+        assert by_id["hybrid1"].model == "local-thinker"
+        assert by_id["hybrid1"].cost == 0.0

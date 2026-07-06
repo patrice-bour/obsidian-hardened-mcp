@@ -151,9 +151,12 @@ def _run_task(
       unless the task carries the `"cloud"` tool — anomaly
       `cloud route not allowed`.
     - **Cost cap**: once the cycle's running cost so far exceeds
-      `max_usd_per_cycle`, further `"cloud"`-tooled tasks are stopped —
-      anomaly `cost cap reached`. Vault-only tasks (no `"cloud"` tool)
-      are never subject to the cap and keep running.
+      `max_usd_per_cycle`, further NON-LOCAL-routed tasks are stopped —
+      anomaly `cost cap reached`. The cap keys on the RESOLVED route,
+      not the declared `"cloud"` tool: only a call that can actually
+      bill is worth stopping. Locally-routed tasks (including tasks
+      that declare `"cloud"` but resolve to a local route) are never
+      subject to the cap and keep running.
 
     Any exception raised while reading the note, calling the LLM, or
     applying the result is caught here so one bad task never aborts the
@@ -172,9 +175,9 @@ def _run_task(
 
     allowed_routes = local_routes if local_routes else (_FALLBACK_ROUTE,)
     route = task.model or allowed_routes[0]
-    is_cloud_task = "cloud" in task.tools
+    is_local_route = route in allowed_routes
 
-    if route not in allowed_routes and not is_cloud_task:
+    if not is_local_route and "cloud" not in task.tools:
         return TaskResult(
             task_id=task_id,
             path=path,
@@ -184,7 +187,7 @@ def _run_task(
             cost=0.0,
         )
 
-    if is_cloud_task and total_cost_so_far > max_usd_per_cycle:
+    if not is_local_route and total_cost_so_far > max_usd_per_cycle:
         return TaskResult(
             task_id=task_id,
             path=path,
