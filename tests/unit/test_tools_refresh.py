@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import unicodedata
 from datetime import date
 from pathlib import Path
@@ -384,6 +385,10 @@ class TestAutoResolution:
             for e in result.data["stale"]
         )
 
+    @pytest.mark.skipif(
+        sys.platform != "darwin",
+        reason="requires normalization-insensitive filesystem lookup (APFS)",
+    )
     def test_accented_filename_nfd_on_disk_pins_against_nfc_whitelist(
         self, tmp_vault: Path, config: AppConfig, audit: AuditLogger
     ) -> None:
@@ -393,6 +398,11 @@ class TestAutoResolution:
         # `abs_path.relative_to(...).as_posix()` (NFD) never matched the
         # whitelist's typed/normalized `note:` (NFC) -> false "unknown
         # refresh_task"/"task/note mismatch" anomaly, never executable.
+        #
+        # darwin-only: the scan opens the note through `VaultPath`'s
+        # NFC-normalized relative path while the file on disk is NFD —
+        # resolving that open requires the filesystem's normalization-
+        # insensitive lookup (APFS/HFS+); on ext4 the NFC open is ENOENT.
         nfc_rel = "01_Notes/Paysage modèles.md"
         nfd_name = unicodedata.normalize("NFD", "Paysage modèles.md")
         (tmp_vault / ".obsidian-hardened-mcp.yaml").write_text(

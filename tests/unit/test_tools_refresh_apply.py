@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import unicodedata
 from datetime import date
 from pathlib import Path
@@ -105,6 +106,10 @@ class TestApply:
 
 
 class TestUnicodeNormalization:
+    @pytest.mark.skipif(
+        sys.platform != "darwin",
+        reason="requires normalization-insensitive filesystem lookup (APFS)",
+    )
     def test_accented_filename_nfd_on_disk_pins_against_nfc_whitelist(
         self, tmp_vault: Path, config: AppConfig, audit: AuditLogger
     ) -> None:
