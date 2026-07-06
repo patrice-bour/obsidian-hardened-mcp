@@ -13,6 +13,7 @@ from obsidian_hardened_mcp.domain.results import ErrorCode
 from obsidian_hardened_mcp.frontmatter import parse_note
 from obsidian_hardened_mcp.security.audit_logger import AuditLogger
 from obsidian_hardened_mcp.tools.refresh import refresh_apply
+from obsidian_hardened_mcp.validation.hooks import HookContext, HookRegistry, HookResult
 
 TODAY = date(2026, 7, 6)
 
@@ -134,3 +135,44 @@ class TestUnicodeNormalization:
         parsed = parse_note(target.read_text())
         assert parsed.body == "New body\n"
         assert str(parsed.frontmatter["refresh_last"]) == "2026-07-06"
+
+
+class TestHooksBeforeSnapshot:
+    """Guards the hooks-before-snapshot invariant: a hook rejection must
+    have ZERO side effects (no write, no snapshot, no success audit line).
+    A future refactor moving the snapshot earlier would silently break this
+    without a test to catch it."""
+
+    class _RejectAllHook:
+        name = "reject_all"
+        phase = "pre_write"
+
+        def validate(self, ctx: HookContext) -> HookResult:
+            return HookResult.reject("test hook rejects all writes")
+
+    def test_hook_rejection_has_zero_side_effects(
+        self, auto_note: Path, tmp_vault: Path, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        before = auto_note.read_text()
+        hooks = HookRegistry([self._RejectAllHook()])
+
+        result = refresh_apply(
+            config, audit, "01_Notes/auto.md", "New body\n", today=TODAY, hooks=hooks
+        )
+
+        assert not result.ok
+        assert result.error is not None
+        assert result.error.code == ErrorCode.VALIDATION_FAILED
+
+        # Note untouched.
+        assert auto_note.read_text() == before
+
+        # No snapshot taken.
+        trash = tmp_vault / ".ohmcp-trash"
+        snapshot_files = [p for p in trash.rglob("*") if p.is_file()]
+        assert snapshot_files == []
+
+        # No refresh_apply success audit line (no audit line at all: the
+        # hook-rejection path returns before any `emit_audit` call).
+        logs = "".join(p.read_text() for p in config.audit_dir.glob("*.jsonl"))
+        assert '"tool":"refresh_apply"' not in logs
