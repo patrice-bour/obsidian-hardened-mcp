@@ -27,6 +27,7 @@ from obsidian_hardened_mcp.fs.listing import iter_markdown
 from obsidian_hardened_mcp.fs.reader import read_text
 from obsidian_hardened_mcp.security.audit_logger import AuditLogger
 from obsidian_hardened_mcp.tools._base import tool_call
+from obsidian_hardened_mcp.tools.frontmatter import merge_frontmatter
 
 
 @tool_call
@@ -112,8 +113,6 @@ def _mark_note(
     """Stamp `refresh_due`/`refresh_stale` when they differ from the stored
     values. Returns 1 when a write happened, 0 otherwise. Delegates to
     `merge_frontmatter` so the write is atomic, round-trip-safe and audited."""
-    from obsidian_hardened_mcp.tools.frontmatter import merge_frontmatter
-
     vp = VaultPath.from_user(rel, config.vault_root)
     text = read_text(vp, max_size_bytes=config.max_file_size_bytes)
     fm: dict[str, Any] = parse_note(text).frontmatter or {}
