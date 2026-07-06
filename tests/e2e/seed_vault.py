@@ -19,6 +19,7 @@ Layout:
         frontmatter-rich.md
         to-rename.md
         to-move.md
+        refresh/stale-contract.md
         unsafe-yaml.md           (only when seed_unsafe=True)
 
 Calling `seed(target, unsafe=False, with_hooks_config=False)` wipes the
@@ -98,6 +99,13 @@ _TO_MOVE_BODY = """\
 # To move
 
 References [[to-rename]] for backlink-rewrite test.
+"""
+
+_REFRESH_STALE_BODY = """\
+# Refresh contract
+
+Long overdue on purpose (refresh_last far in the past) so it is stale
+under every refresh policy, regardless of when this vault is seeded.
 """
 
 # Unsafe YAML — uses an explicit non-default tag. The parser MUST reject
@@ -194,6 +202,18 @@ def seed(
     _write(
         target / "to-move.md",
         _frontmatter("type: note\n") + _TO_MOVE_BODY,
+    )
+
+    # vault-refresh — a contracted note that is always overdue.
+    _write(
+        target / "refresh" / "stale-contract.md",
+        _frontmatter(
+            "type: reference\n"
+            "refresh_every: 7d\n"
+            "refresh_last: 2020-01-01\n"
+            'refresh_prompt: "Re-check this still holds."\n'
+        )
+        + _REFRESH_STALE_BODY,
     )
 
     if unsafe:

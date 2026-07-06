@@ -43,6 +43,7 @@ from scenarios import (  # noqa: E402
     s7_validation_hooks,
     s8_audit,
     s9_rest,
+    s10_refresh,
 )
 from scenarios._assert import ScenarioReport  # noqa: E402
 from seed_vault import seed  # noqa: E402
@@ -80,6 +81,7 @@ async def main() -> int:
             s4_destructive.run,
             s5_path_sandbox.run,
             s6_yaml_safety.run,
+            s10_refresh.run,
         ):
             print(f"--- {fn.__module__} ---")
             rep = await fn(h)
