@@ -92,6 +92,8 @@ class TestScan:
             "due": "2026-06-01",
             "days_overdue": 35,
             "prompt": "Re-check prices.",
+            "task": None,
+            "executable": False,
         }
 
     def test_anomaly_reported_scan_continues(
@@ -307,3 +309,76 @@ class TestVaultRootUnavailable:
         assert result.error is not None
         assert result.error.code == ErrorCode.NOT_FOUND
         assert "vault root unavailable" in result.error.message
+
+
+class TestAutoResolution:
+    @pytest.fixture
+    def auto_vault(self, tmp_vault: Path) -> Path:
+        (tmp_vault / ".obsidian-hardened-mcp.yaml").write_text(
+            "refresh_tasks:\n"
+            "  goodtask:\n"
+            "    note: 01_Notes/auto-ok.md\n"
+            "    prompt: Rebuild the table.\n"
+        )
+        _write(
+            tmp_vault,
+            "01_Notes/auto-ok.md",
+            "---\nrefresh_policy: auto\nrefresh_task: goodtask\n"
+            "refresh_every: 7d\nrefresh_last: 2026-06-01\n---\nBody\n",
+        )
+        _write(
+            tmp_vault,
+            "01_Notes/auto-orphan.md",
+            "---\nrefresh_policy: auto\nrefresh_task: nosuch\n"
+            "refresh_every: 7d\nrefresh_last: 2026-06-01\n---\nBody\n",
+        )
+        _write(
+            tmp_vault,
+            "01_Notes/auto-hijack.md",
+            "---\nrefresh_policy: auto\nrefresh_task: goodtask\n"
+            "refresh_every: 7d\nrefresh_last: 2026-06-01\n---\nBody\n",
+        )
+        return tmp_vault
+
+    def test_pinned_task_is_executable(
+        self, auto_vault: Path, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        result = list_stale_notes(config, audit, today=TODAY)
+        entry = next(
+            e for e in result.data["stale"] if e["path"] == "01_Notes/auto-ok.md"
+        )
+        assert entry["task"] == "goodtask" and entry["executable"] is True
+
+    def test_unknown_task_is_anomaly_not_executable(
+        self, auto_vault: Path, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        result = list_stale_notes(config, audit, today=TODAY)
+        entry = next(
+            e for e in result.data["stale"] if e["path"] == "01_Notes/auto-orphan.md"
+        )
+        assert entry["executable"] is False
+        assert any(
+            a["path"] == "01_Notes/auto-orphan.md" and "unknown refresh_task" in a["reason"]
+            for a in result.data["anomalies"]
+        )
+
+    def test_retargeting_is_blocked(
+        self, auto_vault: Path, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        result = list_stale_notes(config, audit, today=TODAY)
+        entry = next(
+            e for e in result.data["stale"] if e["path"] == "01_Notes/auto-hijack.md"
+        )
+        assert entry["executable"] is False
+        assert any(
+            "task/note mismatch" in a["reason"] for a in result.data["anomalies"]
+        )
+
+    def test_flag_notes_not_executable(
+        self, seeded_vault: Path, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        result = list_stale_notes(config, audit, today=TODAY)
+        assert all(
+            e["executable"] is False and e["task"] is None
+            for e in result.data["stale"]
+        )

@@ -18,6 +18,8 @@ from obsidian_hardened_mcp.config import AppConfig
 from obsidian_hardened_mcp.domain.refresh import (
     POLICIES,
     InvalidContractError,
+    RefreshContract,
+    RefreshTask,
     compute_due,
     parse_contract,
 )
@@ -29,6 +31,10 @@ from obsidian_hardened_mcp.fs.reader import read_text
 from obsidian_hardened_mcp.security.audit_logger import AuditLogger
 from obsidian_hardened_mcp.tools._base import to_plain_dict, tool_call
 from obsidian_hardened_mcp.tools.frontmatter import merge_frontmatter
+from obsidian_hardened_mcp.validation.config_loader import (
+    CONFIG_FILE_NAME,
+    load_refresh_config,
+)
 from obsidian_hardened_mcp.validation.hooks import HookRegistry
 
 
@@ -67,6 +73,10 @@ def list_stale_notes(
     stale: list[dict[str, Any]] = []
     anomalies: list[dict[str, str]] = []
 
+    tasks, _settings, cfg_errors = load_refresh_config(config.vault_root)
+    for message in cfg_errors:
+        anomalies.append({"path": CONFIG_FILE_NAME, "reason": message})
+
     for abs_path in iter_markdown(config.vault_root):
         rel = abs_path.relative_to(config.vault_root).as_posix()
         scanned += 1
@@ -100,6 +110,9 @@ def list_stale_notes(
                 hooks=hooks,
             )
         if is_stale:
+            task_id, executable = _resolve_auto(
+                contract, rel, parsed.frontmatter, tasks, anomalies
+            )
             stale.append(
                 {
                     "path": rel,
@@ -108,6 +121,8 @@ def list_stale_notes(
                     "due": due.isoformat(),
                     "days_overdue": (today - due).days,
                     "prompt": contract.prompt,
+                    "task": task_id,
+                    "executable": executable,
                 }
             )
 
@@ -120,6 +135,56 @@ def list_stale_notes(
             "anomalies": anomalies,
         }
     )
+
+
+def _resolve_auto(
+    contract: RefreshContract,
+    rel: str,
+    fm: Mapping[str, Any] | None,
+    tasks: Mapping[str, RefreshTask],
+    anomalies: list[dict[str, str]],
+) -> tuple[str | None, bool]:
+    """Resolve an `auto`-policy note's `refresh_task` against the vault's
+    whitelist (Task 1's `load_refresh_config`).
+
+    The whitelist is the ONLY source of executable prompts: a task is
+    executable only when it exists in `tasks` AND its declared `note` is
+    pinned to exactly this note's path (`rel`). Any mismatch is reported as
+    an anomaly and the note is still listed as `stale` (policy `flag`
+    treatment), just never executable. Notes whose policy isn't `auto`
+    always return `(None, False)`.
+    """
+    if contract.policy != "auto":
+        return None, False
+
+    refresh_task = (fm or {}).get("refresh_task")
+    if refresh_task is None:
+        anomalies.append(
+            {"path": rel, "reason": "missing refresh_task (required for policy: auto)"}
+        )
+        return None, False
+
+    task_id = str(refresh_task)
+    task = tasks.get(task_id)
+    if task is None:
+        anomalies.append(
+            {"path": rel, "reason": f"unknown refresh_task: {task_id!r}"}
+        )
+        return None, False
+
+    if task.note != rel:
+        anomalies.append(
+            {
+                "path": rel,
+                "reason": (
+                    f"task/note mismatch: task {task_id!r} is pinned to "
+                    f"{task.note!r}, not {rel!r}"
+                ),
+            }
+        )
+        return None, False
+
+    return task_id, True
 
 
 def _mark_note(
