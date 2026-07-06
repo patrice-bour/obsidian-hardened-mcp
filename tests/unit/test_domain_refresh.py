@@ -29,6 +29,25 @@ class TestParseInterval:
         with pytest.raises(InvalidContractError):
             parse_interval(raw)
 
+    def test_huge_magnitude_raises(self) -> None:
+        # Reproduces the OverflowError previously escaping compute_due().
+        with pytest.raises(InvalidContractError):
+            parse_interval("99999999d")
+
+    @pytest.mark.parametrize(
+        "raw", ["36500d", "5200w", "1200m", "100y"]
+    )
+    def test_boundary_magnitude_accepted(self, raw: str) -> None:
+        n, unit = parse_interval(raw)
+        assert (n, unit) == (int(raw[:-1]), raw[-1])
+
+    @pytest.mark.parametrize(
+        "raw", ["36501d", "5201w", "1201m", "101y"]
+    )
+    def test_boundary_magnitude_rejected(self, raw: str) -> None:
+        with pytest.raises(InvalidContractError, match="magnitude exceeds max"):
+            parse_interval(raw)
+
 
 class TestComputeDue:
     def test_days(self) -> None:

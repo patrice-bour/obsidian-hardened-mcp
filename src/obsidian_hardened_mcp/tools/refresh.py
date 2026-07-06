@@ -11,6 +11,7 @@ frontmatter write.
 from __future__ import annotations
 
 import datetime as dt
+from collections.abc import Mapping
 from typing import Any
 
 from obsidian_hardened_mcp.config import AppConfig
@@ -26,7 +27,7 @@ from obsidian_hardened_mcp.frontmatter import parse_note
 from obsidian_hardened_mcp.fs.listing import iter_markdown
 from obsidian_hardened_mcp.fs.reader import read_text
 from obsidian_hardened_mcp.security.audit_logger import AuditLogger
-from obsidian_hardened_mcp.tools._base import tool_call
+from obsidian_hardened_mcp.tools._base import to_plain_dict, tool_call
 from obsidian_hardened_mcp.tools.frontmatter import merge_frontmatter
 from obsidian_hardened_mcp.validation.hooks import HookRegistry
 
@@ -72,25 +73,27 @@ def list_stale_notes(
         try:
             vp = VaultPath.from_user(rel, config.vault_root)
             text = read_text(vp, max_size_bytes=config.max_file_size_bytes)
-            contract = parse_contract(parse_note(text).frontmatter)
+            parsed = parse_note(text)
+            contract = parse_contract(parsed.frontmatter)
+            if contract is None:
+                continue
+            due = compute_due(contract.last, contract.every)
         except InvalidContractError as exc:
             anomalies.append({"path": rel, "reason": str(exc)})
             continue
         except Exception as exc:  # unreadable/malformed note: report, keep going
             anomalies.append({"path": rel, "reason": f"{type(exc).__name__}: {exc}"})
             continue
-        if contract is None:
-            continue
         with_contract += 1
         if policy is not None and contract.policy != policy:
             continue
-        due = compute_due(contract.last, contract.every)
         is_stale = today >= due
         if mark:
             marked += _mark_note(
                 config,
                 audit,
                 rel,
+                frontmatter=parsed.frontmatter,
                 due=due,
                 stale=is_stale,
                 anomalies=anomalies,
@@ -124,6 +127,7 @@ def _mark_note(
     audit: AuditLogger,
     rel: str,
     *,
+    frontmatter: Mapping[str, Any] | None,
     due: dt.date,
     stale: bool,
     anomalies: list[dict[str, str]],
@@ -133,15 +137,15 @@ def _mark_note(
     values. Returns 1 when a write happened, 0 otherwise. Delegates to
     `merge_frontmatter` so the write is atomic, round-trip-safe and audited.
 
+    `frontmatter` is the mapping the caller already parsed during the scan
+    (single read per note): no second read/parse happens here. A file that
+    vanishes between the scan and the write surfaces as a NOT_FOUND anomaly
+    via `merge_frontmatter`'s own guarded read, never an aborted scan.
+
     A failed write (e.g. rejected by a validation hook) is recorded into
     `anomalies` rather than silently counted as a no-op."""
-    vp = VaultPath.from_user(rel, config.vault_root)
-    text = read_text(vp, max_size_bytes=config.max_file_size_bytes)
-    fm: dict[str, Any] = parse_note(text).frontmatter or {}
-    current_due = fm.get("refresh_due")
-    if isinstance(current_due, dt.date):
-        current_due = current_due.isoformat()
-    if str(current_due) == due.isoformat() and fm.get("refresh_stale") is stale:
+    current = to_plain_dict(dict(frontmatter)) if frontmatter else {}
+    if current.get("refresh_due") == due.isoformat() and current.get("refresh_stale") is stale:
         return 0
     result = merge_frontmatter(
         config,

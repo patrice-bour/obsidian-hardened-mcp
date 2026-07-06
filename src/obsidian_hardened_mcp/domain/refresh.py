@@ -20,6 +20,10 @@ DEFAULT_POLICY = "flag"
 
 _INTERVAL_RE = re.compile(r"^([1-9]\d*)([dwmy])$")
 
+# Sane ceilings per unit (~100 years), so a typo'd `refresh_every` cannot
+# push `compute_due` into `dt.date`/`OverflowError` territory.
+_MAX_BY_UNIT: dict[str, int] = {"d": 36500, "w": 5200, "m": 1200, "y": 100}
+
 
 class InvalidContractError(ValueError):
     """A note declares refresh_* fields but the contract is unusable."""
@@ -40,7 +44,13 @@ def parse_interval(raw: str) -> tuple[int, str]:
         raise InvalidContractError(
             f"invalid refresh_every: {raw!r} (expected <int><d|w|m|y>, e.g. '1m')"
         )
-    return int(m.group(1)), m.group(2)
+    n, unit = int(m.group(1)), m.group(2)
+    max_n = _MAX_BY_UNIT[unit]
+    if n > max_n:
+        raise InvalidContractError(
+            f"invalid refresh_every: {raw!r} (magnitude exceeds max {max_n}{unit})"
+        )
+    return n, unit
 
 
 def _add_months(day: dt.date, months: int) -> dt.date:

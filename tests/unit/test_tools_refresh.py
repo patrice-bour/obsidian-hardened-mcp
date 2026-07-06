@@ -11,6 +11,7 @@ from obsidian_hardened_mcp.config import AppConfig
 from obsidian_hardened_mcp.domain.results import ErrorCode
 from obsidian_hardened_mcp.frontmatter import parse_note as _parse_note
 from obsidian_hardened_mcp.security.audit_logger import AuditLogger
+from obsidian_hardened_mcp.tools import refresh as _refresh_module
 from obsidian_hardened_mcp.tools.refresh import list_stale_notes
 from obsidian_hardened_mcp.validation.hooks import (
     HookContext,
@@ -226,6 +227,72 @@ class TestMarkWithHooks:
         assert result.data["marked"] == 3
         # broken-contract.md still reports its parse anomaly; no mark failures.
         assert not any("mark failed" in a["reason"] for a in result.data["anomalies"])
+
+
+class TestHugeMagnitudeAnomaly:
+    def test_huge_refresh_every_is_anomaly_not_abort(
+        self, seeded_vault: Path, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        # Reproduces the OverflowError previously raised by compute_due()
+        # OUTSIDE the per-note try/except, which used to abort the whole
+        # scan. It must now be caught at parse_contract time (parse_interval
+        # bounds the magnitude) and land in anomalies, with the rest of the
+        # scan unaffected.
+        _write(
+            seeded_vault,
+            "01_Notes/huge-interval.md",
+            "---\nrefresh_every: 99999999d\nrefresh_last: 2026-06-01\n---\nBody\n",
+        )
+        result = list_stale_notes(config, audit, today=TODAY)
+        assert result.ok
+        data = result.data
+        stale_paths = {entry["path"] for entry in data["stale"]}
+        assert stale_paths == {"01_Notes/stale-flag.md", "01_Notes/stale-on-read.md"}
+        anomaly_paths = {a["path"] for a in data["anomalies"]}
+        assert "01_Notes/huge-interval.md" in anomaly_paths
+        assert "01_Notes/broken-contract.md" in anomaly_paths
+
+
+class TestMarkSingleRead:
+    def test_note_vanishing_before_mark_is_anomaly_not_abort(
+        self, seeded_vault: Path, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        # Reproduces: a note deleted between the scan read and the (former)
+        # second read in _mark_note used to raise unguarded and abort the
+        # whole scan. _mark_note now reuses the frontmatter parsed during
+        # the scan and never re-reads the file itself; a vanished file is
+        # only ever surfaced by merge_frontmatter's own guarded read.
+        target = seeded_vault / "01_Notes" / "stale-flag.md"
+        original = target.read_text()
+
+        real_merge_frontmatter = _refresh_module.merge_frontmatter
+
+        def _delete_then_merge(
+            config: AppConfig,
+            audit: AuditLogger,
+            rel: str,
+            *args: object,
+            **kwargs: object,
+        ) -> object:
+            if rel == "01_Notes/stale-flag.md":
+                target.unlink()
+            return real_merge_frontmatter(config, audit, rel, *args, **kwargs)
+
+        _refresh_module.merge_frontmatter = _delete_then_merge
+        try:
+            result = list_stale_notes(config, audit, mark=True, today=TODAY)
+        finally:
+            _refresh_module.merge_frontmatter = real_merge_frontmatter
+            if not target.exists():
+                target.write_text(original)
+
+        assert result.ok
+        anomalies = result.data["anomalies"]
+        mark_failures = {a["path"]: a["reason"] for a in anomalies if "mark failed" in a["reason"]}
+        assert "01_Notes/stale-flag.md" in mark_failures
+        assert "not_found" in mark_failures["01_Notes/stale-flag.md"]
+        # The other contracted notes were still marked normally.
+        assert result.data["marked"] == 2
 
 
 class TestVaultRootUnavailable:
