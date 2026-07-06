@@ -41,6 +41,12 @@ from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 
 from obsidian_hardened_mcp.config import TrashPolicy
+from obsidian_hardened_mcp.domain.refresh import (
+    ExecutorSettings,
+    InvalidTaskError,
+    RefreshTask,
+    parse_refresh_task,
+)
 from obsidian_hardened_mcp.frontmatter.yaml_safety import enforce_default_tags_only
 from obsidian_hardened_mcp.validation.builtin_hooks import (
     IsoDateHook,
@@ -266,3 +272,76 @@ def _load_schemas(
                 f"schema file {rel_path!r} is not valid JSON: {exc}"
             ) from exc
     return schemas
+
+
+def load_refresh_config(
+    vault_root: Path,
+) -> tuple[dict[str, RefreshTask], ExecutorSettings, list[str]]:
+    """Load the ``refresh_tasks:`` and ``refresh_executor:`` blocks from the
+    vault YAML config.
+
+    Returns a tuple: (valid tasks dict, executor settings, error messages list).
+    When the config file is absent or has no ``refresh_tasks:``/``refresh_executor:``
+    blocks, returns empty tasks dict, default ExecutorSettings, and empty errors list.
+
+    InvalidTaskError exceptions are caught and collected as error messages —
+    the function never raises.
+    """
+    raw = _load_raw_yaml(vault_root)
+    if raw is None:
+        return {}, ExecutorSettings(), []
+
+    # Parse refresh_tasks
+    tasks_block = raw.get("refresh_tasks")
+    tasks: dict[str, RefreshTask] = {}
+    errors: list[str] = []
+
+    if tasks_block is not None:
+        if not isinstance(tasks_block, dict):
+            errors.append(
+                f"`refresh_tasks` must be a mapping, got {type(tasks_block).__name__}"
+            )
+        else:
+            for task_id, task_raw in tasks_block.items():
+                try:
+                    if not isinstance(task_raw, dict):
+                        raise InvalidTaskError(
+                            f"task entry must be a mapping, got {type(task_raw).__name__}"
+                        )
+                    task = parse_refresh_task(str(task_id), task_raw)
+                    tasks[str(task_id)] = task
+                except InvalidTaskError as exc:
+                    errors.append(str(exc))
+
+    # Parse refresh_executor
+    executor_block = raw.get("refresh_executor")
+    executor_dict: dict[str, Any] = {}
+    if executor_block is not None:
+        if not isinstance(executor_block, dict):
+            errors.append(
+                f"`refresh_executor` must be a mapping, got {type(executor_block).__name__}"
+            )
+        else:
+            executor_dict = {str(k): _plain(v) for k, v in executor_block.items()}
+
+    # Build ExecutorSettings with type coercion
+    settings_kwargs: dict[str, Any] = {}
+    for key in ("max_usd_per_cycle", "min_body_ratio"):
+        if key in executor_dict:
+            try:
+                settings_kwargs[key] = float(executor_dict[key])
+            except (TypeError, ValueError) as exc:
+                errors.append(f"`refresh_executor.{key}` must be a float: {exc}")
+
+    if "local_routes" in executor_dict:
+        routes = executor_dict["local_routes"]
+        if isinstance(routes, list):
+            settings_kwargs["local_routes"] = tuple(str(r) for r in routes)
+        else:
+            errors.append(
+                f"`refresh_executor.local_routes` must be a list, got {type(routes).__name__}"
+            )
+
+    settings = ExecutorSettings(**settings_kwargs)
+
+    return tasks, settings, errors

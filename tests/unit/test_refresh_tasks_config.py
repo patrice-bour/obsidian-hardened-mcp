@@ -1,0 +1,89 @@
+"""Whitelist (`refresh_tasks:`) parsing and loading — vault-refresh v2."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from obsidian_hardened_mcp.domain.refresh import (
+    ExecutorSettings,
+    InvalidTaskError,
+    RefreshTask,
+    parse_refresh_task,
+)
+from obsidian_hardened_mcp.validation.config_loader import load_refresh_config
+
+VALID = {
+    "note": "01_Notes/target.md",
+    "prompt": "Recount notes by type.",
+    "tools": ["vault"],
+}
+
+
+class TestParseRefreshTask:
+    def test_minimal_valid(self) -> None:
+        t = parse_refresh_task("stats", VALID)
+        assert t == RefreshTask(
+            task_id="stats",
+            note="01_Notes/target.md",
+            prompt="Recount notes by type.",
+            tools=frozenset({"vault"}),
+            model=None,
+            web_queries=(),
+        )
+
+    def test_tools_default_is_vault(self) -> None:
+        t = parse_refresh_task("stats", {"note": "a.md", "prompt": "p"})
+        assert t.tools == frozenset({"vault"})
+
+    def test_web_requires_web_queries(self) -> None:
+        raw = dict(VALID, tools=["vault", "web"])
+        with pytest.raises(InvalidTaskError, match="web_queries"):
+            parse_refresh_task("t", raw)
+
+    def test_web_with_queries_ok(self) -> None:
+        raw = dict(VALID, tools=["vault", "web"], web_queries=["q1", "q2"])
+        t = parse_refresh_task("t", raw)
+        assert t.web_queries == ("q1", "q2")
+
+    def test_unknown_tool_rejected(self) -> None:
+        with pytest.raises(InvalidTaskError, match="tools"):
+            parse_refresh_task("t", dict(VALID, tools=["vault", "shell"]))
+
+    @pytest.mark.parametrize("missing", ["note", "prompt"])
+    def test_required_fields(self, missing: str) -> None:
+        raw = {k: v for k, v in VALID.items() if k != missing}
+        with pytest.raises(InvalidTaskError, match=missing):
+            parse_refresh_task("t", raw)
+
+    def test_empty_prompt_rejected(self) -> None:
+        with pytest.raises(InvalidTaskError, match="prompt"):
+            parse_refresh_task("t", dict(VALID, prompt="  "))
+
+
+class TestLoadRefreshConfig:
+    def test_missing_file_yields_empty(self, tmp_path: Path) -> None:
+        tasks, settings, errors = load_refresh_config(tmp_path)
+        assert tasks == {} and errors == []
+        assert settings == ExecutorSettings()
+
+    def test_full_load(self, tmp_path: Path) -> None:
+        (tmp_path / ".obsidian-hardened-mcp.yaml").write_text(
+            "refresh_tasks:\n"
+            "  stats:\n"
+            "    note: 01_Notes/target.md\n"
+            "    prompt: Recount.\n"
+            "  broken:\n"
+            "    note: x.md\n"
+            "refresh_executor:\n"
+            "  max_usd_per_cycle: 1.25\n"
+            "  local_routes: [local-thinker]\n"
+        )
+        tasks, settings, errors = load_refresh_config(tmp_path)
+        assert set(tasks) == {"stats"}
+        assert tasks["stats"].note == "01_Notes/target.md"
+        assert settings.max_usd_per_cycle == 1.25
+        assert settings.local_routes == ("local-thinker",)
+        assert settings.min_body_ratio == 0.3
+        assert len(errors) == 1 and "broken" in errors[0] and "prompt" in errors[0]
