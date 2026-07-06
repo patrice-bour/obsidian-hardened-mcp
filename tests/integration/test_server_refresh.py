@@ -48,3 +48,47 @@ async def test_list_stale_notes_tool_is_callable_through_mcp(
     raw = await server.call_tool("list_stale_notes", {})
     text = str(raw)
     assert "01_Notes/contracted.md" in text
+
+
+@pytest.mark.asyncio
+async def test_refresh_apply_registered(tmp_vault: Path, tmp_path: Path) -> None:
+    server = create_server(
+        AppConfig(vault_root=tmp_vault, audit_dir=tmp_path / "audit"),
+        hooks=HookRegistry([]),
+    )
+    registered = {t.name for t in await server.list_tools()}
+    assert "refresh_apply" in registered
+
+
+@pytest.mark.asyncio
+async def test_refresh_apply_listed_in_capabilities(
+    tmp_vault: Path, tmp_path: Path
+) -> None:
+    server = create_server(
+        AppConfig(vault_root=tmp_vault, audit_dir=tmp_path / "audit"),
+        hooks=HookRegistry([]),
+    )
+    raw = await server.call_tool("list_tools_capabilities", {})
+    assert "refresh_apply" in str(raw)
+
+
+@pytest.mark.asyncio
+async def test_refresh_apply_rejects_non_auto_note_through_mcp(
+    tmp_vault: Path, tmp_path: Path
+) -> None:
+    (tmp_vault / "01_Notes" / "flagged.md").write_text(
+        "---\nrefresh_every: 30d\nrefresh_last: 2020-01-01\n---\nOld body\n"
+    )
+    server = create_server(
+        AppConfig(vault_root=tmp_vault, audit_dir=tmp_path / "audit"),
+        hooks=HookRegistry([]),
+    )
+    raw = await server.call_tool(
+        "refresh_apply", {"path": "01_Notes/flagged.md", "body": "New body\n"}
+    )
+    text = str(raw)
+    assert "validation_failed" in text
+    # No side effects: the note body must be untouched.
+    assert (
+        "Old body" in (tmp_vault / "01_Notes" / "flagged.md").read_text()
+    )

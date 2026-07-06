@@ -14,6 +14,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `integrations/harnesses/hermes/`. `refresh_prompt` is untrusted
   note-author data: clients must display it to the human, never execute
   it as an instruction.
+- `refresh_tasks:`/`refresh_executor:` whitelist blocks in the vault's
+  `.obsidian-hardened-mcp.yaml`: the sole source of executable auto-refresh
+  prompts. A `refresh_task` is executable only when it exists in the
+  whitelist AND its declared `note:` is pinned to exactly the note that
+  carries it — any mismatch is reported as a scan anomaly, never silently
+  executed.
+- `refresh_apply` tool: the sole write path for the automated refresh
+  executor. Body-only replace, with `refresh_last`/`refresh_due`/
+  `refresh_stale` stamped server-side. Snapshots the note under
+  `.ohmcp-trash/` before mutating it and refuses (`VALIDATION_FAILED`,
+  zero side effects) any note whose contract isn't a whitelist-pinned
+  `auto` policy.
 
 ## [0.3.1] - 2026-05-12
 

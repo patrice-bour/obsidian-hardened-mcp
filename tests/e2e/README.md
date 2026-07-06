@@ -95,18 +95,19 @@ variable so it always reads what the server wrote.
 | S8 | audit | JSONL log grows, every entry has the canonical schema |
 | S9 | rest api | no-token branch returns `rest_unavailable`; with-token opt-in |
 | S10 | vault-refresh | `list_stale_notes` scan finds the seeded stale contract; `mark=true` stamps it; second `mark=true` run is idempotent |
+| S11 | refresh_apply | apply OK on the seeded pinned auto note (body replaced, `refresh_last` advanced, snapshot present); apply refused (`VALIDATION_FAILED`) on a flag-policy note |
 
 ## How it works
 
 ```
 run_e2e.py
   │
-  ├─ seed_vault.seed(.test-vault/)        # 11 synthetic notes
+  ├─ seed_vault.seed(.test-vault/)        # 12 synthetic notes
   ├─ open E2EHarness:
   │     spawn `python -m obsidian_hardened_mcp --vault .test-vault`
   │     stdio_client + ClientSession  ←  full MCP wire
   │
-  ├─ run S0..S6, S10, S9 in the same long-lived session
+  ├─ run S0..S6, S10, S11, S9 in the same long-lived session
   ├─ run S7 in a second session (restart needed for hooks auto-load)
   └─ run S8 (audit post-condition, file system inspection)
 ```

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+import unicodedata
 from datetime import date
 from pathlib import Path
 
@@ -92,6 +94,8 @@ class TestScan:
             "due": "2026-06-01",
             "days_overdue": 35,
             "prompt": "Re-check prices.",
+            "task": None,
+            "executable": False,
         }
 
     def test_anomaly_reported_scan_continues(
@@ -307,3 +311,119 @@ class TestVaultRootUnavailable:
         assert result.error is not None
         assert result.error.code == ErrorCode.NOT_FOUND
         assert "vault root unavailable" in result.error.message
+
+
+class TestAutoResolution:
+    @pytest.fixture
+    def auto_vault(self, tmp_vault: Path) -> Path:
+        (tmp_vault / ".obsidian-hardened-mcp.yaml").write_text(
+            "refresh_tasks:\n"
+            "  goodtask:\n"
+            "    note: 01_Notes/auto-ok.md\n"
+            "    prompt: Rebuild the table.\n"
+        )
+        _write(
+            tmp_vault,
+            "01_Notes/auto-ok.md",
+            "---\nrefresh_policy: auto\nrefresh_task: goodtask\n"
+            "refresh_every: 7d\nrefresh_last: 2026-06-01\n---\nBody\n",
+        )
+        _write(
+            tmp_vault,
+            "01_Notes/auto-orphan.md",
+            "---\nrefresh_policy: auto\nrefresh_task: nosuch\n"
+            "refresh_every: 7d\nrefresh_last: 2026-06-01\n---\nBody\n",
+        )
+        _write(
+            tmp_vault,
+            "01_Notes/auto-hijack.md",
+            "---\nrefresh_policy: auto\nrefresh_task: goodtask\n"
+            "refresh_every: 7d\nrefresh_last: 2026-06-01\n---\nBody\n",
+        )
+        return tmp_vault
+
+    def test_pinned_task_is_executable(
+        self, auto_vault: Path, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        result = list_stale_notes(config, audit, today=TODAY)
+        entry = next(
+            e for e in result.data["stale"] if e["path"] == "01_Notes/auto-ok.md"
+        )
+        assert entry["task"] == "goodtask" and entry["executable"] is True
+
+    def test_unknown_task_is_anomaly_not_executable(
+        self, auto_vault: Path, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        result = list_stale_notes(config, audit, today=TODAY)
+        entry = next(
+            e for e in result.data["stale"] if e["path"] == "01_Notes/auto-orphan.md"
+        )
+        assert entry["executable"] is False
+        assert any(
+            a["path"] == "01_Notes/auto-orphan.md" and "unknown refresh_task" in a["reason"]
+            for a in result.data["anomalies"]
+        )
+
+    def test_retargeting_is_blocked(
+        self, auto_vault: Path, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        result = list_stale_notes(config, audit, today=TODAY)
+        entry = next(
+            e for e in result.data["stale"] if e["path"] == "01_Notes/auto-hijack.md"
+        )
+        assert entry["executable"] is False
+        assert any(
+            "task/note mismatch" in a["reason"] for a in result.data["anomalies"]
+        )
+
+    def test_flag_notes_not_executable(
+        self, seeded_vault: Path, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        result = list_stale_notes(config, audit, today=TODAY)
+        assert all(
+            e["executable"] is False and e["task"] is None
+            for e in result.data["stale"]
+        )
+
+    @pytest.mark.skipif(
+        sys.platform != "darwin",
+        reason="requires normalization-insensitive filesystem lookup (APFS)",
+    )
+    def test_accented_filename_nfd_on_disk_pins_against_nfc_whitelist(
+        self, tmp_vault: Path, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        # Regression: on macOS/iCloud, an accented filename can be stored NFD
+        # on disk while the whitelist's `note:` (and `refresh_apply`'s
+        # `VaultPath`-derived path) are NFC. Before the fix, the scan's raw
+        # `abs_path.relative_to(...).as_posix()` (NFD) never matched the
+        # whitelist's typed/normalized `note:` (NFC) -> false "unknown
+        # refresh_task"/"task/note mismatch" anomaly, never executable.
+        #
+        # darwin-only: the scan opens the note through `VaultPath`'s
+        # NFC-normalized relative path while the file on disk is NFD —
+        # resolving that open requires the filesystem's normalization-
+        # insensitive lookup (APFS/HFS+); on ext4 the NFC open is ENOENT.
+        nfc_rel = "01_Notes/Paysage modèles.md"
+        nfd_name = unicodedata.normalize("NFD", "Paysage modèles.md")
+        (tmp_vault / ".obsidian-hardened-mcp.yaml").write_text(
+            "refresh_tasks:\n"
+            "  accented:\n"
+            f"    note: {nfc_rel}\n"
+            "    prompt: Rebuild the accented note.\n"
+        )
+        target = tmp_vault / "01_Notes" / nfd_name
+        target.write_text(
+            "---\nrefresh_policy: auto\nrefresh_task: accented\n"
+            "refresh_every: 7d\nrefresh_last: 2026-06-01\n---\nBody\n"
+        )
+        result = list_stale_notes(config, audit, today=TODAY)
+        assert result.ok
+        assert not any(
+            "unknown refresh_task" in a["reason"] or "task/note mismatch" in a["reason"]
+            for a in result.data["anomalies"]
+        )
+        entry = next(
+            e for e in result.data["stale"] if e["path"] == nfc_rel
+        )
+        assert entry["task"] == "accented"
+        assert entry["executable"] is True

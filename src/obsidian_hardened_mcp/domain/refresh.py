@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import datetime as dt
 import re
+import unicodedata
 from calendar import monthrange
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -113,4 +114,81 @@ def parse_contract(fm: Mapping[str, Any] | None) -> RefreshContract | None:
         every=str(every),
         last=_coerce_date(last, field="refresh_last"),
         prompt=None if prompt is None else str(prompt),
+    )
+
+
+ALLOWED_TASK_TOOLS: frozenset[str] = frozenset({"vault", "web", "cloud"})
+
+
+class InvalidTaskError(ValueError):
+    """A `refresh_tasks:` whitelist entry is unusable."""
+
+
+@dataclass(frozen=True)
+class RefreshTask:
+    task_id: str
+    note: str
+    prompt: str
+    tools: frozenset[str]
+    model: str | None
+    web_queries: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ExecutorSettings:
+    max_usd_per_cycle: float = 0.50
+    min_body_ratio: float = 0.3
+    local_routes: tuple[str, ...] = ()
+
+
+def parse_refresh_task(task_id: str, raw: Mapping[str, Any]) -> RefreshTask:
+    note = str(raw.get("note") or "").strip()
+    if not note:
+        raise InvalidTaskError(f"task {task_id!r}: note is required")
+    # Pinning comparisons (scan + `refresh_apply`) both key off `VaultPath`'s
+    # NFC-normalised relative path (`domain.vault_path.VaultPath.from_user`).
+    # Normalize the whitelist side the same way here, once, at parse time —
+    # so a `./`-prefixed or NFD-typed `note:` still pins correctly instead of
+    # silently failing closed on a macOS/iCloud filename encoding mismatch.
+    note = unicodedata.normalize("NFC", note)
+    if note.startswith("./"):
+        note = note[2:]
+    prompt = str(raw.get("prompt") or "").strip()
+    if not prompt:
+        raise InvalidTaskError(f"task {task_id!r}: prompt is required")
+    tools_raw = raw.get("tools")
+    if tools_raw is None:
+        tools_raw = ["vault"]
+    elif not isinstance(tools_raw, list):
+        raise InvalidTaskError(
+            f"task {task_id!r}: tools must be a list, got {type(tools_raw).__name__}"
+        )
+    tools = frozenset(str(t) for t in tools_raw) | {"vault"}
+    if not tools <= ALLOWED_TASK_TOOLS:
+        raise InvalidTaskError(
+            f"task {task_id!r}: tools must be a subset of {sorted(ALLOWED_TASK_TOOLS)}"
+        )
+    queries_raw = raw.get("web_queries")
+    if queries_raw is None:
+        queries_raw = []
+    elif not isinstance(queries_raw, list):
+        raise InvalidTaskError(
+            f"task {task_id!r}: web_queries must be a list, "
+            f"got {type(queries_raw).__name__}"
+        )
+    queries = tuple(str(q) for q in queries_raw)
+    if "web" in tools and not queries:
+        raise InvalidTaskError(f"task {task_id!r}: web requires web_queries")
+    model = raw.get("model")
+    if model is not None and not isinstance(model, str):
+        raise InvalidTaskError(
+            f"task {task_id!r}: model must be a string, got {type(model).__name__}"
+        )
+    return RefreshTask(
+        task_id=task_id,
+        note=note,
+        prompt=prompt,
+        tools=tools,
+        model=model,
+        web_queries=queries,
     )

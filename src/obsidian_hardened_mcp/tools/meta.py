@@ -130,6 +130,14 @@ def list_tools_capabilities(config: AppConfig) -> ToolResult:
                 "mark=true stamps refresh_due/refresh_stale (write)."
             ),
         },
+        {
+            "name": "refresh_apply",
+            "kind": "write",
+            "description": (
+                "Body-only auto-refresh write: snapshot + server-managed "
+                "refresh_* fields. Only valid for pinned auto contracts."
+            ),
+        },
         # Destructive (2-phase HMAC confirm)
         {
             "name": "delete_note",
