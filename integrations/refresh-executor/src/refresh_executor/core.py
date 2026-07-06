@@ -72,8 +72,15 @@ def run_cycle(
     web_search: WebSearch | None = None,
     today: date | None = None,
     dry_run: bool = False,
+    only_task: str | None = None,
 ) -> CycleReport:
     """Scan `vault_root` for stale, executable `auto` tasks and run each one.
+
+    `only_task`, when set, restricts the cycle to the single `refresh_task`
+    id given: every other executable entry is skipped BEFORE any LLM/web
+    call — the cheapest possible filter, applied against the scan result
+    the same way the `executable` check already is, so it costs nothing and
+    never touches the guards or `_run_task` for tasks that don't match.
 
     Builds `AppConfig` via `AppConfig.from_env` (the same call the MCP
     server's own entry point makes), so it honours `OBSIDIAN_AUDIT_DIR`
@@ -106,6 +113,8 @@ def run_cycle(
 
     for entry in scan.data.get("stale", []):
         if not entry.get("executable"):
+            continue
+        if only_task is not None and str(entry["task"]) != only_task:
             continue
         result = _run_task(
             config,

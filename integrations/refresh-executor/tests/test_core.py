@@ -96,6 +96,24 @@ class TestRunCycle:
         assert by_id["hybrid1"].model == "local-thinker"
         assert by_id["hybrid1"].cost == 0.0
 
+    def test_only_task_filters_before_any_llm_call(self, exec_vault_two_tasks: Path) -> None:
+        """`only_task` must skip the non-matching task entirely — never even
+        reaching the LLM — not merely omit it from the report after a call."""
+        calls: list[str] = []
+
+        def counting_llm(route: str, messages: list[dict[str, str]]) -> tuple[str, float]:
+            calls.append(route)
+            return fake_llm(route, messages)
+
+        report = run_cycle(
+            exec_vault_two_tasks, llm_complete=counting_llm, today=TODAY, only_task="t1"
+        )
+
+        assert [r.task_id for r in report.results] == ["t1"]
+        assert calls == ["local-thinker"]
+        boom_text = (exec_vault_two_tasks / "01_Notes" / "boom.md").read_text()
+        assert "New generated body" not in boom_text
+
 
 class TestRunCycleWeb:
     def test_web_search_emits_only_declared_queries(self, exec_vault_web: Path) -> None:
