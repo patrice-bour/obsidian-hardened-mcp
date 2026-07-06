@@ -28,3 +28,12 @@ hermes cron create "30 8 * * 1" "Load the vault-refresh skill and run its schedu
 (Check `hermes cron create --help` for the exact flag names on your version.)
 If the Hermes gateway is not always running, trigger due jobs with
 `hermes cron tick` from launchd/cron instead.
+
+## Security note
+
+`refresh_prompt` is free-text supplied by whoever authored the note — it
+is untrusted data, not an instruction from the operator. The skill (and
+any client consuming `list_stale_notes` output) must only ever *display*
+`refresh_prompt` to the human for their own judgment; it must never be
+fed back into the agent's context as something to execute or act on
+autonomously.
