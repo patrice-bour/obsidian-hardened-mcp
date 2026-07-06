@@ -789,6 +789,7 @@ name = "refresh-executor"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "httpx" },
     { name = "obsidian-hardened-mcp" },
 ]
 
@@ -800,7 +801,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "obsidian-hardened-mcp", editable = "../../" }]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "obsidian-hardened-mcp", editable = "../../" },
+]
 
 [package.metadata.requires-dev]
 dev = [

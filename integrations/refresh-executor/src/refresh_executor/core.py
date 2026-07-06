@@ -112,6 +112,8 @@ def run_cycle(
             tasks=tasks,
             min_body_ratio=settings.min_body_ratio,
             local_routes=settings.local_routes,
+            max_usd_per_cycle=settings.max_usd_per_cycle,
+            total_cost_so_far=total_cost,
             llm_complete=llm_complete,
             today=today,
             dry_run=dry_run,
@@ -132,6 +134,8 @@ def _run_task(
     tasks: dict[str, RefreshTask],
     min_body_ratio: float,
     local_routes: tuple[str, ...],
+    max_usd_per_cycle: float,
+    total_cost_so_far: float,
     llm_complete: LlmComplete,
     today: date | None,
     dry_run: bool,
@@ -140,9 +144,20 @@ def _run_task(
     """Execute one task end to end, isolating any failure into an anomaly.
 
     Route selection: `task.model or (local_routes[0] if local_routes else
-    "local-thinker")`. Any exception raised while reading the note,
-    calling the LLM, or applying the result is caught here so one bad task
-    never aborts the rest of the cycle.
+    "local-thinker")`. Two guards run before any LLM call:
+
+    - **Route guard**: a route outside `local_routes` (falling back to
+      just `"local-thinker"` when `local_routes` is unset) is refused
+      unless the task carries the `"cloud"` tool — anomaly
+      `cloud route not allowed`.
+    - **Cost cap**: once the cycle's running cost so far exceeds
+      `max_usd_per_cycle`, further `"cloud"`-tooled tasks are stopped —
+      anomaly `cost cap reached`. Vault-only tasks (no `"cloud"` tool)
+      are never subject to the cap and keep running.
+
+    Any exception raised while reading the note, calling the LLM, or
+    applying the result is caught here so one bad task never aborts the
+    rest of the cycle.
     """
     task = tasks.get(task_id)
     if task is None:
@@ -155,7 +170,29 @@ def _run_task(
             cost=0.0,
         )
 
-    route = task.model or (local_routes[0] if local_routes else _FALLBACK_ROUTE)
+    allowed_routes = local_routes if local_routes else (_FALLBACK_ROUTE,)
+    route = task.model or allowed_routes[0]
+    is_cloud_task = "cloud" in task.tools
+
+    if route not in allowed_routes and not is_cloud_task:
+        return TaskResult(
+            task_id=task_id,
+            path=path,
+            status="anomaly",
+            reason="cloud route not allowed",
+            model=route,
+            cost=0.0,
+        )
+
+    if is_cloud_task and total_cost_so_far > max_usd_per_cycle:
+        return TaskResult(
+            task_id=task_id,
+            path=path,
+            status="anomaly",
+            reason="cost cap reached",
+            model=route,
+            cost=0.0,
+        )
 
     try:
         current_body = _read_current_body(config, path)

@@ -72,6 +72,66 @@ def exec_vault(tmp_vault: Path) -> Path:
 
 
 @pytest.fixture
+def exec_vault_cloud_denied(tmp_vault: Path) -> Path:
+    """A vault with one `auto` task pinned to a cloud model but WITHOUT the
+    `cloud` tool — the route guard must refuse it before any LLM call."""
+    (tmp_vault / ".obsidian-hardened-mcp.yaml").write_text(
+        "refresh_tasks:\n"
+        "  t1:\n"
+        "    note: 01_Notes/auto.md\n"
+        "    prompt: Refresh this note with the latest summary.\n"
+        "    model: cloud-x\n"
+    )
+    (tmp_vault / "01_Notes" / "auto.md").write_text(
+        "---\n"
+        "refresh_policy: auto\n"
+        "refresh_task: t1\n"
+        "refresh_every: 1m\n"
+        "refresh_last: 2026-05-01\n"
+        "---\n" + _STALE_BODY
+    )
+    return tmp_vault
+
+
+@pytest.fixture
+def exec_vault_cost_cap(tmp_vault: Path) -> Path:
+    """A vault with two `cloud`-tooled tasks (`cloud1`, `cloud2`) and one
+    vault-only task (`vault1`), and a `max_usd_per_cycle` of 0.01 — tight
+    enough that a fake LLM costing 0.02/call trips the cap after the first
+    cloud task, while `vault1` must still run past the cap."""
+    (tmp_vault / ".obsidian-hardened-mcp.yaml").write_text(
+        "refresh_executor:\n"
+        "  max_usd_per_cycle: 0.01\n"
+        "  local_routes:\n"
+        "    - local-thinker\n"
+        "refresh_tasks:\n"
+        "  cloud1:\n"
+        "    note: 01_Notes/cloud1.md\n"
+        "    prompt: Refresh this note via the cloud model.\n"
+        "    tools: [cloud]\n"
+        "    model: cloud-x\n"
+        "  cloud2:\n"
+        "    note: 01_Notes/cloud2.md\n"
+        "    prompt: Refresh this other note via the cloud model.\n"
+        "    tools: [cloud]\n"
+        "    model: cloud-x\n"
+        "  vault1:\n"
+        "    note: 01_Notes/vault1.md\n"
+        "    prompt: Refresh this note with only vault access.\n"
+    )
+    for name, task_id in (("cloud1", "cloud1"), ("cloud2", "cloud2"), ("vault1", "vault1")):
+        (tmp_vault / "01_Notes" / f"{name}.md").write_text(
+            "---\n"
+            "refresh_policy: auto\n"
+            f"refresh_task: {task_id}\n"
+            "refresh_every: 1m\n"
+            "refresh_last: 2026-05-01\n"
+            "---\n" + _STALE_BODY
+        )
+    return tmp_vault
+
+
+@pytest.fixture
 def exec_vault_two_tasks(tmp_vault: Path) -> Path:
     """A vault with two executable tasks: `t1` (fine) and `boom-task`
     (whose prompt contains the word "boom", so a flaky `llm_complete`

@@ -5,6 +5,7 @@ description = "Vault-only refresh execution core for vault-refresh v2 — calls 
 requires-python = ">=3.11"
 dependencies = [
     "obsidian-hardened-mcp",
+    "httpx>=0.27",
 ]
 
 [tool.uv.sources]

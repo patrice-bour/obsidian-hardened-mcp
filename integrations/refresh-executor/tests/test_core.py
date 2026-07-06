@@ -42,3 +42,31 @@ class TestRunCycle:
         report = run_cycle(exec_vault_two_tasks, llm_complete=flaky, today=TODAY)
         statuses = {r.task_id: r.status for r in report.results}
         assert statuses == {"boom-task": "anomaly", "t1": "applied"}
+
+    def test_cloud_model_without_cloud_tool_is_anomaly(
+        self, exec_vault_cloud_denied: Path
+    ) -> None:
+        report = run_cycle(exec_vault_cloud_denied, llm_complete=fake_llm, today=TODAY)
+        [res] = report.results
+        assert res.status == "anomaly"
+        assert res.reason == "cloud route not allowed"
+        assert res.cost == 0.0
+
+    def test_cost_cap_stops_cloud_tasks_but_not_vault_only(
+        self, exec_vault_cost_cap: Path
+    ) -> None:
+        def costly_llm(route: str, messages: list[dict[str, str]]) -> tuple[str, float]:
+            return "# Refreshed\n\nNew generated body, long enough to pass ratio.\n", 0.02
+
+        report = run_cycle(exec_vault_cost_cap, llm_complete=costly_llm, today=TODAY)
+        by_id = {r.task_id: r for r in report.results}
+
+        cloud_statuses = sorted([by_id["cloud1"].status, by_id["cloud2"].status])
+        assert cloud_statuses == ["anomaly", "applied"]
+        cap_anomaly = next(
+            by_id[tid] for tid in ("cloud1", "cloud2") if by_id[tid].status == "anomaly"
+        )
+        assert cap_anomaly.reason == "cost cap reached"
+        assert cap_anomaly.cost == 0.0
+
+        assert by_id["vault1"].status == "applied"
