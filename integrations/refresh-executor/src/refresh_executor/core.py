@@ -85,8 +85,11 @@ def run_cycle(
     failure (e.g. an unreadable vault root) yields an empty report rather
     than raising — the executor is meant to run unattended.
 
-    `web_search` is accepted now for interface stability but not yet
-    invoked — wiring its results into a task's user message is Task 7.
+    A task that declares the `"web"` tool has its `web_queries` searched
+    via `web_search` (one call per declared query, results concatenated
+    into the user message) — see `_build_messages`. A task declaring
+    `"web"` while `web_search` is `None` (no API key configured) is an
+    anomaly (`"web unavailable"`), never a silent no-op.
     """
     config = AppConfig.from_env(vault_root)
     audit = AuditLogger(audit_dir=config.audit_dir)
@@ -115,6 +118,7 @@ def run_cycle(
             max_usd_per_cycle=settings.max_usd_per_cycle,
             total_cost_so_far=total_cost,
             llm_complete=llm_complete,
+            web_search=web_search,
             today=today,
             dry_run=dry_run,
             hooks=hooks,
@@ -137,6 +141,7 @@ def _run_task(
     max_usd_per_cycle: float,
     total_cost_so_far: float,
     llm_complete: LlmComplete,
+    web_search: WebSearch | None,
     today: date | None,
     dry_run: bool,
     hooks: HookRegistry,
@@ -144,7 +149,7 @@ def _run_task(
     """Execute one task end to end, isolating any failure into an anomaly.
 
     Route selection: `task.model or (local_routes[0] if local_routes else
-    "local-thinker")`. Two guards run before any LLM call:
+    "local-thinker")`. Three guards run before any LLM call:
 
     - **Route guard**: a route outside `local_routes` (falling back to
       just `"local-thinker"` when `local_routes` is unset) is refused
@@ -157,10 +162,13 @@ def _run_task(
       bill is worth stopping. Locally-routed tasks (including tasks
       that declare `"cloud"` but resolve to a local route) are never
       subject to the cap and keep running.
+    - **Web guard**: a task carrying the `"web"` tool with `web_search`
+      unavailable (no API key configured) is refused — anomaly
+      `web unavailable` — rather than silently skipping the search.
 
-    Any exception raised while reading the note, calling the LLM, or
-    applying the result is caught here so one bad task never aborts the
-    rest of the cycle.
+    Any exception raised while reading the note, searching the web, calling
+    the LLM, or applying the result is caught here so one bad task never
+    aborts the rest of the cycle.
     """
     task = tasks.get(task_id)
     if task is None:
@@ -197,9 +205,19 @@ def _run_task(
             cost=0.0,
         )
 
+    if "web" in task.tools and web_search is None:
+        return TaskResult(
+            task_id=task_id,
+            path=path,
+            status="anomaly",
+            reason="web unavailable",
+            model=route,
+            cost=0.0,
+        )
+
     try:
         current_body = _read_current_body(config, path)
-        messages = _build_messages(task, current_body)
+        messages = _build_messages(task, current_body, web_search=web_search)
         new_body, cost = llm_complete(route, messages)
     except Exception as exc:  # per-task isolation is the point: never abort the cycle
         return TaskResult(
@@ -247,13 +265,24 @@ def _read_current_body(config: AppConfig, path: str) -> str:
     return parse_note(content).body
 
 
-def _build_messages(task: RefreshTask, current_body: str) -> list[dict[str, str]]:
+def _build_messages(
+    task: RefreshTask, current_body: str, *, web_search: WebSearch | None
+) -> list[dict[str, str]]:
     """System message (fixed contract) + user message (whitelisted prompt,
-    current body). Web results are NOT wired in yet — `run_cycle` accepts
-    `web_search` for interface stability, but injecting its results into
-    the user message is Task 7's job (`task.tools`/`task.web_queries`
-    already carry the data this will key off of)."""
-    user_content = f"{task.prompt}\n\n---\n\n{current_body}"
+    current body, optional web-search blocks).
+
+    SECURITY INVARIANT: only the task's DECLARED `web_queries` are ever
+    searched — one `web_search` call per declared query, nothing derived
+    from note content or LLM output. By the time this runs, `_run_task`'s
+    web guard has already ensured `web_search` is not `None` whenever
+    `"web" in task.tools`; the `is not None` check here is defensive.
+    """
+    web_blocks = ""
+    if "web" in task.tools and web_search is not None:
+        blocks = [web_search(query) for query in task.web_queries]
+        if blocks:
+            web_blocks = "\n\n---\n\n" + "\n\n".join(blocks)
+    user_content = f"{task.prompt}\n\n---\n\n{current_body}{web_blocks}"
     return [
         {"role": "system", "content": _SYSTEM_MESSAGE},
         {"role": "user", "content": user_content},

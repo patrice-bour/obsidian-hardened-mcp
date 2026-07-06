@@ -182,6 +182,32 @@ def exec_vault_cap_hybrid(tmp_vault: Path) -> Path:
 
 
 @pytest.fixture
+def exec_vault_web(tmp_vault: Path) -> Path:
+    """A vault with one `auto` task declaring the `web` tool and two
+    `web_queries` — used to assert only the DECLARED queries are ever
+    searched, and that a missing `web_search` (no API key) is an anomaly."""
+    (tmp_vault / ".obsidian-hardened-mcp.yaml").write_text(
+        "refresh_tasks:\n"
+        "  web1:\n"
+        "    note: 01_Notes/auto.md\n"
+        "    prompt: Refresh this note with the latest summary.\n"
+        "    tools: [web]\n"
+        "    web_queries:\n"
+        "      - first query\n"
+        "      - second query\n"
+    )
+    (tmp_vault / "01_Notes" / "auto.md").write_text(
+        "---\n"
+        "refresh_policy: auto\n"
+        "refresh_task: web1\n"
+        "refresh_every: 1m\n"
+        "refresh_last: 2026-05-01\n"
+        "---\n" + _STALE_BODY
+    )
+    return tmp_vault
+
+
+@pytest.fixture
 def exec_vault_two_tasks(tmp_vault: Path) -> Path:
     """A vault with two executable tasks: `t1` (fine) and `boom-task`
     (whose prompt contains the word "boom", so a flaky `llm_complete`

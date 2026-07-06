@@ -95,3 +95,40 @@ class TestRunCycle:
         assert by_id["hybrid1"].status == "applied"
         assert by_id["hybrid1"].model == "local-thinker"
         assert by_id["hybrid1"].cost == 0.0
+
+
+class TestRunCycleWeb:
+    def test_web_search_emits_only_declared_queries(self, exec_vault_web: Path) -> None:
+        """Security invariant: only the task's DECLARED `web_queries` are
+        ever searched — nothing derived from note content or LLM output."""
+        recorded: list[str] = []
+
+        def fake_web_search(query: str) -> str:
+            recorded.append(query)
+            return f"[result for {query}]"
+
+        captured: dict[str, str] = {}
+
+        def capturing_llm(route: str, messages: list[dict[str, str]]) -> tuple[str, float]:
+            captured["content"] = messages[-1]["content"]
+            return fake_llm(route, messages)
+
+        report = run_cycle(
+            exec_vault_web,
+            llm_complete=capturing_llm,
+            web_search=fake_web_search,
+            today=TODAY,
+        )
+
+        assert recorded == ["first query", "second query"]
+        [res] = report.results
+        assert res.status == "applied"
+        assert "[result for first query]" in captured["content"]
+        assert "[result for second query]" in captured["content"]
+
+    def test_web_declared_without_web_search_is_anomaly(self, exec_vault_web: Path) -> None:
+        report = run_cycle(exec_vault_web, llm_complete=fake_llm, today=TODAY)
+        [res] = report.results
+        assert res.status == "anomaly"
+        assert res.reason == "web unavailable"
+        assert res.cost == 0.0
