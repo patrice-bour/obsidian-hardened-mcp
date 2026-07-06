@@ -27,6 +27,7 @@ from obsidian_hardened_mcp.security.audit_logger import AuditLogger
 from obsidian_hardened_mcp.tools.read import read_note
 from obsidian_hardened_mcp.tools.refresh import list_stale_notes, refresh_apply
 from obsidian_hardened_mcp.validation.config_loader import (
+    CONFIG_FILE_NAME,
     load_refresh_config,
     load_validation_config,
 )
@@ -98,15 +99,17 @@ def run_cycle(
     `"web"` while `web_search` is `None` (no API key configured) is an
     anomaly (`"web unavailable"`), never a silent no-op.
 
-    Scan/config anomalies (a typo'd whitelist entry, an unreadable note, a
-    task/note pinning mismatch, ...) are folded into the returned
-    `CycleReport` as `TaskResult`s with `status="anomaly"` — so they show
-    up in `_print_report`'s CLI output and in the report note, exactly like
-    a failed task. `load_refresh_config`'s own error messages are NOT
-    re-added here: `list_stale_notes` already calls `load_refresh_config`
-    itself and folds its `InvalidTaskError` messages into
-    `scan.data["anomalies"]` (under `path=CONFIG_FILE_NAME`), so doing it
-    again here would double-report the same broken whitelist entry.
+    Whitelist-relevant scan anomalies (a typo'd whitelist entry, an unknown
+    `refresh_task`, a task/note pinning mismatch) are folded into the
+    returned `CycleReport` as `TaskResult`s with `status="anomaly"` — so
+    they show up in `_print_report`'s CLI output and in the report note,
+    exactly like a failed task. Anomalies unrelated to the whitelist (e.g.
+    malformed frontmatter anywhere in the vault) are aggregated into a
+    single count line so a large legacy vault cannot flood the weekly
+    report. `load_refresh_config`'s own error messages are NOT re-added
+    here: `list_stale_notes` already folds its `InvalidTaskError` messages
+    into `scan.data["anomalies"]` (under `path=CONFIG_FILE_NAME`), so doing
+    it again here would double-report the same broken whitelist entry.
     """
     config = AppConfig.from_env(vault_root)
     audit = AuditLogger(audit_dir=config.audit_dir)
@@ -121,13 +124,35 @@ def run_cycle(
     results: list[TaskResult] = []
     total_cost = 0.0
 
+    unrelated_anomalies = 0
     for anomaly in scan.data.get("anomalies", []):
+        path = str(anomaly.get("path", ""))
+        reason = str(anomaly.get("reason", "")).splitlines()[0].strip()
+        if path != CONFIG_FILE_NAME and "refresh_task" not in reason and "task/note" not in reason:
+            # Scan-wide noise (e.g. a malformed frontmatter elsewhere in the
+            # vault) is not actionable for the whitelist: aggregate it.
+            unrelated_anomalies += 1
+            continue
         results.append(
             TaskResult(
                 task_id="<config>",
-                path=str(anomaly.get("path", "")),
+                path=path,
                 status="anomaly",
-                reason=str(anomaly.get("reason", "")),
+                reason=reason,
+                model="",
+                cost=0.0,
+            )
+        )
+    if unrelated_anomalies:
+        results.append(
+            TaskResult(
+                task_id="<scan>",
+                path="",
+                status="anomaly",
+                reason=(
+                    f"{unrelated_anomalies} unrelated scan anomalies "
+                    "(see list_stale_notes for details)"
+                ),
                 model="",
                 cost=0.0,
             )
