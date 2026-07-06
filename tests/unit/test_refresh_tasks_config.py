@@ -61,6 +61,16 @@ class TestParseRefreshTask:
         with pytest.raises(InvalidTaskError, match="prompt"):
             parse_refresh_task("t", dict(VALID, prompt="  "))
 
+    @pytest.mark.parametrize("bad_tools", [5, "vault", {"vault": True}])
+    def test_non_list_tools_rejected(self, bad_tools: object) -> None:
+        with pytest.raises(InvalidTaskError, match="tools"):
+            parse_refresh_task("t", dict(VALID, tools=bad_tools))
+
+    @pytest.mark.parametrize("bad_queries", ["hello", 42, {"q": 1}])
+    def test_non_list_web_queries_rejected(self, bad_queries: object) -> None:
+        with pytest.raises(InvalidTaskError, match="web_queries"):
+            parse_refresh_task("t", dict(VALID, web_queries=bad_queries))
+
 
 class TestLoadRefreshConfig:
     def test_missing_file_yields_empty(self, tmp_path: Path) -> None:
@@ -87,3 +97,19 @@ class TestLoadRefreshConfig:
         assert settings.local_routes == ("local-thinker",)
         assert settings.min_body_ratio == 0.3
         assert len(errors) == 1 and "broken" in errors[0] and "prompt" in errors[0]
+
+    def test_scalar_tools_entry_does_not_kill_load(self, tmp_path: Path) -> None:
+        (tmp_path / ".obsidian-hardened-mcp.yaml").write_text(
+            "refresh_tasks:\n"
+            "  good:\n"
+            "    note: 01_Notes/target.md\n"
+            "    prompt: Recount.\n"
+            "  bad:\n"
+            "    note: x.md\n"
+            "    prompt: p.\n"
+            "    tools: 5\n"
+        )
+        tasks, settings, errors = load_refresh_config(tmp_path)
+        assert set(tasks) == {"good"}
+        assert settings == ExecutorSettings()
+        assert len(errors) == 1 and "bad" in errors[0] and "tools" in errors[0]

@@ -147,13 +147,27 @@ def parse_refresh_task(task_id: str, raw: Mapping[str, Any]) -> RefreshTask:
     prompt = str(raw.get("prompt") or "").strip()
     if not prompt:
         raise InvalidTaskError(f"task {task_id!r}: prompt is required")
-    tools_raw = raw.get("tools") or ["vault"]
+    tools_raw = raw.get("tools")
+    if tools_raw is None:
+        tools_raw = ["vault"]
+    elif not isinstance(tools_raw, list):
+        raise InvalidTaskError(
+            f"task {task_id!r}: tools must be a list, got {type(tools_raw).__name__}"
+        )
     tools = frozenset(str(t) for t in tools_raw) | {"vault"}
     if not tools <= ALLOWED_TASK_TOOLS:
         raise InvalidTaskError(
             f"task {task_id!r}: tools must be a subset of {sorted(ALLOWED_TASK_TOOLS)}"
         )
-    queries = tuple(str(q) for q in (raw.get("web_queries") or ()))
+    queries_raw = raw.get("web_queries")
+    if queries_raw is None:
+        queries_raw = []
+    elif not isinstance(queries_raw, list):
+        raise InvalidTaskError(
+            f"task {task_id!r}: web_queries must be a list, "
+            f"got {type(queries_raw).__name__}"
+        )
+    queries = tuple(str(q) for q in queries_raw)
     if "web" in tools and not queries:
         raise InvalidTaskError(f"task {task_id!r}: web requires web_queries")
     model = raw.get("model")
