@@ -109,5 +109,24 @@ def _mark_note(
     due: dt.date,
     stale: bool,
 ) -> int:
-    """Stamp derived fields. Implemented in the next task; keep at 0 writes."""
-    return 0
+    """Stamp `refresh_due`/`refresh_stale` when they differ from the stored
+    values. Returns 1 when a write happened, 0 otherwise. Delegates to
+    `merge_frontmatter` so the write is atomic, round-trip-safe and audited."""
+    from obsidian_hardened_mcp.tools.frontmatter import merge_frontmatter
+
+    vp = VaultPath.from_user(rel, config.vault_root)
+    text = read_text(vp, max_size_bytes=config.max_file_size_bytes)
+    fm: dict[str, Any] = parse_note(text).frontmatter or {}
+    current_due = fm.get("refresh_due")
+    if isinstance(current_due, dt.date):
+        current_due = current_due.isoformat()
+    if str(current_due) == due.isoformat() and fm.get("refresh_stale") is stale:
+        return 0
+    result = merge_frontmatter(
+        config,
+        audit,
+        rel,
+        {"refresh_due": due.isoformat(), "refresh_stale": stale},
+        mode="shallow",
+    )
+    return 1 if result.ok else 0

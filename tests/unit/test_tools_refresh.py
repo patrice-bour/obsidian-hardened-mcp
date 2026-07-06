@@ -9,6 +9,7 @@ import pytest
 
 from obsidian_hardened_mcp.config import AppConfig
 from obsidian_hardened_mcp.domain.results import ErrorCode
+from obsidian_hardened_mcp.frontmatter import parse_note as _parse_note
 from obsidian_hardened_mcp.security.audit_logger import AuditLogger
 from obsidian_hardened_mcp.tools.refresh import list_stale_notes
 
@@ -120,3 +121,59 @@ class TestScan:
         list_stale_notes(config, audit, today=TODAY)
         after = {p: p.read_text() for p in seeded_vault.rglob("*.md")}
         assert before == after
+
+
+class TestMark:
+    def test_mark_stamps_due_and_stale(
+        self, seeded_vault: Path, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        result = list_stale_notes(config, audit, mark=True, today=TODAY)
+        assert result.ok
+        assert result.data["marked"] == 3  # les 3 notes sous contrat valides
+        fm = _parse_note(
+            (seeded_vault / "01_Notes" / "stale-flag.md").read_text()
+        ).frontmatter
+        assert str(fm["refresh_due"]) == "2026-06-01"
+        assert fm["refresh_stale"] is True
+        fm_fresh = _parse_note(
+            (seeded_vault / "01_Notes" / "fresh.md").read_text()
+        ).frontmatter
+        assert str(fm_fresh["refresh_due"]) == "2027-07-01"
+        assert fm_fresh["refresh_stale"] is False
+
+    def test_mark_preserves_other_fields_and_body(
+        self, seeded_vault: Path, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        target = seeded_vault / "01_Notes" / "stale-flag.md"
+        list_stale_notes(config, audit, mark=True, today=TODAY)
+        text = target.read_text()
+        assert 'refresh_prompt: "Re-check prices."' in text
+        assert text.rstrip().endswith("Body")
+
+    def test_mark_is_idempotent(
+        self, seeded_vault: Path, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        list_stale_notes(config, audit, mark=True, today=TODAY)
+        snapshot = {
+            p: p.read_text() for p in seeded_vault.rglob("*.md")
+        }
+        second = list_stale_notes(config, audit, mark=True, today=TODAY)
+        assert second.data["marked"] == 0  # rien à réécrire
+        assert {p: p.read_text() for p in seeded_vault.rglob("*.md")} == snapshot
+
+    def test_mark_never_touches_broken_notes(
+        self, seeded_vault: Path, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        broken = seeded_vault / "01_Notes" / "broken-contract.md"
+        before = broken.read_text()
+        list_stale_notes(config, audit, mark=True, today=TODAY)
+        assert broken.read_text() == before
+
+    def test_mark_writes_are_audited(
+        self, seeded_vault: Path, config: AppConfig, audit: AuditLogger
+    ) -> None:
+        list_stale_notes(config, audit, mark=True, today=TODAY)
+        logs = list(config.audit_dir.glob("*.jsonl"))
+        assert logs, "mark=True must leave an audit trail"
+        content = "".join(p.read_text() for p in logs)
+        assert "merge_frontmatter" in content
